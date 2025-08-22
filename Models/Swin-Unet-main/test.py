@@ -19,6 +19,9 @@ from networks.vision_transformer import SwinUnet as ViT_seg
 from utils import test_single_volume
 
 parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='swinunet', choices=['swinunet', 'missformer'], help='Model to use: swinunet or missformer')
+
 parser.add_argument('--root_path', type=str,
                     default='../data/Synapse/test_vol_h5',
                     help='root dir for validation volume data')  # for acdc volume_path=root_dir
@@ -75,6 +78,8 @@ config = get_config(args)
 
 
 def inference(args, model, test_save_path=None):
+    from datasets.dataset_udiadsbib import rgb_to_class
+    import torchvision.transforms.functional as TF
     if args.dataset.lower() == "udiads_bib":
         import matplotlib.pyplot as plt
         from matplotlib.colors import ListedColormap
@@ -105,42 +110,63 @@ def inference(args, model, test_save_path=None):
         FP = np.zeros(n_classes, dtype=np.float64)
         FN = np.zeros(n_classes, dtype=np.float64)
         IoU = np.zeros(n_classes, dtype=np.float64)
+        from PIL import Image
+        patch_size = getattr(model, 'img_size', 224) if hasattr(model, 'img_size') else 224
+        stride = patch_size  # no overlap, or set to patch_size//2 for 50% overlap
         for i_batch, sampled_batch in tqdm(enumerate(testloader)):
-            image = sampled_batch["image"]
-            label = sampled_batch["label"]
-            case_name = sampled_batch['case_name'][0]
-            image = image.cuda()
-            label = label.cuda()
-            with torch.no_grad():
-                output = model(image)
-                pred = torch.argmax(output, dim=1).cpu().numpy()[0]
-            # Save side-by-side comparison image
+            # Load original high-res image from disk
+            img_path = db_test.img_paths[i_batch]
+            orig_img_pil = Image.open(img_path).convert("RGB")
+            orig_img_np = np.array(orig_img_pil)
+            h, w = orig_img_np.shape[:2]
+            # Prepare empty prediction and count maps
+            pred_full = np.zeros((h, w), dtype=np.float32)
+            count_map = np.zeros((h, w), dtype=np.float32)
+            # Sliding window over the image
+            for y in range(0, h - patch_size + 1, stride):
+                for x in range(0, w - patch_size + 1, stride):
+                    patch = orig_img_np[y:y+patch_size, x:x+patch_size, :]
+                    patch_tensor = TF.to_tensor(Image.fromarray(patch)).unsqueeze(0).cuda()
+                    with torch.no_grad():
+                        output = model(patch_tensor)
+                        pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
+                    pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
+                    count_map[y:y+patch_size, x:x+patch_size] += 1
+            # Normalize by count_map to handle overlaps
+            pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
+            # Load ground truth mask
+            mask_path = db_test.mask_paths[i_batch]
+            gt_pil = Image.open(mask_path).convert("RGB")
+            gt_np = np.array(gt_pil)
+            gt_class = rgb_to_class(gt_np)
+            # Save side-by-side comparison image (Original, Prediction, Ground Truth)
             if test_save_path is not None:
                 compare_dir = os.path.join(test_save_path, 'compare')
                 os.makedirs(compare_dir, exist_ok=True)
-                gt = label.cpu().numpy()[0] if hasattr(label, 'cpu') else label[0]
-                fig, axs = plt.subplots(1, 2, figsize=(8, 4))
-                axs[0].imshow(pred, cmap=cmap, vmin=0, vmax=5)
-                axs[0].set_title('Prediction')
+                fig, axs = plt.subplots(1, 3, figsize=(12, 4))
+                axs[0].imshow(orig_img_np)
+                axs[0].set_title('Original')
                 axs[0].axis('off')
-                axs[1].imshow(gt, cmap=cmap, vmin=0, vmax=5)
-                axs[1].set_title('Ground Truth')
+                axs[1].imshow(pred_full, cmap=cmap, vmin=0, vmax=5)
+                axs[1].set_title('Prediction')
                 axs[1].axis('off')
+                axs[2].imshow(gt_class, cmap=cmap, vmin=0, vmax=5)
+                axs[2].set_title('Ground Truth')
+                axs[2].axis('off')
                 plt.tight_layout()
-                save_img_path = os.path.join(compare_dir, f"{case_name.replace('/', '_')}_compare.png")
+                save_img_path = os.path.join(compare_dir, f"{os.path.splitext(os.path.basename(img_path))[0]}_compare.png")
                 plt.savefig(save_img_path, bbox_inches='tight')
                 plt.close(fig)
             # Compute metrics for each class
-            gt = label.cpu().numpy()[0] if hasattr(label, 'cpu') else label[0]
             for cls in range(n_classes):
-                pred_c = (pred == cls)
-                gt_c = (gt == cls)
+                pred_c = (pred_full == cls)
+                gt_c = (gt_class == cls)
                 TP[cls] += np.logical_and(pred_c, gt_c).sum()
                 FP[cls] += np.logical_and(pred_c, np.logical_not(gt_c)).sum()
                 FN[cls] += np.logical_and(np.logical_not(pred_c), gt_c).sum()
                 union = np.logical_or(pred_c, gt_c).sum()
                 IoU[cls] += np.logical_and(pred_c, gt_c).sum() / (union + 1e-8)
-            logging.info(f"Tested {case_name}")
+            logging.info(f"Tested {os.path.splitext(os.path.basename(img_path))[0]}")
         # Calculate metrics
         precision = TP / (TP + FP + 1e-8)
         recall = TP / (TP + FN + 1e-8)
@@ -215,6 +241,25 @@ if __name__ == "__main__":
         args.is_pretrain = True
 
     net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
+
+    # Model selection logic (same as train.py)
+    def get_model(args, config):
+        model_name = args.model.lower()
+        if model_name == 'swinunet':
+            from networks.vision_transformer import SwinUnet as ViT_seg
+            net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
+            net.load_from(config)
+            return net
+        elif model_name == 'missformer':
+            from networks.MissFormer.MISSFormer import MISSFormer
+            net = MISSFormer(num_classes=args.num_classes)
+            net = net.cuda()
+            return net
+        else:
+            print(f"Unknown model: {args.model}. Supported: swinunet, missformer")
+            sys.exit(1)
+
+    net = get_model(args, config)
 
 
     # Find best model checkpoint for UDIADS_BIB

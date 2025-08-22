@@ -1,9 +1,10 @@
+
+import numpy as np
 import logging
 import os
 import sys
-from matplotlib import transforms
+from torchvision import transforms
 import torch
-import numpy as np
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.nn import CrossEntropyLoss
@@ -19,9 +20,10 @@ def worker_init_fn(worker_id):
     base_seed = getattr(worker_init_fn, 'base_seed', 1234)
     random.seed(base_seed + worker_id)
 
-def trainer_synapse(args, model, snapshot_path, train_dataset=None):
+def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=None):
     import random
     from datasets.dataset_synapse import Synapse_dataset, RandomGenerator
+
     logging.basicConfig(filename=snapshot_path + "/log.txt", level=logging.INFO,
                         format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
@@ -30,51 +32,14 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None):
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
     # max_iterations = args.max_iterations
-    if train_dataset is not None:
-        # Balanced patch sampling: ensure each batch has at least one patch with rare classes (1, 4, 5)
-        val_ratio = 0.2
-        val_size = int(len(train_dataset) * val_ratio)
-        train_size = len(train_dataset) - val_size
-        db_train, db_val = torch.utils.data.random_split(train_dataset, [train_size, val_size], generator=torch.Generator().manual_seed(args.seed))
-        # Build balanced sampler using db_train
-        rare_classes = [1, 4, 5]
-        rare_indices = []
-        common_indices = []
-        for i in range(len(db_train)):
-            label = db_train[i]['label'].numpy()
-            # For patch-based mode, rare class if any rare pixel in patch
-            if any([(label == rc).any() for rc in rare_classes]):
-                rare_indices.append(i)
-            else:
-                common_indices.append(i)
-        from torch.utils.data import Sampler
-        class BalancedBatchSampler(Sampler):
-            def __init__(self, rare_indices, common_indices, batch_size):
-                self.rare_indices = rare_indices
-                self.common_indices = common_indices
-                self.batch_size = batch_size
-                self.num_batches = int(np.ceil((len(rare_indices) + len(common_indices)) / batch_size))
-            def __iter__(self):
-                rare = self.rare_indices.copy()
-                common = self.common_indices.copy()
-                random.shuffle(rare)
-                random.shuffle(common)
-                for _ in range(self.num_batches):
-                    batch = []
-                    if rare:
-                        batch.append(rare.pop())
-                    while len(batch) < self.batch_size and common:
-                        batch.append(common.pop())
-                    while len(batch) < self.batch_size and rare:
-                        batch.append(rare.pop())
-                    yield batch
-            def __len__(self):
-                return self.num_batches
-        sampler = BalancedBatchSampler(rare_indices, common_indices, batch_size)
+    if train_dataset is not None and hasattr(args, 'val_dataset') and args.val_dataset is not None:
+        # Use provided train and val datasets (for UDiadsBib)
+        from torch.utils.data import DataLoader
+        batch_size = args.batch_size * args.n_gpu
         worker_init_fn.base_seed = args.seed
-        train_loader = DataLoader(db_train, batch_sampler=sampler, num_workers=args.num_workers,
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
                                   pin_memory=True, worker_init_fn=worker_init_fn)
-        val_loader = DataLoader(db_val, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,
+        val_loader = DataLoader(args.val_dataset, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,
                                 pin_memory=True, worker_init_fn=worker_init_fn)
         # Print class distribution for the first batch
         first_batch = next(iter(train_loader))
@@ -82,19 +47,14 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None):
         flat = labels.flatten()
         bincount = np.bincount(flat, minlength=args.num_classes)
         print("Class pixel counts in first batch:", bincount)
-    else:
-        db_train = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="train",
-                                   transform=transforms.Compose(
-                                       [RandomGenerator(output_size=[args.img_size, args.img_size])]))
-        db_val = Synapse_dataset(base_dir=args.root_path, list_dir=args.list_dir, split="val",
-                                 transform=transforms.Compose(
-                                     [RandomGenerator(output_size=[args.img_size, args.img_size])]))
-        print("The length of train set is: {}".format(len(db_train)))
-        worker_init_fn.base_seed = args.seed
-        train_loader = DataLoader(db_train, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
-                                  pin_memory=True, worker_init_fn=worker_init_fn)
-        val_loader = DataLoader(db_val, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,
-                                pin_memory=True, worker_init_fn=worker_init_fn)
+    # Only support UDiadsBib: always use provided train and val datasets
+    from torch.utils.data import DataLoader
+    batch_size = args.batch_size * args.n_gpu
+    worker_init_fn.base_seed = args.seed
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
+                              pin_memory=True, worker_init_fn=worker_init_fn)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,
+                            pin_memory=True, worker_init_fn=worker_init_fn)
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()
@@ -162,20 +122,48 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None):
         logging.info(f"Epoch {epoch+1}/{args.max_epochs} - Train Loss: {train_loss:.4f}")
         print(f"  CrossEntropyLoss: {loss_ce.item():.4f}, FocalLoss: {loss_focal.item():.4f}, DiceLoss: {loss_dice.item():.4f}")
 
-        # Validation
+        # Validation with sliding window inference
         model.eval()
         val_loss = 0.0
+        patch_size = getattr(model, 'img_size', 224) if hasattr(model, 'img_size') else 224
+        stride = patch_size  # or patch_size // 2 for overlap
+        from torchvision.transforms import functional as TF
         with torch.no_grad():
-            for batch in val_loader:
-                if isinstance(batch, dict):
-                    images = batch['image'].cuda()
-                    labels = batch['label'].cuda()
-                else:
-                    images = batch[0].cuda()
-                    labels = batch[1].cuda()
-                outputs = model(images)
-                loss_ce = ce_loss(outputs, labels)
-                loss_dice = dice_loss(outputs, labels)
+            for batch_idx, batch in enumerate(val_loader):
+                # Load original high-res image and mask from disk
+                img_path = val_dataset.img_paths[batch_idx]
+                mask_path = val_dataset.mask_paths[batch_idx]
+                from PIL import Image
+                orig_img_pil = Image.open(img_path).convert("RGB")
+                orig_img_np = np.array(orig_img_pil)
+                h, w = orig_img_np.shape[:2]
+                # Prepare empty prediction and count maps
+                pred_full = np.zeros((h, w, args.num_classes), dtype=np.float32)
+                count_map = np.zeros((h, w), dtype=np.float32)
+                # Sliding window over the image
+                for y in range(0, h - patch_size + 1, stride):
+                    for x in range(0, w - patch_size + 1, stride):
+                        patch = orig_img_np[y:y+patch_size, x:x+patch_size, :]
+                        patch_tensor = TF.to_tensor(Image.fromarray(patch)).unsqueeze(0).cuda()
+                        output = model(patch_tensor)
+                        output_np = output.squeeze(0).cpu().numpy()  # (C, H, W)
+                        output_np = np.transpose(output_np, (1, 2, 0))  # (H, W, C)
+                        pred_full[y:y+patch_size, x:x+patch_size, :] += output_np
+                        count_map[y:y+patch_size, x:x+patch_size] += 1
+                # Normalize by count_map
+                count_map = np.maximum(count_map, 1)[:, :, None]
+                pred_full = pred_full / count_map
+                pred_label = np.argmax(pred_full, axis=-1)
+                # Load ground truth mask
+                gt_pil = Image.open(mask_path).convert("RGB")
+                from datasets.dataset_udiadsbib import rgb_to_class
+                gt_np = np.array(gt_pil)
+                gt_class = rgb_to_class(gt_np)
+                # Compute loss on the full image
+                pred_tensor = torch.from_numpy(pred_full.transpose(2, 0, 1)).unsqueeze(0).float().cuda()  # (1, C, H, W)
+                gt_tensor = torch.from_numpy(gt_class).unsqueeze(0).long().cuda()  # (1, H, W)
+                loss_ce = ce_loss(pred_tensor, gt_tensor)
+                loss_dice = dice_loss(pred_tensor, gt_tensor)
                 loss = 0.5 * loss_ce + 0.5 * loss_dice
                 val_loss += loss.item()
         val_loss /= len(val_loader)

@@ -3,8 +3,7 @@ from torchvision import transforms as tvtf
 
 # Default transform for resizing images and masks to 224x224
 import random
-def default_transform(image, mask_class):
-    img_size = (224, 224)
+def default_transform(image, mask_class, img_size=(448, 448)):
     # Resize
     image = image.resize(img_size, Image.BILINEAR)
     mask_class = Image.fromarray(mask_class.astype(np.uint8)).resize(img_size, Image.NEAREST)
@@ -17,12 +16,12 @@ def default_transform(image, mask_class):
 
     # Random crop (with padding if needed)
     if random.random() > 0.5:
-        crop_size = 192  # slightly smaller than 224
+        crop_size = int(img_size[0] * 0.85)  # slightly smaller than patch size
         i = random.randint(0, img_size[1] - crop_size)
         j = random.randint(0, img_size[0] - crop_size)
         image = image.crop((j, i, j + crop_size, i + crop_size))
         mask_class = mask_class[i:i+crop_size, j:j+crop_size]
-        # Resize back to 224x224
+        # Resize back to patch size
         image = image.resize(img_size, Image.BILINEAR)
         mask_class = Image.fromarray(mask_class.astype(np.uint8)).resize(img_size, Image.NEAREST)
         mask_class = np.array(mask_class)
@@ -72,17 +71,22 @@ def rgb_to_class(mask):
 import glob
 
 class UDiadsBibDataset(Dataset):
-    def __init__(self, root_dir, split, transform=None, patch_size=512, stride=256):
+    def __init__(self, root_dir, split, transform=None, patch_size=448, stride=224):
         if transform is None:
-            self.transform = default_transform
+            if split == 'training':
+                # Use high-res patch size for training
+                self.transform = lambda img, mask: default_transform(img, mask, img_size=(patch_size, patch_size))
+            else:
+                # For val/test, do not resize or augment, just return as is (for sliding window inference)
+                self.transform = lambda img, mask: (img, mask)
         else:
             self.transform = transform
         self.root_dir = root_dir
         self.split = split
         # Use patch-based mode for training, full-image for val/test
         if split == 'training':
-            self.patch_size = 512
-            self.stride = 256
+            self.patch_size = patch_size
+            self.stride = stride
         else:
             self.patch_size = None
             self.stride = None

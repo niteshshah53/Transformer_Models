@@ -13,11 +13,30 @@ from trainer import trainer_synapse
 from config import get_config
 from datasets.dataset_udiadsbib import UDiadsBibDataset
 
+# Model selection logic
+import sys
+def get_model(args, config):
+    model_name = args.model.lower()
+    if model_name == 'swinunet':
+        from networks.vision_transformer import SwinUnet as ViT_seg
+        net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
+        net.load_from(config)
+        return net
+    elif model_name == 'missformer':
+        from networks.MissFormer.MISSFormer import MISSFormer
+        net = MISSFormer(num_classes=args.num_classes)
+        net = net.cuda()
+        return net
+    else:
+        print(f"Unknown model: {args.model}. Supported: swinunet, missformer")
+        sys.exit(1)
+
 parser = argparse.ArgumentParser()
+parser.add_argument('--model', type=str, default='swinunet', choices=['swinunet', 'missformer'], help='Model to use: swinunet or missformer')
 parser.add_argument('--root_path', type=str,
                     default='../data/Synapse/train_npz', help='root dir for data')
 parser.add_argument('--dataset', type=str,
-                    default='Synapse', help='experiment_name (Synapse or UDIADS_BIB)')
+                    default='UDIADS_BIB', help='experiment_name (UDIADS_BIB only)')
 parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-MS', help='Root dir for U-DIADS-Bib dataset')
 parser.add_argument('--udiadsbib_split', type=str, default='training', help='Split for U-DIADS-Bib (training/validation/test)')
 parser.add_argument('--list_dir', type=str,
@@ -75,13 +94,51 @@ if args.dataset.lower() == "udiads_bib":
     args.num_classes = 6
     train_dataset = UDiadsBibDataset(
         root_dir=args.udiadsbib_root,
-        split=args.udiadsbib_split,
+        split="training",
         patch_size=args.patch_size,
         stride=args.patch_stride
     )
-else:
-    if args.dataset == "Synapse":
-        args.root_path = os.path.join(args.root_path, "train_npz")
+    val_dataset = UDiadsBibDataset(
+        root_dir=args.udiadsbib_root,
+        split="validation",
+        patch_size=None,
+        stride=None
+    )
+
+# Only support UDIADS_BIB
+args.num_classes = 6
+train_dataset = UDiadsBibDataset(
+    root_dir=args.udiadsbib_root,
+    split="training",
+    patch_size=args.patch_size,
+    stride=args.patch_stride
+)
+val_dataset = UDiadsBibDataset(
+    root_dir=args.udiadsbib_root,
+    split="validation",
+    patch_size=None,
+    stride=None
+)
+config = get_config(args)
+
+if __name__ == "__main__":
+    if not args.deterministic:
+        cudnn.benchmark = True
+        cudnn.deterministic = False
+    else:
+        cudnn.benchmark = False
+        cudnn.deterministic = True
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+
+    if not os.path.exists(args.output_dir):
+        os.makedirs(args.output_dir)
+
+    net = get_model(args, config)
+    trainer_synapse(args, net, args.output_dir, train_dataset=train_dataset, val_dataset=val_dataset)
 
 config = get_config(args)
 
@@ -118,12 +175,11 @@ if __name__ == "__main__":
     if not os.path.exists(args.output_dir):
         os.makedirs(args.output_dir)
 
-    net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
-    net.load_from(config)
+    net = get_model(args, config)
 
     if args.dataset.lower() == "udiads_bib":
-        # You may want to implement a new trainer for UDiadsBib, or adapt trainer_synapse
-        trainer_synapse(args, net, args.output_dir, train_dataset=train_dataset)
+        # Pass both train and val datasets
+        trainer_synapse(args, net, args.output_dir, train_dataset=train_dataset, val_dataset=val_dataset)
     else:
         trainer_synapse(args, net, args.output_dir)
 

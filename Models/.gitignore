@@ -42,3 +42,6 @@ test_log/
 
 # Ignore SLURM output
 slurm-*.out
+
+# Others
+command.txt
