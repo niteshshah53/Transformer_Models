@@ -39,6 +39,7 @@ parser.add_argument('--dataset', type=str,
                     default='UDIADS_BIB', help='experiment_name (UDIADS_BIB only)')
 parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-MS', help='Root dir for U-DIADS-Bib dataset')
 parser.add_argument('--udiadsbib_split', type=str, default='training', help='Split for U-DIADS-Bib (training/validation/test)')
+parser.add_argument('--use_patched_data', action='store_true', help='Use pre-generated patches instead of full images')
 parser.add_argument('--list_dir', type=str,
                     default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
@@ -96,29 +97,20 @@ if args.dataset.lower() == "udiads_bib":
         root_dir=args.udiadsbib_root,
         split="training",
         patch_size=args.patch_size,
-        stride=args.patch_stride
+        stride=args.patch_stride,
+        use_patched_data=args.use_patched_data
     )
     val_dataset = UDiadsBibDataset(
         root_dir=args.udiadsbib_root,
         split="validation",
         patch_size=None,
-        stride=None
+        stride=None,
+        use_patched_data=args.use_patched_data
     )
+else:
+    print(f"Error: Unsupported dataset {args.dataset}")
+    sys.exit(1)
 
-# Only support UDIADS_BIB
-args.num_classes = 6
-train_dataset = UDiadsBibDataset(
-    root_dir=args.udiadsbib_root,
-    split="training",
-    patch_size=args.patch_size,
-    stride=args.patch_stride
-)
-val_dataset = UDiadsBibDataset(
-    root_dir=args.udiadsbib_root,
-    split="validation",
-    patch_size=None,
-    stride=None
-)
 config = get_config(args)
 
 if __name__ == "__main__":
@@ -139,10 +131,8 @@ if __name__ == "__main__":
 
     net = get_model(args, config)
     trainer_synapse(args, net, args.output_dir, train_dataset=train_dataset, val_dataset=val_dataset)
-
-config = get_config(args)
-
-if __name__ == "__main__":
+    print("TRAINING COMPLETED")
+    sys.exit(0)
     if not args.deterministic:
         cudnn.benchmark = True
         cudnn.deterministic = False

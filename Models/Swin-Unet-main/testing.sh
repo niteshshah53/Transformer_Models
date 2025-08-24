@@ -1,14 +1,12 @@
 #!/bin/bash -l
-#SBATCH --job-name=das_train_test
+#SBATCH --job-name=das_test
 #SBATCH --output=logs/test_%j.out
 #SBATCH --error=logs/test_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=12:00:00
+#SBATCH --time=24:00:00
 #SBATCH --gres=gpu:1
-#SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=kshahnitesh@gmail.com
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -24,15 +22,16 @@ mkdir -p logs
 
 conda activate pytorch2.6-py3.12
 
-# --- Run testing with SwinUnet ---
+# --- Run testing with SwinUnet for Latin2 ---
 python3 test.py \
     --model swinunet \
     --dataset UDIADS_BIB \
-    --udiadsbib_root "U-DIADS-Bib-MS" \
+    --udiadsbib_root "U-DIADS-Bib-MS_patched" \
     --udiadsbib_split test \
-    --img_size 2016 \
+    --manuscript "Latin2" \
+    --img_size 224 \
     --cfg configs/swin_tiny_patch4_window7_224_lite.yaml \
     --num_classes 6 \
-    --output_dir ./model_out/udiadsbib_patch512_swinunet \
-    --is_savenii
-
+    --output_dir "./model_out/udiadsbib_patch224_swinunet_Latin2" \
+    --is_savenii \
+    --use_patched_data 

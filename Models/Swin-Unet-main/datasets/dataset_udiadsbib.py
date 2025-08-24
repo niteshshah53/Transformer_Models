@@ -71,7 +71,14 @@ def rgb_to_class(mask):
 import glob
 
 class UDiadsBibDataset(Dataset):
-    def __init__(self, root_dir, split, transform=None, patch_size=448, stride=224):
+    def __init__(self, root_dir, split, transform=None, patch_size=448, stride=224, use_patched_data=False):
+        self.use_patched_data = use_patched_data
+        self.root_dir = root_dir
+        self.split = split
+        self.patch_size = patch_size if not use_patched_data and split == 'training' else None
+        self.stride = stride if not use_patched_data and split == 'training' else None
+        
+        # Set up the transform
         if transform is None:
             if split == 'training':
                 # Use high-res patch size for training
@@ -81,21 +88,20 @@ class UDiadsBibDataset(Dataset):
                 self.transform = lambda img, mask: (img, mask)
         else:
             self.transform = transform
-        self.root_dir = root_dir
-        self.split = split
-        # Use patch-based mode for training, full-image for val/test
-        if split == 'training':
-            self.patch_size = patch_size
-            self.stride = stride
+            
+        # Get file paths based on whether we're using patched data or not
+        if use_patched_data:
+            self.img_paths, self.mask_paths = self._get_patched_file_paths()
         else:
-            self.patch_size = None
-            self.stride = None
-        self.img_paths, self.mask_paths = self._get_file_paths()
-        if self.patch_size is not None:
-            self.patches = []
-            self._prepare_patches()
+            self.img_paths, self.mask_paths = self._get_original_file_paths()
+            
+            # For original data with patch extraction, prepare patches for training
+            if not use_patched_data and self.patch_size is not None and split == 'training':
+                self.patches = []
+                self._prepare_patches()
 
-    def _get_file_paths(self):
+    def _get_original_file_paths(self):
+        """Get file paths for original (non-patched) data"""
         img_paths = []
         mask_paths = []
         img_dirs = glob.glob(os.path.join(self.root_dir, '**', f'img-*', self.split), recursive=True)
@@ -104,13 +110,58 @@ class UDiadsBibDataset(Dataset):
             mask_dir = os.path.join(os.path.dirname(img_dir).replace('img-', 'pixel-level-gt-'), self.split)
             if not os.path.isdir(mask_dir):
                 continue
-            for img_name in sorted([f for f in os.listdir(img_dir) if f.endswith('.jpg')]):
-                mask_name = img_name.replace('.jpg', '.png')
+            for img_name in sorted([f for f in os.listdir(img_dir) if f.endswith('.jpg') or f.endswith('.png')]):
+                mask_name = img_name.replace('.jpg', '.png').replace('.JPG', '.png')
                 img_path = os.path.join(img_dir, img_name)
                 mask_path = os.path.join(mask_dir, mask_name)
                 if os.path.exists(img_path) and os.path.exists(mask_path):
                     img_paths.append(img_path)
                     mask_paths.append(mask_path)
+        return img_paths, mask_paths
+        
+    def _get_patched_file_paths(self):
+        """Get file paths for pre-generated patches"""
+        img_paths = []
+        mask_paths = []
+        
+        # Pattern for patched dataset structure
+        # U-DIADS-Bib-MS_patched/{manuscript}/Image/{split}/image_name_{patch_id}.png
+        # U-DIADS-Bib-MS_patched/{manuscript}/mask/{split}_labels/image_name_{patch_id}_zones_NA.png
+        
+        # We'll just use the manuscript specified in the root_dir
+        manuscript = os.path.basename(self.root_dir)
+        base_dir = os.path.dirname(self.root_dir)
+        
+        img_dir = f'{base_dir}/{manuscript}/Image/{self.split}'
+        mask_dir = f'{base_dir}/{manuscript}/mask/{self.split}_labels'
+        
+        print(f"Looking for images in: {img_dir}")
+        print(f"Looking for masks in: {mask_dir}")
+        
+        if not os.path.exists(img_dir) or not os.path.exists(mask_dir):
+            print(f"Warning: One of the directories does not exist!")
+            return [], []
+            
+        # Get all patch images
+        patch_imgs = sorted(glob.glob(os.path.join(img_dir, '*.png')))
+        print(f"Found {len(patch_imgs)} patch images")
+        
+        for img_path in patch_imgs:
+            # Extract the base name (without extension)
+            img_basename = os.path.basename(img_path)
+            img_basename_no_ext = os.path.splitext(img_basename)[0]
+            
+            # Construct the mask filename directly
+            mask_basename = f"{img_basename_no_ext}_zones_NA.png"
+            mask_path = os.path.join(mask_dir, mask_basename)
+            
+            if os.path.exists(mask_path):
+                img_paths.append(img_path)
+                mask_paths.append(mask_path)
+        
+        print(f"Successfully matched {len(img_paths)} image-mask pairs")
+        return img_paths, mask_paths
+            
         return img_paths, mask_paths
 
     def _prepare_patches(self):
@@ -123,14 +174,14 @@ class UDiadsBibDataset(Dataset):
                     self.patches.append((idx, x, y))
 
     def __len__(self):
-        if self.patch_size is not None:
+        if not self.use_patched_data and self.patch_size is not None and self.split == 'training':
             return len(self.patches)
         else:
             return len(self.img_paths)
 
     def __getitem__(self, idx):
-        if self.patch_size is not None:
-            # Patch-based mode
+        if not self.use_patched_data and self.patch_size is not None and self.split == 'training':
+            # Patch-based mode for original data
             img_idx, x, y = self.patches[idx]
             img_path = self.img_paths[img_idx]
             mask_path = self.mask_paths[img_idx]
@@ -144,6 +195,20 @@ class UDiadsBibDataset(Dataset):
             image_patch = TF.to_tensor(image_patch)
             case_name = f"{os.path.splitext(os.path.basename(img_path))[0]}_x{x}_y{y}"
             return {"image": image_patch, "label": torch.from_numpy(mask_class).long(), "case_name": case_name}
+        elif self.use_patched_data:
+            # Pre-generated patches mode
+            img_path = self.img_paths[idx]
+            mask_path = self.mask_paths[idx]
+            image = Image.open(img_path).convert("RGB")
+            mask = Image.open(mask_path).convert("RGB")
+            mask_class = rgb_to_class(np.array(mask))
+            # For pre-generated patches, apply transforms but don't resize (they're already patch-sized)
+            image, mask_class = self.transform(image, mask_class)
+            image = TF.to_tensor(image)
+            # Just use the filename (without extension) as the case name
+            filename = os.path.basename(img_path)
+            case_name = os.path.splitext(filename)[0]
+            return {"image": image, "label": torch.from_numpy(mask_class).long(), "case_name": case_name}
         else:
             # Whole-image mode (for inference)
             img_path = self.img_paths[idx]
@@ -160,5 +225,3 @@ class UDiadsBibDataset(Dataset):
             image = TF.to_tensor(image)
             case_name = os.path.splitext(os.path.basename(img_path))[0]
             return {"image": image, "label": torch.from_numpy(mask_class).long(), "case_name": case_name}
-
-    # Removed old __len__ and __getitem__

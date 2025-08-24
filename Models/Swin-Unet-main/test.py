@@ -11,6 +11,7 @@ import torch
 import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import glob
 
 from config import get_config
 from datasets.dataset_synapse import Synapse_dataset
@@ -27,6 +28,9 @@ parser.add_argument('--root_path', type=str,
                     help='root dir for validation volume data')  # for acdc volume_path=root_dir
 parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-MS', help='Root dir for U-DIADS-Bib dataset')
 parser.add_argument('--udiadsbib_split', type=str, default='test', help='Split for U-DIADS-Bib (training/validation/test)')
+parser.add_argument('--manuscript', type=str, choices=['Latin2', 'Latin14396', 'Latin16746', 'Syr341'], required=True,
+                    help='Manuscript to test (Latin2, Latin14396, Latin16746, or Syr341)')
+parser.add_argument('--use_patched_data', action='store_true', help='Use pre-generated patches instead of full images')
 parser.add_argument('--dataset', type=str,
                     default='datasets', help='experiment_name')
 parser.add_argument('--num_classes', type=int,
@@ -95,56 +99,204 @@ def inference(args, model, test_save_path=None):
             (0, 255, 0),       # 5: Chapter Headings (lime)
         ]
         cmap = ListedColormap(class_colors)
-        db_test = UDiadsBibDataset(
-            root_dir=args.udiadsbib_root,
-            split=args.udiadsbib_split,
-            patch_size=None,
-            stride=None
-        )
-        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-        logging.info("{} test iterations per epoch".format(len(testloader)))
-        model.eval()
+        
+        # For Option 1: Use pre-generated patches
+        logging.info("Using pre-generated patches for testing")
+        
+        # Instead of loading the original dataset, we'll work with the patched data
+        patch_size = 224  # Size of patches from Sliding_window_generate_dataset.py
+        
         # Initialize metric accumulators
         n_classes = 6
         TP = np.zeros(n_classes, dtype=np.float64)
         FP = np.zeros(n_classes, dtype=np.float64)
         FN = np.zeros(n_classes, dtype=np.float64)
         IoU = np.zeros(n_classes, dtype=np.float64)
-        from PIL import Image
-        patch_size = getattr(model, 'img_size', 224) if hasattr(model, 'img_size') else 224
-        stride = patch_size  # no overlap, or set to patch_size//2 for 50% overlap
-        for i_batch, sampled_batch in tqdm(enumerate(testloader)):
-            # Load original high-res image from disk
-            img_path = db_test.img_paths[i_batch]
-            orig_img_pil = Image.open(img_path).convert("RGB")
-            orig_img_np = np.array(orig_img_pil)
-            h, w = orig_img_np.shape[:2]
-            # Prepare empty prediction and count maps
-            pred_full = np.zeros((h, w), dtype=np.float32)
-            count_map = np.zeros((h, w), dtype=np.float32)
-            # Sliding window over the image
-            for y in range(0, h - patch_size + 1, stride):
-                for x in range(0, w - patch_size + 1, stride):
-                    patch = orig_img_np[y:y+patch_size, x:x+patch_size, :]
-                    patch_tensor = TF.to_tensor(Image.fromarray(patch)).unsqueeze(0).cuda()
-                    with torch.no_grad():
-                        output = model(patch_tensor)
-                        pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
+        
+        # Prepare result directory for PNGs
+        result_dir = os.path.join(test_save_path, "result") if test_save_path is not None else None
+        if result_dir is not None:
+            os.makedirs(result_dir, exist_ok=True)
+            
+        # Dictionary to group patches by original image
+        patch_groups = {}  # key: original_image_name, value: list of patch paths
+        patch_positions = {}  # key: patch_path, value: (x, y) position in original image
+        # Find all patch images for test set
+        manuscript_name = args.manuscript
+        patch_dir = f'{args.udiadsbib_root}/{manuscript_name}/Image/test'
+        mask_dir = f'{args.udiadsbib_root}/{manuscript_name}/mask/test_labels'
+        
+        if not os.path.exists(patch_dir) or not os.path.exists(mask_dir):
+            logging.info(f"Skipping {manuscript_name} - patch directories not found")
+            return
+            
+        patch_files = sorted(glob.glob(os.path.join(patch_dir, '*.png')))
+        mask_files = sorted(glob.glob(os.path.join(mask_dir, '*.png')))
+        
+        if len(patch_files) == 0:
+            logging.info(f"No patches found for {manuscript_name}")
+            return
+            
+        logging.info(f"Found {len(patch_files)} patches for {manuscript_name}")
+        
+        # Group patches by original image
+        for patch_path in patch_files:
+            # Extract original image name and patch position
+            filename = os.path.basename(patch_path)
+            # Expected format: original_name_XXXXXX.png
+            parts = filename.split('_')
+            if len(parts) >= 2:
+                original_name = '_'.join(parts[:-1])  # Everything before the last underscore
+                patch_id = int(parts[-1].split('.')[0])  # The number after the last underscore
+                
+                # Group by original image
+                if original_name not in patch_groups:
+                    patch_groups[original_name] = []
+                patch_groups[original_name].append(patch_path)
+                
+                # Store patch ID for position calculation later
+                patch_positions[patch_path] = patch_id
+        
+        # Now process each original image by stitching its patches
+        for original_name, patches in patch_groups.items():
+            logging.info(f"Processing original image: {original_name} with {len(patches)} patches")
+            
+            # First, find the original image dimensions to accurately calculate patch positions
+            orig_width = 0
+            orig_height = 0
+            
+            # Try to find the original image to get its dimensions
+            manuscript_name = args.manuscript
+            # Look for .jpg in the original directory (not patched)
+            orig_path_jpg = f'U-DIADS-Bib-MS/{manuscript_name}/img-{manuscript_name}/test/{original_name}.jpg'
+            if os.path.exists(orig_path_jpg):
+                with Image.open(orig_path_jpg) as img:
+                    orig_width, orig_height = img.size
+            
+            if orig_width == 0 or orig_height == 0:
+                logging.warning(f"Could not find original image for {original_name}, estimating dimensions from patches")
+                # Estimate dimensions from patch positions
+                for patch_path in patches:
+                    patch_id = patch_positions[patch_path]
+                    # We need to determine the number of patches per row in the original extraction
+                    # This requires knowing the original image width
+                    # As a fallback, estimate based on max patch_id
+                    patches_per_row = 10  # Default fallback
+                    
+                max_patch_id = max([patch_positions[p] for p in patches])
+                max_x = ((max_patch_id % patches_per_row) + 1) * patch_size
+                max_y = ((max_patch_id // patches_per_row) + 1) * patch_size
+            else:
+                # Calculate patches per row based on original width
+                patches_per_row = orig_width // patch_size
+                if patches_per_row == 0:
+                    patches_per_row = 1
+                # Use original dimensions but ensure they're multiples of patch_size
+                max_x = ((orig_width // patch_size) + (1 if orig_width % patch_size else 0)) * patch_size
+                max_y = ((orig_height // patch_size) + (1 if orig_height % patch_size else 0)) * patch_size
+            
+            logging.info(f"Original image dimensions (estimated): {max_x}x{max_y}")
+            
+            # Create empty prediction map - using int32 to allow for accumulation
+            pred_full = np.zeros((max_y, max_x), dtype=np.int32)
+            count_map = np.zeros((max_y, max_x), dtype=np.int32)
+            
+            # Process each patch
+            for patch_path in patches:
+                patch_id = patch_positions[patch_path]
+                
+                # Calculate position using the same logic as in Sliding_window_generate_dataset.py
+                # In the extraction script, patches are created in row-major order (across then down)
+                x = (patch_id % patches_per_row) * patch_size
+                y = (patch_id // patches_per_row) * patch_size
+                
+                # Load patch
+                patch = Image.open(patch_path).convert("RGB")
+                patch_tensor = TF.to_tensor(patch).unsqueeze(0).cuda()
+                
+                # Get prediction
+                with torch.no_grad():
+                    output = model(patch_tensor)
+                    pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
+                
+                # Add to prediction map (check boundaries to avoid index errors)
+                if y+patch_size <= pred_full.shape[0] and x+patch_size <= pred_full.shape[1]:
                     pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
                     count_map[y:y+patch_size, x:x+patch_size] += 1
-            # Normalize by count_map to handle overlaps
+                else:
+                    # Handle edge cases (partial patches at image boundaries)
+                    valid_h = min(patch_size, pred_full.shape[0]-y)
+                    valid_w = min(patch_size, pred_full.shape[1]-x)
+                    if valid_h > 0 and valid_w > 0:
+                        pred_full[y:y+valid_h, x:x+valid_w] += pred_patch[:valid_h, :valid_w]
+                        count_map[y:y+valid_h, x:x+valid_w] += 1
+            # Normalize by count map
             pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
-            # Load ground truth mask
-            mask_path = db_test.mask_paths[i_batch]
-            gt_pil = Image.open(mask_path).convert("RGB")
-            gt_np = np.array(gt_pil)
-            gt_class = rgb_to_class(gt_np)
-            # Save side-by-side comparison image (Original, Prediction, Ground Truth)
-            if test_save_path is not None:
+            
+            # For evaluation, we need to find the corresponding ground truth
+            # We'll look for the original full mask in the original dataset
+            original_gt_found = False
+            manuscript_name = args.manuscript
+            gt_path = f'U-DIADS-Bib-MS/{manuscript_name}/pixel-level-gt-{manuscript_name}/test/{original_name}.png'
+            if os.path.exists(gt_path):
+                gt_pil = Image.open(gt_path).convert("RGB")
+                gt_np = np.array(gt_pil)
+                gt_class = rgb_to_class(gt_np)
+                original_gt_found = True
+            
+            if not original_gt_found:
+                logging.warning(f"Could not find original ground truth for {original_name}")
+                # Create a dummy ground truth (all zeros) for saving comparison images
+                gt_class = np.zeros_like(pred_full)
+            
+            # Save predicted mask as PNG in result directory
+            if result_dir is not None:
+                # Convert class indices to RGB
+                rgb_mask = np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8)
+                for idx, color in enumerate(class_colors):
+                    rgb_mask[pred_full == idx] = color
+                pred_png_path = os.path.join(result_dir, f"{original_name}.png")
+                Image.fromarray(rgb_mask).save(pred_png_path)
+            
+            # Save side-by-side comparison image for visualization
+            if test_save_path is not None and original_gt_found:
                 compare_dir = os.path.join(test_save_path, 'compare')
                 os.makedirs(compare_dir, exist_ok=True)
+                
+                # Resize gt_class if dimensions don't match (could happen due to patch positions estimation)
+                if gt_class.shape != pred_full.shape:
+                    logging.warning(f"Resizing ground truth for {original_name} from {gt_class.shape} to {pred_full.shape}")
+                    gt_class_resized = np.zeros_like(pred_full)
+                    min_h = min(gt_class.shape[0], pred_full.shape[0])
+                    min_w = min(gt_class.shape[1], pred_full.shape[1])
+                    gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
+                    gt_class = gt_class_resized
+                
+                # Create visualization
                 fig, axs = plt.subplots(1, 3, figsize=(12, 4))
-                axs[0].imshow(orig_img_np)
+                
+                # Load original image for visualization
+                orig_img_path = None
+                manuscript_name = args.manuscript
+                test_img_path_jpg = f'U-DIADS-Bib-MS/{manuscript_name}/img-{manuscript_name}/test/{original_name}.jpg'
+                if os.path.exists(test_img_path_jpg):
+                    orig_img_path = test_img_path_jpg
+                
+                if orig_img_path:
+                    orig_img = Image.open(orig_img_path).convert("RGB")
+                    orig_img_np = np.array(orig_img)
+                    # Resize if dimensions don't match
+                    if orig_img_np.shape[:2] != pred_full.shape:
+                        orig_img_np_resized = np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8)
+                        min_h = min(orig_img_np.shape[0], pred_full.shape[0])
+                        min_w = min(orig_img_np.shape[1], pred_full.shape[1])
+                        orig_img_np_resized[:min_h, :min_w] = orig_img_np[:min_h, :min_w]
+                        orig_img_np = orig_img_np_resized
+                    axs[0].imshow(orig_img_np)
+                else:
+                    # Create a blank image if original not found
+                    axs[0].imshow(np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8))
+                
                 axs[0].set_title('Original')
                 axs[0].axis('off')
                 axs[1].imshow(pred_full, cmap=cmap, vmin=0, vmax=5)
@@ -154,24 +306,37 @@ def inference(args, model, test_save_path=None):
                 axs[2].set_title('Ground Truth')
                 axs[2].axis('off')
                 plt.tight_layout()
-                save_img_path = os.path.join(compare_dir, f"{os.path.splitext(os.path.basename(img_path))[0]}_compare.png")
+                save_img_path = os.path.join(compare_dir, f"{original_name}_compare.png")
                 plt.savefig(save_img_path, bbox_inches='tight')
                 plt.close(fig)
-            # Compute metrics for each class
-            for cls in range(n_classes):
-                pred_c = (pred_full == cls)
-                gt_c = (gt_class == cls)
-                TP[cls] += np.logical_and(pred_c, gt_c).sum()
-                FP[cls] += np.logical_and(pred_c, np.logical_not(gt_c)).sum()
-                FN[cls] += np.logical_and(np.logical_not(pred_c), gt_c).sum()
-                union = np.logical_or(pred_c, gt_c).sum()
-                IoU[cls] += np.logical_and(pred_c, gt_c).sum() / (union + 1e-8)
-            logging.info(f"Tested {os.path.splitext(os.path.basename(img_path))[0]}")
+            # Compute metrics for each class if ground truth is available
+            if original_gt_found:
+                for cls in range(n_classes):
+                    pred_c = (pred_full == cls)
+                    gt_c = (gt_class == cls)
+                    TP[cls] += np.logical_and(pred_c, gt_c).sum()
+                    FP[cls] += np.logical_and(pred_c, np.logical_not(gt_c)).sum()
+                    FN[cls] += np.logical_and(np.logical_not(pred_c), gt_c).sum()
+                    union = np.logical_or(pred_c, gt_c).sum()
+                    IoU[cls] += np.logical_and(pred_c, gt_c).sum() / (union + 1e-8)
+            
+            logging.info(f"Processed {original_name}")
+        
         # Calculate metrics
-        precision = TP / (TP + FP + 1e-8)
-        recall = TP / (TP + FN + 1e-8)
-        f1 = 2 * precision * recall / (precision + recall + 1e-8)
-        mean_iou = IoU / len(testloader)
+        manuscript_name = args.manuscript
+        num_processed_images = sum(1 for img in patch_groups 
+                                if os.path.exists(f'U-DIADS-Bib-MS/{manuscript_name}/pixel-level-gt-{manuscript_name}/test/{img}.png'))
+        
+        if num_processed_images > 0:
+            precision = TP / (TP + FP + 1e-8)
+            recall = TP / (TP + FN + 1e-8)
+            f1 = 2 * precision * recall / (precision + recall + 1e-8)
+            mean_iou = IoU / num_processed_images
+        else:
+            precision = np.zeros(n_classes)
+            recall = np.zeros(n_classes) 
+            f1 = np.zeros(n_classes)
+            mean_iou = np.zeros(n_classes)
         class_names = ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title', 'Chapter Headings']
         logging.info("\nPer-class metrics:")
         for cls in range(n_classes):

@@ -31,25 +31,8 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     base_lr = args.base_lr
     num_classes = args.num_classes
     batch_size = args.batch_size * args.n_gpu
-    # max_iterations = args.max_iterations
-    if train_dataset is not None and hasattr(args, 'val_dataset') and args.val_dataset is not None:
-        # Use provided train and val datasets (for UDiadsBib)
-        from torch.utils.data import DataLoader
-        batch_size = args.batch_size * args.n_gpu
-        worker_init_fn.base_seed = args.seed
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
-                                  pin_memory=True, worker_init_fn=worker_init_fn)
-        val_loader = DataLoader(args.val_dataset, batch_size=batch_size, shuffle=False, num_workers=args.num_workers,
-                                pin_memory=True, worker_init_fn=worker_init_fn)
-        # Print class distribution for the first batch
-        first_batch = next(iter(train_loader))
-        labels = first_batch['label'].cpu().numpy()
-        flat = labels.flatten()
-        bincount = np.bincount(flat, minlength=args.num_classes)
-        print("Class pixel counts in first batch:", bincount)
-    # Only support UDiadsBib: always use provided train and val datasets
-    from torch.utils.data import DataLoader
-    batch_size = args.batch_size * args.n_gpu
+    
+    # Set up data loaders
     worker_init_fn.base_seed = args.seed
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=args.num_workers,
                               pin_memory=True, worker_init_fn=worker_init_fn)
@@ -58,6 +41,19 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     if args.n_gpu > 1:
         model = nn.DataParallel(model)
     model.train()
+
+    # Print training information header
+    print("\n" + "="*80)
+    print(f"TRAINING CONFIGURATION")
+    print("-"*80)
+    print(f"• Dataset: {args.dataset}")
+    print(f"• Model: {args.model}")
+    print(f"• Batch Size: {batch_size}")
+    print(f"• Max Epochs: {args.max_epochs}")
+    print(f"• Learning Rate: {base_lr}")
+    print(f"• Number of Classes: {num_classes}")
+    print(f"• Output Directory: {snapshot_path}")
+    print("="*80 + "\n")
 
     # Compute class weights for UDiadsBibDataset
     if hasattr(train_dataset, 'img_paths') and hasattr(train_dataset, 'mask_paths') and args.dataset.lower() == 'udiads_bib':
@@ -83,8 +79,17 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
         class_freq = class_counts / class_counts.sum()
         weights = 1.0 / (class_freq + 1e-6)
         weights = weights / weights.sum()  # Normalize
-        print('Class frequencies:', class_freq)
-        print('Class weights:', weights)
+        
+        # Print class frequencies and weights in a table format
+        print("\n" + "-"*80)
+        print("CLASS DISTRIBUTION ANALYSIS")
+        print("-"*80)
+        print(f"{'Class':<6} {'Frequency':<15} {'Weight':<15}")
+        print("-"*80)
+        for cls in range(args.num_classes):
+            print(f"{cls:<6} {class_freq[cls]:<15.6f} {weights[cls]:<15.6f}")
+        print("-"*80 + "\n")
+            
         ce_loss = CrossEntropyLoss(weight=torch.tensor(weights, dtype=torch.float32).cuda())
     else:
         ce_loss = CrossEntropyLoss()
@@ -119,9 +124,16 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             train_loss += loss.item()
         train_loss /= len(train_loader)
         writer.add_scalar('train/loss', train_loss, epoch)
-        logging.info(f"Epoch {epoch+1}/{args.max_epochs} - Train Loss: {train_loss:.4f}")
-        print(f"  CrossEntropyLoss: {loss_ce.item():.4f}, FocalLoss: {loss_focal.item():.4f}, DiceLoss: {loss_dice.item():.4f}")
-
+        
+        # Print epoch summary with consistent formatting
+        print("\n" + "="*80)
+        print(f"EPOCH {epoch+1}/{args.max_epochs}")
+        print("-"*80)
+        print(f"Train Loss: {train_loss:.4f}")
+        print(f"  • CE Loss: {loss_ce.item():.4f}")
+        print(f"  • Focal Loss: {loss_focal.item():.4f}")
+        print(f"  • Dice Loss: {loss_dice.item():.4f}")
+        
         # Validation with sliding window inference
         model.eval()
         val_loss = 0.0
@@ -168,20 +180,30 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                 val_loss += loss.item()
         val_loss /= len(val_loader)
         writer.add_scalar('val/loss', val_loss, epoch)
-        logging.info(f"Epoch {epoch+1}/{args.max_epochs} - Val Loss: {val_loss:.4f}")
+        print(f"Validation Loss: {val_loss:.4f}")
 
         # Save best model
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             save_path = os.path.join(snapshot_path, f"best_model_epoch{epoch+1}.pth")
             torch.save(model.state_dict(), save_path)
-            logging.info(f"Best model saved at epoch {epoch+1} with val loss {val_loss:.4f}")
+            print(f"✓ Best model saved at epoch {epoch+1} with val loss {val_loss:.4f}")
+            print("-"*80)
+        else:
+            print("-"*80)
 
         # Step the learning rate scheduler
         scheduler.step()
         writer.add_scalar('train/lr', optimizer.param_groups[0]['lr'], epoch)
 
+    # Print training summary
+    print("\n" + "="*80)
+    print("TRAINING COMPLETED")
+    print("-"*80)
+    print(f"• Best Validation Loss: {best_val_loss:.4f}")
+    print(f"• Model Saved To: {snapshot_path}")
+    print("="*80 + "\n")
+    
     writer.close()
-    logging.info("Training completed.")
 
 
