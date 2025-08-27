@@ -28,10 +28,11 @@ python3 test.py \
     --dataset UDIADS_BIB \
     --udiadsbib_root "U-DIADS-Bib-MS_patched" \
     --udiadsbib_split test \
-    --manuscript "Latin2" \
+    --manuscript "Latin14396" \
     --img_size 224 \
     --cfg configs/swin_tiny_patch4_window7_224_lite.yaml \
     --num_classes 6 \
-    --output_dir "./model_out/udiadsbib_patch224_swinunet_Latin2" \
+    --output_dir "./model_out/udiadsbib_patch224_swinunet_Latin14396" \
     --is_savenii \
+    --use_postprocessing \
     --use_patched_data 

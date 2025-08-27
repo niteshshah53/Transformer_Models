@@ -114,9 +114,11 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                 labels = batch[1].cuda()
             outputs = model(images)
             loss_ce = ce_loss(outputs, labels)
-            loss_dice = dice_loss(outputs, labels)
-            # Baseline A: Weighted sum (CE + Dice)
-            loss = 0.5 * loss_ce + 0.5 * loss_dice
+            loss_focal = focal_loss(outputs, labels)
+            # Compute Dice on probabilities for stable behaviour
+            loss_dice = dice_loss(outputs, labels, softmax=True)
+            # Main loss: Weighted sum (CE, Focal, Dice) - more weight to Focal/Dice
+            loss = 0.05 * loss_ce + 0.475 * loss_focal + 0.475 * loss_dice
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -174,7 +176,8 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                 pred_tensor = torch.from_numpy(pred_full.transpose(2, 0, 1)).unsqueeze(0).float().cuda()  # (1, C, H, W)
                 gt_tensor = torch.from_numpy(gt_class).unsqueeze(0).long().cuda()  # (1, H, W)
                 loss_ce = ce_loss(pred_tensor, gt_tensor)
-                loss_dice = dice_loss(pred_tensor, gt_tensor)
+                # pred_tensor contains logits averaged over patches; compute Dice on probabilities
+                loss_dice = dice_loss(pred_tensor, gt_tensor, softmax=True)
                 loss = 0.5 * loss_ce + 0.5 * loss_dice
                 val_loss += loss.item()
         val_loss /= len(val_loader)

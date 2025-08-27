@@ -34,7 +34,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --img_size 224 \
         --num_classes 6 \
         --output_dir ./model_out/udiadsbib_patch224_swinunet_${MANUSCRIPT} \
-        --max_epochs 3 \
+        --max_epochs 300 \
         --batch_size 32 \
         --cfg configs/swin_tiny_patch4_window7_224_lite.yaml \
         --use_patched_data
