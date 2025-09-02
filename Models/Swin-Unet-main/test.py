@@ -1,469 +1,767 @@
-from os.path import split
+"""
+Testing Script for Historical Document Segmentation Models
+
+This script evaluates trained models on historical document test datasets by:
+- Loading trained model checkpoints
+- Running inference on test images using patch-based approach
+- Computing segmentation metrics (IoU, Precision, Recall, F1)
+- Saving prediction visualizations
+
+Supported datasets: U-DIADS-Bib, DIVAHISDB
+
+Usage:
+    # For SwinUnet:
+    python test.py --cfg config.yaml --output_dir ./models/ --manuscript Latin2 --is_savenii
+    
+    # For MissFormer (no config needed):
+    python test.py --model missformer --output_dir ./models/ --manuscript Latin2 --is_savenii
+    
+Author: Clean Code Version
+"""
+
 import argparse
 import logging
 import os
 import random
 import sys
 import warnings
-warnings.filterwarnings("ignore")
+import glob
+
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from torch.utils.data import DataLoader
-from tqdm import tqdm
-import glob
+from PIL import Image
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 
 from config import get_config
-from datasets.dataset_synapse import Synapse_dataset
-from datasets.dataset_udiadsbib import UDiadsBibDataset
-from networks.vision_transformer import SwinUnet as ViT_seg
-from utils import test_single_volume
 
-parser = argparse.ArgumentParser()
-parser = argparse.ArgumentParser()
-parser.add_argument('--model', type=str, default='swinunet', choices=['swinunet', 'missformer'], help='Model to use: swinunet or missformer')
-
-parser.add_argument('--root_path', type=str,
-                    default='../data/Synapse/test_vol_h5',
-                    help='root dir for validation volume data')  # for acdc volume_path=root_dir
-parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-MS', help='Root dir for U-DIADS-Bib dataset')
-parser.add_argument('--udiadsbib_split', type=str, default='test', help='Split for U-DIADS-Bib (training/validation/test)')
-parser.add_argument('--manuscript', type=str, choices=['Latin2', 'Latin14396', 'Latin16746', 'Syr341'], required=True,
-                    help='Manuscript to test (Latin2, Latin14396, Latin16746, or Syr341)')
-parser.add_argument('--use_patched_data', action='store_true', help='Use pre-generated patches instead of full images')
-parser.add_argument('--dataset', type=str,
-                    default='datasets', help='experiment_name')
-parser.add_argument('--num_classes', type=int,
-                    default=9, help='output channel of network')
-parser.add_argument('--list_dir', type=str,
-                    default='./lists/lists_Synapse', help='list dir')
-parser.add_argument('--output_dir', type=str, help='output dir')
-parser.add_argument('--max_iterations', type=int, default=30000, help='maximum epoch number to train')
-parser.add_argument('--max_epochs', type=int, default=150, help='maximum epoch number to train')
-parser.add_argument('--batch_size', type=int, default=24,
-                    help='batch_size per gpu')
-parser.add_argument('--img_size', type=int, default=2016, help='input image width for full-res inference (2016 for U-DIADS-Bib)')
-# Patch-based arguments
-parser.add_argument('--is_savenii', action="store_true", help='whether to save results during inference')
-parser.add_argument('--test_save_dir', type=str, default='../predictions', help='saving prediction as nii!')
-parser.add_argument('--deterministic', type=int, default=1, help='whether use deterministic training')
-parser.add_argument('--base_lr', type=float, default=0.01, help='segmentation network learning rate')
-parser.add_argument('--seed', type=int, default=1234, help='random seed')
-parser.add_argument('--cfg', type=str, required=True, metavar="FILE", help='path to config file', )
-parser.add_argument(
-    "--opts",
-    help="Modify config options by adding 'KEY VALUE' pairs. ",
-    default=None,
-    nargs='+',
-)
-parser.add_argument('--zip', action='store_true', help='use zipped dataset instead of folder dataset')
-parser.add_argument('--cache-mode', type=str, default='part', choices=['no', 'full', 'part'],
-                    help='no: no cache, '
-                         'full: cache all data, '
-                         'part: sharding the dataset into nonoverlapping pieces and only cache one piece')
-parser.add_argument('--resume', help='resume from checkpoint')
-parser.add_argument('--accumulation-steps', type=int, help="gradient accumulation steps")
-parser.add_argument('--use-checkpoint', action='store_true',
-                    help="whether to use gradient checkpointing to save memory")
-parser.add_argument('--amp-opt-level', type=str, default='O1', choices=['O0', 'O1', 'O2'],
-                    help='mixed precision opt level, if O0, no amp is used')
-parser.add_argument('--tag', help='tag of experiment')
-parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
-parser.add_argument('--throughput', action='store_true', help='Test throughput only')
-
-parser.add_argument("--n_class", default=4, type=int)
-parser.add_argument("--split_name", default="test", help="Directory of the input list")
-
-args = parser.parse_args()
-
-# Quick safety check: detect accidental paste fragments like 'mg_size' that become standalone argv tokens
-import sys as _sys
-_bad_tokens = [t for t in _sys.argv[1:] if t.lstrip('-').startswith('mg_') or t.lstrip('-').startswith('mg')]
-if _bad_tokens:
-    print(f"Warning: suspicious argv tokens detected: {_bad_tokens}\nDid you accidentally paste a continuation fragment? Use a single-line command or PowerShell backtick (`) correctly.")
-
-# Normalize class argument names for compatibility
-args.num_classes = getattr(args, 'num_classes', getattr(args, 'n_class', None))
-args.n_class = getattr(args, 'n_class', args.num_classes)
-if args.num_classes is None:
-    raise ValueError('Please provide --num_classes (or --n_class).')
-
-if args.dataset == "Synapse":
-    args.volume_path = os.path.join(args.volume_path, "test_vol_h5")
-config = get_config(args)
+# Suppress warnings for cleaner output
+warnings.filterwarnings("ignore")
 
 
-def inference(args, model, test_save_path=None):
-    from datasets.dataset_udiadsbib import rgb_to_class
-    import torchvision.transforms.functional as TF
-    if args.dataset.lower() == "udiads_bib":
-        import matplotlib.pyplot as plt
-        from matplotlib.colors import ListedColormap
-        from PIL import Image
-        import numpy as np
-        # Custom colormap for 6 classes
-        class_colors = [
-            (0, 0, 0),         # 0: Background (black)
-            (255, 255, 0),     # 1: Paratext (yellow)
-            (0, 255, 255),     # 2: Decoration (cyan)
-            (255, 0, 255),     # 3: Main Text (magenta)
-            (255, 0, 0),       # 4: Title (red)
-            (0, 255, 0),       # 5: Chapter Headings (lime)
-        ]
-        cmap = ListedColormap(class_colors)
+def parse_arguments():
+    """Parse command line arguments for testing script."""
+    parser = argparse.ArgumentParser(
+        description='Test segmentation models on historical document datasets',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Test on U-DIADS-Bib dataset with SwinUnet
+  python test.py --cfg configs/swin_tiny.yaml --output_dir ./models/ \\
+                 --dataset UDIADS_BIB --manuscript Latin2 --is_savenii
+  
+  # Test with MissFormer model (no config needed)
+  python test.py --model missformer --dataset UDIADS_BIB \\
+                 --output_dir ./models/ --manuscript Latin2
+                 
+  # Test on DIVAHISDB dataset with SwinUnet
+  python test.py --cfg configs/swin_tiny.yaml --dataset DIVAHISDB \\
+                 --output_dir ./models/ --manuscript Latin2
+        """
+    )
+    
+    # Core arguments
+    parser.add_argument('--cfg', type=str, required=False, metavar="FILE",
+                       help='Path to model configuration file (required for SwinUnet, optional for MissFormer)')
+    parser.add_argument('--output_dir', type=str, required=True,
+                       help='Directory containing trained model checkpoints')
+    
+    # Model selection
+    parser.add_argument('--model', type=str, default='swinunet',
+                       choices=['swinunet', 'missformer'],
+                       help='Model architecture to test')
+    
+    # Dataset configuration
+    parser.add_argument('--dataset', type=str, default='UDIADS_BIB',
+                       choices=['UDIADS_BIB', 'DIVAHISDB'],
+                       help='Dataset to test on')
+    parser.add_argument('--manuscript', type=str, required=True,
+                       help='Manuscript to test (e.g., Latin2, Latin14396, Latin16746, Syr341, Latin2FS, etc.)')
+    parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-MS',
+                       help='Root directory for U-DIADS-Bib dataset')
+    parser.add_argument('--divahisdb_root', type=str, default='DIVAHISDB',
+                       help='Root directory for DIVAHISDB dataset')
+    parser.add_argument('--use_patched_data', action='store_true',
+                       help='Use pre-generated patches instead of full images')
+    
+    # Model parameters
+    parser.add_argument('--num_classes', type=int, default=None,
+                       help='Number of segmentation classes (auto-detected from dataset)')
+    parser.add_argument('--img_size', type=int, default=224,
+                       help='Input patch size for inference')
+    parser.add_argument('--batch_size', type=int, default=24,
+                       help='Batch size for testing')
+    
+    # Output options
+    parser.add_argument('--is_savenii', action="store_true",
+                       help='Save prediction results during inference')
+    parser.add_argument('--test_save_dir', type=str, default='../predictions',
+                       help='Directory to save prediction results')
+    
+    # System configuration
+    parser.add_argument('--deterministic', type=int, default=1,
+                       help='Use deterministic testing')
+    parser.add_argument('--seed', type=int, default=1234,
+                       help='Random seed for reproducibility')
+    
+    # Advanced options (required by config.py)
+    parser.add_argument('--opts', nargs='+', default=None,
+                       help='Modify config options')
+    parser.add_argument('--zip', action='store_true',
+                       help='Use zipped dataset')
+    parser.add_argument('--cache-mode', type=str, default='part',
+                       choices=['no', 'full', 'part'],
+                       help='Dataset caching strategy')
+    parser.add_argument('--resume', help='Resume from checkpoint')
+    parser.add_argument('--accumulation-steps', type=int,
+                       help='Gradient accumulation steps')
+    parser.add_argument('--use-checkpoint', action='store_true',
+                       help='Use gradient checkpointing')
+    parser.add_argument('--amp-opt-level', type=str, default='O1',
+                       choices=['O0', 'O1', 'O2'],
+                       help='Mixed precision optimization level')
+    parser.add_argument('--tag', help='Experiment tag')
+    parser.add_argument('--eval', action='store_true',
+                       help='Evaluation only mode')
+    parser.add_argument('--throughput', action='store_true',
+                       help='Test throughput only')
+    
+    return parser.parse_args()
+
+
+def validate_arguments(args):
+    """Validate and normalize command line arguments."""
+    # Check for suspicious command line tokens
+    bad_tokens = [t for t in sys.argv[1:] if t.lstrip('-').startswith('mg_')]
+    if bad_tokens:
+        print(f"Warning: suspicious argv tokens detected: {bad_tokens}")
+        print("Did you accidentally paste a continuation fragment?")
+    
+    # Validate required paths
+    if args.model.lower() == 'swinunet':
+        if not args.cfg:
+            raise ValueError("--cfg argument is required for SwinUnet model")
+        if not os.path.exists(args.cfg):
+            raise ValueError(f"Config file not found: {args.cfg}")
+    elif args.model.lower() == 'missformer' and args.cfg:
+        # For MissFormer, config is optional but if provided, validate it exists
+        if not os.path.exists(args.cfg):
+            raise ValueError(f"Config file not found: {args.cfg}")
+    
+    if not os.path.exists(args.output_dir):
+        raise ValueError(f"Output directory not found: {args.output_dir}")
+    
+    # Set dataset-specific parameters
+    if args.dataset.upper() == "UDIADS_BIB":
+        args.num_classes = 6
+        if not os.path.exists(args.udiadsbib_root):
+            raise ValueError(f"U-DIADS-Bib dataset path not found: {args.udiadsbib_root}")
+    elif args.dataset.upper() == "DIVAHISDB":
+        args.num_classes = 4
+        if not os.path.exists(args.divahisdb_root):
+            raise ValueError(f"DIVAHISDB dataset path not found: {args.divahisdb_root}")
+
+
+def get_model(args, config):
+    """
+    Create and load the specified model architecture.
+    
+    Args:
+        args: Command line arguments
+        config: Model configuration (None for MissFormer)
         
-        # For Option 1: Use pre-generated patches
-        logging.info("Using pre-generated patches for testing")
+    Returns:
+        torch.nn.Module: Initialized model
+    """
+    model_name = args.model.lower()
+    
+    if model_name == 'swinunet':
+        if config is None:
+            raise ValueError("Config is required for SwinUnet model")
+        from networks.vision_transformer import SwinUnet as ViT_seg
+        model = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
+        model.load_from(config)
+        return model
         
-        # Instead of loading the original dataset, we'll work with the patched data
-        patch_size = 224  # Size of patches from Sliding_window_generate_dataset.py
+    elif model_name == 'missformer':
+        from networks.MissFormer.MISSFormer import MISSFormer
+        model = MISSFormer(num_classes=args.num_classes).cuda()
+        return model
         
-        # Initialize metric accumulators
-        n_classes = 6
-        TP = np.zeros(n_classes, dtype=np.float64)
-        FP = np.zeros(n_classes, dtype=np.float64)
-        FN = np.zeros(n_classes, dtype=np.float64)
-        IoU = np.zeros(n_classes, dtype=np.float64)
-        
-        # Prepare result directory for PNGs
-        result_dir = os.path.join(test_save_path, "result") if test_save_path is not None else None
-        if result_dir is not None:
-            os.makedirs(result_dir, exist_ok=True)
-            
-        # Dictionary to group patches by original image
-        patch_groups = {}  # key: original_image_name, value: list of patch paths
-        patch_positions = {}  # key: patch_path, value: (x, y) position in original image
-        # Find all patch images for test set
-        manuscript_name = args.manuscript
-        patch_dir = f'{args.udiadsbib_root}/{manuscript_name}/Image/test'
-        mask_dir = f'{args.udiadsbib_root}/{manuscript_name}/mask/test_labels'
-        
-        if not os.path.exists(patch_dir) or not os.path.exists(mask_dir):
-            logging.info(f"Skipping {manuscript_name} - patch directories not found")
-            return
-            
-        patch_files = sorted(glob.glob(os.path.join(patch_dir, '*.png')))
-        mask_files = sorted(glob.glob(os.path.join(mask_dir, '*.png')))
-        
-        if len(patch_files) == 0:
-            logging.info(f"No patches found for {manuscript_name}")
-            return
-            
-        logging.info(f"Found {len(patch_files)} patches for {manuscript_name}")
-        
-        # Group patches by original image
-        for patch_path in patch_files:
-            # Extract original image name and patch position
-            filename = os.path.basename(patch_path)
-            # Expected format: original_name_XXXXXX.png
-            parts = filename.split('_')
-            if len(parts) >= 2:
-                original_name = '_'.join(parts[:-1])  # Everything before the last underscore
-                patch_id = int(parts[-1].split('.')[0])  # The number after the last underscore
-                
-                # Group by original image
-                if original_name not in patch_groups:
-                    patch_groups[original_name] = []
-                patch_groups[original_name].append(patch_path)
-                
-                # Store patch ID for position calculation later
-                patch_positions[patch_path] = patch_id
-        
-        # Now process each original image by stitching its patches
-        for original_name, patches in patch_groups.items():
-            logging.info(f"Processing original image: {original_name} with {len(patches)} patches")
-            
-            # First, find the original image dimensions to accurately calculate patch positions
-            orig_width = 0
-            orig_height = 0
-            
-            # Try to find the original image to get its dimensions
-            manuscript_name = args.manuscript
-            # Look for .jpg in the original directory (not patched)
-            orig_path_jpg = f'U-DIADS-Bib-MS/{manuscript_name}/img-{manuscript_name}/test/{original_name}.jpg'
-            if os.path.exists(orig_path_jpg):
-                with Image.open(orig_path_jpg) as img:
-                    orig_width, orig_height = img.size
-            
-            if orig_width == 0 or orig_height == 0:
-                logging.warning(f"Could not find original image for {original_name}, estimating dimensions from patches")
-                # Estimate dimensions from patch positions
-                for patch_path in patches:
-                    patch_id = patch_positions[patch_path]
-                    # We need to determine the number of patches per row in the original extraction
-                    # This requires knowing the original image width
-                    # As a fallback, estimate based on max patch_id
-                    patches_per_row = 10  # Default fallback
-                    
-                max_patch_id = max([patch_positions[p] for p in patches])
-                max_x = ((max_patch_id % patches_per_row) + 1) * patch_size
-                max_y = ((max_patch_id // patches_per_row) + 1) * patch_size
-            else:
-                # Calculate patches per row based on original width
-                patches_per_row = orig_width // patch_size
-                if patches_per_row == 0:
-                    patches_per_row = 1
-                # Use original dimensions but ensure they're multiples of patch_size
-                max_x = ((orig_width // patch_size) + (1 if orig_width % patch_size else 0)) * patch_size
-                max_y = ((orig_height // patch_size) + (1 if orig_height % patch_size else 0)) * patch_size
-            
-            logging.info(f"Original image dimensions (estimated): {max_x}x{max_y}")
-            
-            # Create empty prediction map - using int32 to allow for accumulation
-            pred_full = np.zeros((max_y, max_x), dtype=np.int32)
-            count_map = np.zeros((max_y, max_x), dtype=np.int32)
-            
-            # Process each patch
-            for patch_path in patches:
-                patch_id = patch_positions[patch_path]
-                
-                # Calculate position using the same logic as in Sliding_window_generate_dataset.py
-                # In the extraction script, patches are created in row-major order (across then down)
-                x = (patch_id % patches_per_row) * patch_size
-                y = (patch_id // patches_per_row) * patch_size
-                
-                # Load patch
-                patch = Image.open(patch_path).convert("RGB")
-                patch_tensor = TF.to_tensor(patch).unsqueeze(0).cuda()
-                
-                # Get prediction
-                with torch.no_grad():
-                    output = model(patch_tensor)
-                    pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
-                
-                # Add to prediction map (check boundaries to avoid index errors)
-                if y+patch_size <= pred_full.shape[0] and x+patch_size <= pred_full.shape[1]:
-                    pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
-                    count_map[y:y+patch_size, x:x+patch_size] += 1
-                else:
-                    # Handle edge cases (partial patches at image boundaries)
-                    valid_h = min(patch_size, pred_full.shape[0]-y)
-                    valid_w = min(patch_size, pred_full.shape[1]-x)
-                    if valid_h > 0 and valid_w > 0:
-                        pred_full[y:y+valid_h, x:x+valid_w] += pred_patch[:valid_h, :valid_w]
-                        count_map[y:y+valid_h, x:x+valid_w] += 1
-            # Normalize by count map
-            pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
-            
-            # For evaluation, we need to find the corresponding ground truth
-            # We'll look for the original full mask in the original dataset
-            original_gt_found = False
-            manuscript_name = args.manuscript
-            gt_path = f'U-DIADS-Bib-MS/{manuscript_name}/pixel-level-gt-{manuscript_name}/test/{original_name}.png'
-            if os.path.exists(gt_path):
-                gt_pil = Image.open(gt_path).convert("RGB")
-                gt_np = np.array(gt_pil)
-                gt_class = rgb_to_class(gt_np)
-                original_gt_found = True
-            
-            if not original_gt_found:
-                logging.warning(f"Could not find original ground truth for {original_name}")
-                # Create a dummy ground truth (all zeros) for saving comparison images
-                gt_class = np.zeros_like(pred_full)
-            
-            # Save predicted mask as PNG in result directory
-            if result_dir is not None:
-                # Convert class indices to RGB
-                rgb_mask = np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8)
-                for idx, color in enumerate(class_colors):
-                    rgb_mask[pred_full == idx] = color
-                pred_png_path = os.path.join(result_dir, f"{original_name}.png")
-                Image.fromarray(rgb_mask).save(pred_png_path)
-            
-            # Save side-by-side comparison image for visualization
-            if test_save_path is not None and original_gt_found:
-                compare_dir = os.path.join(test_save_path, 'compare')
-                os.makedirs(compare_dir, exist_ok=True)
-                
-                # Resize gt_class if dimensions don't match (could happen due to patch positions estimation)
-                if gt_class.shape != pred_full.shape:
-                    logging.warning(f"Resizing ground truth for {original_name} from {gt_class.shape} to {pred_full.shape}")
-                    gt_class_resized = np.zeros_like(pred_full)
-                    min_h = min(gt_class.shape[0], pred_full.shape[0])
-                    min_w = min(gt_class.shape[1], pred_full.shape[1])
-                    gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
-                    gt_class = gt_class_resized
-                
-                # Create visualization
-                fig, axs = plt.subplots(1, 3, figsize=(12, 4))
-                
-                # Load original image for visualization
-                orig_img_path = None
-                manuscript_name = args.manuscript
-                test_img_path_jpg = f'U-DIADS-Bib-MS/{manuscript_name}/img-{manuscript_name}/test/{original_name}.jpg'
-                if os.path.exists(test_img_path_jpg):
-                    orig_img_path = test_img_path_jpg
-                
-                if orig_img_path:
-                    orig_img = Image.open(orig_img_path).convert("RGB")
-                    # Always resize original image to match prediction size using high-quality interpolation
-                    if orig_img.size != (pred_full.shape[1], pred_full.shape[0]):
-                        orig_img = orig_img.resize((pred_full.shape[1], pred_full.shape[0]), Image.BILINEAR)
-                    axs[0].imshow(np.array(orig_img))
-                else:
-                    # Create a blank image if original not found
-                    axs[0].imshow(np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8))
-                
-                axs[0].set_title('Original')
-                axs[0].axis('off')
-                axs[1].imshow(pred_full, cmap=cmap, vmin=0, vmax=5)
-                axs[1].set_title('Prediction')
-                axs[1].axis('off')
-                axs[2].imshow(gt_class, cmap=cmap, vmin=0, vmax=5)
-                axs[2].set_title('Ground Truth')
-                axs[2].axis('off')
-                plt.tight_layout()
-                save_img_path = os.path.join(compare_dir, f"{original_name}_compare.png")
-                plt.savefig(save_img_path, bbox_inches='tight')
-                plt.close(fig)
-            # Compute metrics for each class if ground truth is available
-            if original_gt_found:
-                for cls in range(n_classes):
-                    pred_c = (pred_full == cls)
-                    gt_c = (gt_class == cls)
-                    TP[cls] += np.logical_and(pred_c, gt_c).sum()
-                    FP[cls] += np.logical_and(pred_c, np.logical_not(gt_c)).sum()
-                    FN[cls] += np.logical_and(np.logical_not(pred_c), gt_c).sum()
-                    # IoU will be computed from aggregated TP/FP/FN after all images
-            
-            logging.info(f"Processed {original_name}")
-        
-        # Calculate metrics
-        manuscript_name = args.manuscript
-        num_processed_images = sum(1 for img in patch_groups 
-                                if os.path.exists(f'U-DIADS-Bib-MS/{manuscript_name}/pixel-level-gt-{manuscript_name}/test/{img}.png'))
-        
-        if num_processed_images > 0:
-            precision = TP / (TP + FP + 1e-8)
-            recall = TP / (TP + FN + 1e-8)
-            f1 = 2 * precision * recall / (precision + recall + 1e-8)
-            # Official IoU per class: TP / (TP + FP + FN)
-            iou_per_class = TP / (TP + FP + FN + 1e-8)
-            mean_iou = iou_per_class
-        else:
-            precision = np.zeros(n_classes)
-            recall = np.zeros(n_classes) 
-            f1 = np.zeros(n_classes)
-            mean_iou = np.zeros(n_classes)
-        class_names = ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title', 'Chapter Headings']
-        logging.info("\nPer-class metrics:")
-        for cls in range(n_classes):
-            logging.info(f"{class_names[cls]}: Precision={precision[cls]:.4f}, Recall={recall[cls]:.4f}, F1={f1[cls]:.4f}, IoU={mean_iou[cls]:.4f}")
-        logging.info("\nMean metrics:")
-        logging.info(f"Mean Precision: {np.mean(precision):.4f}")
-        logging.info(f"Mean Recall: {np.mean(recall):.4f}")
-        logging.info(f"Mean F1: {np.mean(f1):.4f}")
-        logging.info(f"Mean IoU: {np.mean(mean_iou):.4f}")
-        logging.info("Inference on U-DIADS-Bib completed.")
-        return "Testing Finished!"
     else:
-        db_test = Synapse_dataset(base_dir=args.volume_path, split=args.split_name, list_dir=args.list_dir)
-        testloader = DataLoader(db_test, batch_size=1, shuffle=False, num_workers=1)
-        logging.info("{} test iterations per epoch".format(len(testloader)))
-        model.eval()
-        metric_list = 0.0
-        for i_batch, sampled_batch in tqdm(enumerate(testloader)):
-            image, label, case_name = sampled_batch["image"], sampled_batch["label"], sampled_batch['case_name'][0]
-            if args.dataset == "datasets":
-                case_name = split(case_name.split(",")[0])[-1]
-            metric_i = test_single_volume(image, label, model, classes=args.num_classes,
-                                          patch_size=[args.img_size, args.img_size],
-                                          test_save_path=test_save_path, case=case_name, z_spacing=args.z_spacing)
-            metric_list += np.array(metric_i)
-            logging.info('idx %d case %s mean_dice %f mean_hd95 %f' % (
-                i_batch, case_name, np.mean(metric_i, axis=0)[0], np.mean(metric_i, axis=0)[1]))
-        metric_list = metric_list / len(db_test)
-        for i in range(1, args.num_classes):
-            logging.info('Mean class %d mean_dice %f mean_hd95 %f' % (i, metric_list[i - 1][0], metric_list[i - 1][1]))
-        performance = np.mean(metric_list, axis=0)[0]
-        mean_hd95 = np.mean(metric_list, axis=0)[1]
-        logging.info('Testing performance in best val model: mean_dice : %f mean_hd95 : %f' % (performance, mean_hd95))
-        return "Testing Finished!"
+        print(f"Unknown model: {args.model}. Supported: swinunet, missformer")
+        sys.exit(1)
 
 
-if __name__ == "__main__":
+def setup_logging(log_folder, snapshot_name):
+    """Set up logging configuration."""
+    os.makedirs(log_folder, exist_ok=True)
+    log_file = os.path.join(log_folder, f"{snapshot_name}.txt")
+    
+    logging.basicConfig(
+        filename=log_file,
+        level=logging.INFO,
+        format='[%(asctime)s.%(msecs)03d] %(message)s',
+        datefmt='%H:%M:%S'
+    )
+    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+
+
+def setup_reproducible_testing(args):
+    """Set up reproducible testing environment."""
     if not args.deterministic:
         cudnn.benchmark = True
         cudnn.deterministic = False
     else:
         cudnn.benchmark = False
         cudnn.deterministic = True
+    
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
     torch.cuda.manual_seed(args.seed)
 
-    dataset_name = args.dataset
 
-    if args.dataset.lower() == "udiads_bib":
-        args.num_classes = 6
-        args.is_pretrain = True
-    else:
-        dataset_config = {
-            args.dataset: {
-                'root_path': args.root_path,
-                'list_dir': f'./lists/{args.dataset}',
-                'num_classes': args.n_class,
-                "z_spacing": 1
-            },
-        }
-        args.num_classes = dataset_config[dataset_name]['num_classes']
-        args.volume_path = dataset_config[dataset_name]['root_path']
-        args.list_dir = dataset_config[dataset_name]['list_dir']
-        args.z_spacing = dataset_config[dataset_name]['z_spacing']
-        args.is_pretrain = True
-
-    net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
-
-    # Model selection logic (same as train.py)
-    def get_model(args, config):
-        model_name = args.model.lower()
-        if model_name == 'swinunet':
-            from networks.vision_transformer import SwinUnet as ViT_seg
-            net = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
-            net.load_from(config)
-            return net
-        elif model_name == 'missformer':
-            from networks.MissFormer.MISSFormer import MISSFormer
-            net = MISSFormer(num_classes=args.num_classes)
-            net = net.cuda()
-            return net
+def load_model_checkpoint(model, args):
+    """
+    Load trained model checkpoint.
+    
+    Args:
+        model: Model to load weights into
+        args: Command line arguments
+        
+    Returns:
+        str: Name of loaded checkpoint file
+    """
+    checkpoint_path = os.path.join(args.output_dir, 'best_model_latest.pth')
+    
+    if not os.path.exists(checkpoint_path):
+        # Try alternative checkpoint names
+        alt_path = os.path.join(args.output_dir, 'best_model.pth')
+        if os.path.exists(alt_path):
+            checkpoint_path = alt_path
         else:
-            print(f"Unknown model: {args.model}. Supported: swinunet, missformer")
-            sys.exit(1)
+            raise FileNotFoundError(f"No checkpoint found in {args.output_dir}")
+    
+    msg = model.load_state_dict(torch.load(checkpoint_path))
+    print(f"Model checkpoint loaded: {msg}")
+    
+    return os.path.basename(checkpoint_path)
 
-    net = get_model(args, config)
 
-
-    # Always load the best_model_latest.pth for Swin-Unet (UDIADS_BIB dataset)
-    if args.dataset.lower() == "udiads_bib":
-        snapshot = os.path.join(args.output_dir, 'best_model_latest.pth')
-        if not os.path.exists(snapshot):
-            raise FileNotFoundError("best_model_latest.pth not found in output_dir")
+def get_dataset_info(dataset_type):
+    """
+    Get dataset-specific information.
+    
+    Args:
+        dataset_type (str): Type of dataset
+        
+    Returns:
+        tuple: (class_colors, class_names, rgb_to_class_function)
+    """
+    if dataset_type.upper() == "UDIADS_BIB":
+        from datasets.dataset_udiadsbib import rgb_to_class
+        
+        class_colors = [
+            (0, 0, 0),         # 0: Background (black)
+            (255, 255, 0),     # 1: Paratext (yellow)
+            (0, 255, 255),     # 2: Decoration (cyan)  
+            (255, 0, 255),     # 3: Main Text (magenta)
+            (255, 0, 0),       # 4: Title (red)
+            (0, 255, 0),       # 5: Chapter Headings (lime)
+        ]
+        
+        class_names = [
+            'Background', 'Paratext', 'Decoration', 
+            'Main Text', 'Title', 'Chapter Headings'
+        ]
+        
+        return class_colors, class_names, rgb_to_class
+        
+    elif dataset_type.upper() == "DIVAHISDB":
+        try:
+            from datasets.dataset_divahisdb import rgb_to_class
+        except ImportError:
+            print("Warning: DIVAHISDB dataset class not available")
+            rgb_to_class = None
+        
+        class_colors = [
+            (0, 0, 1),  # 0: Background
+            (0, 0, 2),  # 1: Comment
+            (0, 0, 4),  # 2: Decoration
+            (0, 0, 8),  # 3: Main text
+        ]
+        
+        class_names = ['Background', 'Comment', 'Decoration', 'Main Text']
+        
+        return class_colors, class_names, rgb_to_class
+    
     else:
-        snapshot = os.path.join(args.output_dir, 'best_model.pth')
-        if not os.path.exists(snapshot):
-            snapshot = snapshot.replace('best_model', 'epoch_' + str(args.max_epochs - 1))
-    msg = net.load_state_dict(torch.load(snapshot))
-    print("self trained swin unet", msg)
-    snapshot_name = os.path.basename(snapshot)
+        raise ValueError(f"Unknown dataset type: {dataset_type}")
 
+
+def get_dataset_paths(args):
+    """
+    Get dataset-specific file paths.
+    
+    Args:
+        args: Command line arguments
+        
+    Returns:
+        tuple: (patch_dir, mask_dir, original_img_dir, original_mask_dir)
+    """
+    manuscript_name = args.manuscript
+    
+    if args.dataset.upper() == "UDIADS_BIB":
+        if args.use_patched_data:
+            patch_dir = f'{args.udiadsbib_root}/{manuscript_name}/Image/test'
+            mask_dir = f'{args.udiadsbib_root}/{manuscript_name}/mask/test_labels'
+        else:
+            patch_dir = f'{args.udiadsbib_root}/{manuscript_name}/img-{manuscript_name}/test'
+            mask_dir = f'{args.udiadsbib_root}/{manuscript_name}/pixel-level-gt-{manuscript_name}/test'
+        
+        # Use the original dataset directory (before patching) for original images
+        # Extract the base directory name from the patched data root
+        base_dir = args.udiadsbib_root.replace('_patched', '')
+        original_img_dir = f'{base_dir}/{manuscript_name}/img-{manuscript_name}/test'
+        original_mask_dir = f'{base_dir}/{manuscript_name}/pixel-level-gt-{manuscript_name}/test'
+        
+    elif args.dataset.upper() == "DIVAHISDB":
+        if args.use_patched_data:
+            patch_dir = f'{args.divahisdb_root}/{manuscript_name}/Image/test'
+            mask_dir = f'{args.divahisdb_root}/{manuscript_name}/mask/test_labels'
+        else:
+            patch_dir = f'{args.divahisdb_root}/img/{manuscript_name}/test'
+            mask_dir = f'{args.divahisdb_root}/pixel-level-gt/{manuscript_name}/test'
+        
+        original_img_dir = f'{args.divahisdb_root}/img/{manuscript_name}/test'
+        original_mask_dir = f'{args.divahisdb_root}/pixel-level-gt/{manuscript_name}/test'
+    
+    return patch_dir, mask_dir, original_img_dir, original_mask_dir
+
+
+def process_patch_groups(patch_files):
+    """
+    Group patch files by their original image names.
+    
+    Args:
+        patch_files (list): List of patch file paths
+        
+    Returns:
+        tuple: (patch_groups, patch_positions) dictionaries
+    """
+    patch_groups = {}
+    patch_positions = {}
+    
+    for patch_path in patch_files:
+        filename = os.path.basename(patch_path)
+        parts = filename.split('_')
+        
+        if len(parts) >= 2:
+            original_name = '_'.join(parts[:-1])
+            patch_id = int(parts[-1].split('.')[0])
+            
+            if original_name not in patch_groups:
+                patch_groups[original_name] = []
+            patch_groups[original_name].append(patch_path)
+            patch_positions[patch_path] = patch_id
+    
+    return patch_groups, patch_positions
+
+
+def estimate_image_dimensions(original_name, original_img_dir, patches, patch_positions, patch_size=224):
+    """
+    Estimate original image dimensions from patch information.
+    
+    Args:
+        original_name (str): Name of original image
+        original_img_dir (str): Directory containing original images
+        patches (list): List of patch paths
+        patch_positions (dict): Mapping of patch paths to positions
+        patch_size (int): Size of each patch
+        
+    Returns:
+        tuple: (width, height, patches_per_row)
+    """
+    # Try to find original image for exact dimensions
+    for ext in ['.jpg', '.png', '.tif', '.tiff']:
+        orig_path = os.path.join(original_img_dir, f"{original_name}{ext}")
+        if os.path.exists(orig_path):
+            with Image.open(orig_path) as img:
+                orig_width, orig_height = img.size
+            
+            patches_per_row = orig_width // patch_size
+            if patches_per_row == 0:
+                patches_per_row = 1
+            
+            max_x = ((orig_width // patch_size) + (1 if orig_width % patch_size else 0)) * patch_size
+            max_y = ((orig_height // patch_size) + (1 if orig_height % patch_size else 0)) * patch_size
+            
+            return max_x, max_y, patches_per_row
+    
+    # Estimate from patch positions if original not found
+    logging.warning(f"Could not find original image for {original_name}, estimating dimensions")
+    patches_per_row = 10  # Default fallback
+    max_patch_id = max([patch_positions[p] for p in patches])
+    max_x = ((max_patch_id % patches_per_row) + 1) * patch_size
+    max_y = ((max_patch_id // patches_per_row) + 1) * patch_size
+    
+    return max_x, max_y, patches_per_row
+
+
+def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patch_size, model):
+    """
+    Stitch together patch predictions into full image.
+    
+    Args:
+        patches (list): List of patch file paths
+        patch_positions (dict): Mapping of patch paths to positions
+        max_x, max_y (int): Maximum image dimensions
+        patches_per_row (int): Number of patches per row
+        patch_size (int): Size of each patch
+        model: Neural network model
+        
+    Returns:
+        numpy.ndarray: Stitched prediction map
+    """
+    import torchvision.transforms.functional as TF
+    
+    pred_full = np.zeros((max_y, max_x), dtype=np.int32)
+    count_map = np.zeros((max_y, max_x), dtype=np.int32)
+    
+    for patch_path in patches:
+        patch_id = patch_positions[patch_path]
+        
+        # Calculate patch position
+        x = (patch_id % patches_per_row) * patch_size
+        y = (patch_id // patches_per_row) * patch_size
+        
+        # Load and process patch
+        patch = Image.open(patch_path).convert("RGB")
+        patch_tensor = TF.to_tensor(patch).unsqueeze(0).cuda()
+        
+        with torch.no_grad():
+            output = model(patch_tensor)
+            pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
+            
+
+        
+        # Add to prediction map with boundary checking
+        if y + patch_size <= pred_full.shape[0] and x + patch_size <= pred_full.shape[1]:
+            pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
+            count_map[y:y+patch_size, x:x+patch_size] += 1
+        else:
+            # Handle edge cases
+            valid_h = min(patch_size, pred_full.shape[0] - y)
+            valid_w = min(patch_size, pred_full.shape[1] - x)
+            if valid_h > 0 and valid_w > 0:
+                pred_full[y:y+valid_h, x:x+valid_w] += pred_patch[:valid_h, :valid_w]
+                count_map[y:y+valid_h, x:x+valid_w] += 1
+    
+    # Normalize by count map
+    pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
+    return pred_full
+
+
+def save_prediction_results(pred_full, original_name, class_colors, result_dir):
+    """Save prediction results as RGB image."""
+    if result_dir is not None:
+        os.makedirs(result_dir, exist_ok=True)
+        
+        # Convert class indices to RGB
+        rgb_mask = np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8)
+        for idx, color in enumerate(class_colors):
+            rgb_mask[pred_full == idx] = color
+        
+        pred_png_path = os.path.join(result_dir, f"{original_name}.png")
+        Image.fromarray(rgb_mask).save(pred_png_path)
+
+
+def save_comparison_visualization(pred_full, gt_class, original_name, original_img_dir, 
+                                test_save_path, class_colors, class_names):
+    """Save side-by-side comparison visualization."""
+    compare_dir = os.path.join(test_save_path, 'compare')
+    os.makedirs(compare_dir, exist_ok=True)
+    
+    # Create colormap
+    cmap = ListedColormap(class_colors)
+    n_classes = len(class_colors)
+    
+    # Resize ground truth if dimensions don't match
+    if gt_class.shape != pred_full.shape:
+        logging.warning(f"Resizing ground truth for {original_name}")
+        gt_class_resized = np.zeros_like(pred_full)
+        min_h = min(gt_class.shape[0], pred_full.shape[0])
+        min_w = min(gt_class.shape[1], pred_full.shape[1])
+        gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
+        gt_class = gt_class_resized
+    
+    # Create visualization
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    
+    # Find and load original image
+    orig_img_path = None
+    for ext in ['.jpg', '.png', '.tif', '.tiff']:
+        test_path = os.path.join(original_img_dir, f"{original_name}{ext}")
+        if os.path.exists(test_path):
+            orig_img_path = test_path
+            break
+    
+    if orig_img_path:
+        orig_img = Image.open(orig_img_path).convert("RGB")
+        if orig_img.size != (pred_full.shape[1], pred_full.shape[0]):
+            orig_img = orig_img.resize((pred_full.shape[1], pred_full.shape[0]), Image.BILINEAR)
+        axs[0].imshow(np.array(orig_img))
+    else:
+        axs[0].imshow(np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8))
+    
+    axs[0].set_title('Original Image')
+    axs[0].axis('off')
+    
+    axs[1].imshow(pred_full, cmap=cmap, vmin=0, vmax=(n_classes - 1))
+    axs[1].set_title('Prediction')
+    axs[1].axis('off')
+    
+    axs[2].imshow(gt_class, cmap=cmap, vmin=0, vmax=(n_classes - 1))
+    axs[2].set_title('Ground Truth')
+    axs[2].axis('off')
+    
+    plt.tight_layout()
+    save_img_path = os.path.join(compare_dir, f"{original_name}_compare.png")
+    plt.savefig(save_img_path, bbox_inches='tight', dpi=150)
+    plt.close(fig)
+
+
+def compute_segmentation_metrics(pred_full, gt_class, n_classes, TP, FP, FN):
+    """
+    Compute segmentation metrics for each class.
+    
+    Args:
+        pred_full: Prediction array
+        gt_class: Ground truth array
+        n_classes: Number of classes
+        TP, FP, FN: Arrays to accumulate metrics
+    """
+    for cls in range(n_classes):
+        pred_c = (pred_full == cls)
+        gt_c = (gt_class == cls)
+        TP[cls] += np.logical_and(pred_c, gt_c).sum()
+        FP[cls] += np.logical_and(pred_c, np.logical_not(gt_c)).sum()
+        FN[cls] += np.logical_and(np.logical_not(pred_c), gt_c).sum()
+
+
+def print_final_metrics(TP, FP, FN, class_names, num_processed_images):
+    """Print final computed metrics."""
+    n_classes = len(class_names)
+    
+    if num_processed_images > 0:
+        precision = TP / (TP + FP + 1e-8)
+        recall = TP / (TP + FN + 1e-8)
+        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+        iou_per_class = TP / (TP + FP + FN + 1e-8)
+    else:
+        precision = np.zeros(n_classes)
+        recall = np.zeros(n_classes)
+        f1 = np.zeros(n_classes)
+        iou_per_class = np.zeros(n_classes)
+    
+    logging.info("\nPer-class metrics:")
+    logging.info("-" * 80)
+    for cls in range(n_classes):
+        logging.info(f"{class_names[cls]:<15}: Precision={precision[cls]:.4f}, "
+                    f"Recall={recall[cls]:.4f}, F1={f1[cls]:.4f}, IoU={iou_per_class[cls]:.4f}")
+    
+    logging.info("\nMean metrics:")
+    logging.info("-" * 40)
+    logging.info(f"Mean Precision: {np.mean(precision):.4f}")
+    logging.info(f"Mean Recall: {np.mean(recall):.4f}")
+    logging.info(f"Mean F1: {np.mean(f1):.4f}")
+    logging.info(f"Mean IoU: {np.mean(iou_per_class):.4f}")
+
+
+def inference(args, model, test_save_path=None):
+    """
+    Run inference on historical document dataset.
+    
+    Args:
+        args: Command line arguments
+        model: Trained neural network model
+        test_save_path: Path to save test results
+        
+    Returns:
+        str: Status message
+    """
+    logging.info(f"Starting inference on {args.dataset} dataset")
+    
+    # Get dataset-specific information
+    class_colors, class_names, rgb_to_class_func = get_dataset_info(args.dataset)
+    n_classes = len(class_colors)
+    # Use the actual patch size that the model was trained on (224x224)
+    # args.img_size is the full image size, not the patch size
+    patch_size = 224
+    
+    # Get dataset paths
+    patch_dir, mask_dir, original_img_dir, original_mask_dir = get_dataset_paths(args)
+    
+    # Check if directories exist
+    if not os.path.exists(patch_dir):
+        logging.error(f"Patch directory not found: {patch_dir}")
+        return "Testing Failed!"
+    
+    # Find patch files
+    patch_files = sorted(glob.glob(os.path.join(patch_dir, '*.png')))
+    if len(patch_files) == 0:
+        logging.info(f"No patch files found in {patch_dir}")
+        return "Testing Finished!"
+    
+    logging.info(f"Found {len(patch_files)} patches for {args.manuscript}")
+    
+    # Initialize metrics
+    TP = np.zeros(n_classes, dtype=np.float64)
+    FP = np.zeros(n_classes, dtype=np.float64)  
+    FN = np.zeros(n_classes, dtype=np.float64)
+    
+    # Set up result directory
+    result_dir = os.path.join(test_save_path, "result") if test_save_path else None
+    
+    # Group patches by original image
+    patch_groups, patch_positions = process_patch_groups(patch_files)
+    
+    # Process each original image
+    num_processed_images = 0
+    
+    for original_name, patches in patch_groups.items():
+        logging.info(f"Processing: {original_name} ({len(patches)} patches)")
+        
+        # Estimate image dimensions
+        max_x, max_y, patches_per_row = estimate_image_dimensions(
+            original_name, original_img_dir, patches, patch_positions, patch_size
+        )
+        
+        # Stitch patches together
+        pred_full = stitch_patches(
+            patches, patch_positions, max_x, max_y, 
+            patches_per_row, patch_size, model
+        )
+        
+        # Save prediction results
+        save_prediction_results(pred_full, original_name, class_colors, result_dir)
+        
+        # Load ground truth for evaluation
+        gt_found = False
+        for ext in ['.png', '.jpg', '.tif', '.tiff']:
+            gt_path = os.path.join(original_mask_dir, f"{original_name}{ext}")
+            if os.path.exists(gt_path):
+                gt_pil = Image.open(gt_path).convert("RGB")
+                gt_np = np.array(gt_pil)
+                
+                if rgb_to_class_func:
+                    gt_class = rgb_to_class_func(gt_np)
+                    gt_found = True
+                    break
+        
+        if not gt_found:
+            logging.warning(f"No ground truth found for {original_name}")
+            gt_class = np.zeros_like(pred_full)
+        
+        # Save comparison visualization
+        if test_save_path and gt_found:
+            save_comparison_visualization(
+                pred_full, gt_class, original_name, original_img_dir,
+                test_save_path, class_colors, class_names
+            )
+        
+        # Compute metrics
+        if gt_found:
+            compute_segmentation_metrics(pred_full, gt_class, n_classes, TP, FP, FN)
+            num_processed_images += 1
+        
+        logging.info(f"Completed: {original_name}")
+    
+    # Print final metrics
+    print_final_metrics(TP, FP, FN, class_names, num_processed_images)
+    logging.info(f"Inference completed on {num_processed_images} images")
+    
+    return "Testing Finished!"
+
+
+def main():
+    """Main testing function."""
+    print("=== Historical Document Segmentation Testing ===")
+    print()
+    
+    # Parse and validate arguments
+    args = parse_arguments()
+    
+    try:
+        validate_arguments(args)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
+    
+    # Set up reproducible testing
+    setup_reproducible_testing(args)
+    
+    # Load configuration and create model
+    if args.model.lower() == 'swinunet':
+        config = get_config(args)
+        model = get_model(args, config)
+    elif args.model.lower() == 'missformer':
+        # For MissFormer, we don't need config since it trains from scratch
+        config = None
+        model = get_model(args, config)
+    else:
+        print(f"Unknown model: {args.model}. Supported: swinunet, missformer")
+        sys.exit(1)
+    
+    # Load trained model checkpoint
+    try:
+        checkpoint_name = load_model_checkpoint(model, args)
+        print(f"Loaded checkpoint: {checkpoint_name}")
+    except Exception as e:
+        print(f"ERROR: Failed to load model checkpoint: {e}")
+        sys.exit(1)
+    
+    # Set up logging
     log_folder = './test_log/test_log_'
-    os.makedirs(log_folder, exist_ok=True)
-    logging.basicConfig(filename=log_folder + '/' + snapshot_name + ".txt", level=logging.INFO,
-                        format='[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S')
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    setup_logging(log_folder, checkpoint_name)
+    
     logging.info(str(args))
-    logging.info(snapshot_name)
-
+    logging.info(f"Testing with checkpoint: {checkpoint_name}")
+    
+    # Set up test save directory
     if args.is_savenii:
-        args.test_save_dir = os.path.join(args.output_dir, "predictions")
-        test_save_path = args.test_save_dir
+        test_save_path = os.path.join(args.output_dir, "predictions")
         os.makedirs(test_save_path, exist_ok=True)
+        logging.info(f"Saving predictions to: {test_save_path}")
     else:
         test_save_path = None
-    inference(args, net, test_save_path)
+        logging.info("Not saving prediction files")
+    
+    # Run inference
+    print()
+    print("=== Starting Testing ===")
+    print(f"Dataset: {args.dataset}")
+    print(f"Model: {args.model}")
+    print(f"Manuscript: {args.manuscript}")
+    print(f"Save predictions: {args.is_savenii}")
+    print()
+    
+    try:
+        result = inference(args, model, test_save_path)
+        print()
+        print("=== TESTING COMPLETED SUCCESSFULLY ===")
+        print(f"Results saved to: {test_save_path if test_save_path else 'No files saved'}")
+        print("="*50)
+        return result
+        
+    except Exception as e:
+        print(f"ERROR: Testing failed: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
 
-# python train.py --dataset Synapse --cfg $CFG --root_path $DATA_DIR --max_epochs $EPOCH_TIME --output_dir $OUT_DIR --img_size $IMG_SIZE --base_lr $LEARNING_RATE --batch_size $BATCH_SIZE
-# python train.py --output_dir './model_out/datasets' --dataset datasets --img_size 224 --batch_size 32 --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --root_path /media/aicvi/11111bdb-a0c7-4342-9791-36af7eb70fc0/NNUNET_OUTPUT/nnunet_preprocessed/Dataset001_mm/nnUNetPlans_2d_split
-# python test.py --output_dir ./model_out/datasets --dataset datasets --cfg configs/swin_tiny_patch4_window7_224_lite.yaml --is_saveni --root_path /media/aicvi/11111bdb-a0c7-4342-9791-36af7eb70fc0/NNUNET_OUTPUT/nnunet_preprocessed/Dataset001_mm/test --max_epoch 150 --base_lr 0.05 --img_size 224 --batch_size 24
+
+if __name__ == "__main__":
+    main()

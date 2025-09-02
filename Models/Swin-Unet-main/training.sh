@@ -24,7 +24,7 @@ conda activate pytorch2.6-py3.12
 
 # --- Run training for multiple manuscripts ---
 # Manuscripts to train on
-manuscripts=("Latin2" "Latin14396" "Latin16746" "Syr341")
+manuscripts=("Latin2FS" "Latin14396FS" "Latin16746FS" "Syr341FS")
 
 for m in "${manuscripts[@]}"; do
     echo "=== Training $m ==="
@@ -34,10 +34,9 @@ for m in "${manuscripts[@]}"; do
         --dataset UDIADS_BIB \
         --udiadsbib_root "U-DIADS-Bib-FS_patched/${m}" \
         --use_patched_data \
-        --img_size 224 \
         --num_classes 6 \
         --batch_size 32 \
-        --max_epochs 30 \
+        --max_epochs 300 \
         --output_dir "./model_out/udiadsbib_patch224_swinunet_${m}"
 
     rc=$?
