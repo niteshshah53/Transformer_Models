@@ -8,6 +8,44 @@ import random
 import torchvision.transforms.functional as TF
 from functools import partial
 
+
+def default_transform(image, mask_class, img_size=(224, 224)):
+    """Simple transform like SwinUnet - just resize and basic flips/rotations."""
+    # Resize
+    image = image.resize(img_size, Image.BILINEAR)
+    mask_class = Image.fromarray(mask_class.astype(np.uint8)).resize(img_size, Image.NEAREST)
+    mask_class = np.array(mask_class)
+
+    # Random horizontal flip (p=0.5)
+    if random.random() >= 0.5:
+        image = image.transpose(Image.FLIP_LEFT_RIGHT)
+        mask_class = np.fliplr(mask_class)
+
+    # Random vertical flip (p=0.5)
+    if random.random() >= 0.5:
+        image = image.transpose(Image.FLIP_TOP_BOTTOM)
+        mask_class = np.flipud(mask_class)
+
+    # Random rotation by 90, 180, or 270 degrees (p=0.5)
+    if random.random() >= 0.5:
+        angle = random.choice([90, 180, 270])
+        image = image.rotate(angle, resample=Image.BILINEAR)
+        mask_class = Image.fromarray(mask_class.astype(np.uint8)).rotate(angle, resample=Image.NEAREST)
+        mask_class = np.array(mask_class)
+
+    mask_class = mask_class.copy()
+    return image, mask_class
+
+
+def training_transform(img, mask, patch_size):
+    """Training transform wrapper."""
+    return default_transform(img, mask, img_size=(patch_size, patch_size))
+
+
+def identity_transform(img, mask):
+    """Identity transform for validation."""
+    return img, mask
+
 """
 Simple DIVAHISDB dataset loader.
 
@@ -96,21 +134,12 @@ class DivaHisDBDataset(Dataset):
                     from datasets.sstrans_transforms import sstrans_validation_transform
                     self.transform = sstrans_validation_transform(patch_size=patch_size)
             elif model_type and model_type.lower() in ['hybrid1', 'hybrid2']:
-                # Use hybrid-specific transforms with enhanced augmentation
-                # Hybrid models use 224x224 patches
-                hybrid_patch_size = 224
+                # Use simple transforms like SwinUnet (no complex augmentation)
                 if split == 'training':
-                    import sys
-                    import os
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'hybrid'))
-                    from augmentation import hybrid_training_transform
-                    self.transform = hybrid_training_transform(patch_size=hybrid_patch_size)
+                    from functools import partial
+                    self.transform = partial(training_transform, patch_size=patch_size)
                 else:
-                    import sys
-                    import os
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'hybrid'))
-                    from augmentation import hybrid_validation_transform
-                    self.transform = hybrid_validation_transform(patch_size=hybrid_patch_size)
+                    self.transform = identity_transform
             else:
                 # Default identity transforms for other models (same as SwinUnet)
                 self.transform = lambda img, mask: (img, mask)
@@ -182,11 +211,8 @@ class DivaHisDBDataset(Dataset):
         if self.model_type and self.model_type.lower() == 'sstrans':
             # SSTRANS transforms handle tensor conversion and normalization
             image_tensor, mask_tensor = self.transform(image, mask_class)
-        elif self.model_type and self.model_type.lower() in ['hybrid1', 'hybrid2']:
-            # Hybrid transforms handle tensor conversion and normalization
-            image_tensor, mask_tensor = self.transform(image, mask_class)
         else:
-            # simple resize for whole-image mode to a standard size if not patched
+            # Simple transforms for all other models (including hybrid)
             if not self.use_patched_data:
                 image = image.resize((2016, 1344), Image.BILINEAR)
                 mask_class = Image.fromarray(mask_class.astype(np.uint8)).resize((2016, 1344), Image.NEAREST)

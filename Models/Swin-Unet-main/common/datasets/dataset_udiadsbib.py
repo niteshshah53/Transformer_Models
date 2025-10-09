@@ -113,21 +113,12 @@ class UDiadsBibDataset(Dataset):
                     from datasets.sstrans_transforms import sstrans_validation_transform
                     self.transform = sstrans_validation_transform(patch_size=patch_size)
             elif model_type and model_type.lower() in ['hybrid1', 'hybrid2']:
-                # Use hybrid-specific transforms with enhanced augmentation
-                # Hybrid models use 224x224 patches
-                hybrid_patch_size = 224
+                # Use simple transforms like SwinUnet (no complex augmentation)
                 if split == 'training':
-                    import sys
-                    import os
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'hybrid'))
-                    from augmentation import hybrid_training_transform
-                    self.transform = hybrid_training_transform(patch_size=hybrid_patch_size)
+                    # bind patch_size so the transform is a picklable top-level callable
+                    self.transform = partial(training_transform, patch_size=patch_size)
                 else:
-                    import sys
-                    import os
-                    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'models', 'hybrid'))
-                    from augmentation import hybrid_validation_transform
-                    self.transform = hybrid_validation_transform(patch_size=hybrid_patch_size)
+                    self.transform = identity_transform
             else:
                 # Default transforms for other models (same as SwinUnet)
                 if split == 'training':
@@ -246,10 +237,8 @@ class UDiadsBibDataset(Dataset):
             if self.model_type and self.model_type.lower() == 'sstrans':
                 # SSTRANS transforms handle tensor conversion and normalization
                 image_tensor, mask_tensor = self.transform(image_patch, mask_class)
-            elif self.model_type and self.model_type.lower() in ['hybrid1', 'hybrid2']:
-                # Hybrid transforms handle tensor conversion and normalization
-                image_tensor, mask_tensor = self.transform(image_patch, mask_class)
             else:
+                # Simple transforms for all other models (including hybrid)
                 image_patch, mask_class = self.transform(image_patch, mask_class)
                 image_tensor = TF.to_tensor(image_patch)
                 mask_tensor = torch.from_numpy(mask_class).long()
@@ -267,10 +256,8 @@ class UDiadsBibDataset(Dataset):
             if self.model_type and self.model_type.lower() == 'sstrans':
                 # SSTRANS transforms handle tensor conversion and normalization
                 image_tensor, mask_tensor = self.transform(image, mask_class)
-            elif self.model_type and self.model_type.lower() in ['hybrid1', 'hybrid2']:
-                # Hybrid transforms handle tensor conversion and normalization
-                image_tensor, mask_tensor = self.transform(image, mask_class)
             else:
+                # Simple transforms for all other models (including hybrid)
                 # For pre-generated patches, apply transforms but don't resize (they're already patch-sized)
                 image, mask_class = self.transform(image, mask_class)
                 image_tensor = TF.to_tensor(image)
@@ -296,10 +283,8 @@ class UDiadsBibDataset(Dataset):
             if self.model_type and self.model_type.lower() == 'sstrans':
                 # SSTRANS transforms handle tensor conversion and normalization
                 image_tensor, mask_tensor = self.transform(image, mask_class)
-            elif self.model_type and self.model_type.lower() in ['hybrid1', 'hybrid2']:
-                # Hybrid transforms handle tensor conversion and normalization
-                image_tensor, mask_tensor = self.transform(image, mask_class)
             else:
+                # Simple transforms for all other models (including hybrid)
                 image, mask_class = self.transform(image, mask_class)
                 image_tensor = TF.to_tensor(image)
                 mask_tensor = torch.from_numpy(mask_class).long()

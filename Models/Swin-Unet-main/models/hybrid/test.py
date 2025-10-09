@@ -47,11 +47,11 @@ def parse_arguments():
         epilog="""
 Examples:
   # Test on U-DIADS-Bib dataset with Hybrid EfficientNet-Swin
-  python test.py --model hybrid --output_dir ./models/ \\
+  python test.py --model hybrid1 --output_dir ./models/ \\
                  --dataset UDIADS_BIB --manuscript Latin2 --is_savenii
   
   # Test on DIVAHISDB dataset with Hybrid EfficientNet-Swin
-  python test.py --model hybrid --dataset DIVAHISDB \\
+  python test.py --model hybrid2 --dataset DIVAHISDB \\
                  --output_dir ./models/ --manuscript Latin2
         """
     )

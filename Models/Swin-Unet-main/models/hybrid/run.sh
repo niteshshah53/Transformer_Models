@@ -22,8 +22,9 @@ module load cudnn
 mkdir -p ../../logs
 
 # Training configuration for Hybrid2:
-# - model: hybrid2 (requires config file)
-# - dataset: UDIADS_BIB (5 classes for Syr341FS, 6 classes for others)
+# - model: hybrid2 (Swin-EfficientNet hybrid)
+# - dataset: UDIADS_BIB (5 classes for Syr341, 6 classes for others)
+# - efficientnet_variant: b4 (balanced performance)
 # - base_lr: Initial learning rate
 # - patience: Early stopping patience
 
@@ -40,6 +41,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "=== Training Hybrid2 $MANUSCRIPT ==="
     python3 train.py \
         --model hybrid2 \
+        --efficientnet_variant b4 \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -53,10 +55,12 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "=== Testing Hybrid2 $MANUSCRIPT ==="
     python3 test.py \
         --model hybrid2 \
+        --efficientnet_variant b4 \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --is_savenii \
+        --use_tta \
         --output_dir "./All_Results_with_No_FocalLoss/hybrid2/UDIADS_BIB_MS/udiadsbib_patch224_hybrid2_${MANUSCRIPT}"
 done

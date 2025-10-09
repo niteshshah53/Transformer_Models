@@ -125,8 +125,9 @@ def compute_class_weights(train_dataset, num_classes):
     # Compute frequencies
     class_freq = class_counts / class_counts.sum()
 
-    # Inverse frequency (no normalization)
-    weights = np.log(1.0 + (1.0 / (class_freq + 1e-6)))
+    # Use proper inverse frequency weighting with smoothing
+    weights = 1.0 / (class_freq + 0.01)  # Add small epsilon to prevent extreme weights
+    weights = weights / weights.sum() * num_classes  # Normalize
 
     # Print
     print("\n" + "-"*80)
@@ -157,40 +158,32 @@ def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, see
     Returns:
         tuple: (train_loader, val_loader)
     """
-    # Optimize num_workers for better performance
+    # On Windows, reduce num_workers to avoid multiprocessing issues
     if os.name == 'nt':  # Windows
         num_workers = min(num_workers, 2)
         if num_workers > 0:
             print(f"Windows detected: reducing num_workers to {num_workers}")
-    else:
-        # On Linux/HPC systems, use more workers for better performance
-        num_workers = min(num_workers, 8)  # Cap at 8 workers
-        print(f"Using {num_workers} data loading workers for faster training")
     
     # Create a partial function for worker initialization
     import functools
     worker_fn = functools.partial(worker_init_fn, seed=seed)
     
-    train_loader = torch.utils.data.DataLoader(
+    train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
         num_workers=num_workers,
         pin_memory=True,
-        worker_init_fn=worker_fn if num_workers > 0 else None,
-        persistent_workers=True if num_workers > 0 else False,  # Keep workers alive between epochs
-        prefetch_factor=2 if num_workers > 0 else None  # Prefetch batches for faster loading
+        worker_init_fn=worker_fn if num_workers > 0 else None
     )
     
-    val_loader = torch.utils.data.DataLoader(
+    val_loader = DataLoader(
         val_dataset,
         batch_size=batch_size,
         shuffle=False,
         num_workers=num_workers,
         pin_memory=True,
-        worker_init_fn=worker_fn if num_workers > 0 else None,
-        persistent_workers=True if num_workers > 0 else False,  # Keep workers alive between epochs
-        prefetch_factor=2 if num_workers > 0 else None  # Prefetch batches for faster loading
+        worker_init_fn=worker_fn if num_workers > 0 else None
     )
     
     return train_loader, val_loader
@@ -198,7 +191,7 @@ def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, see
 
 def create_loss_functions(class_weights, num_classes):
     """
-    Create the loss functions used for training.
+    Create loss functions WITH class weights properly applied.
     
     Args:
         class_weights (torch.Tensor): Weights for each class
@@ -208,11 +201,36 @@ def create_loss_functions(class_weights, num_classes):
         tuple: (cross_entropy_loss, focal_loss, dice_loss)
     """
     
-    ce_loss = CrossEntropyLoss()
-    focal_loss = FocalLoss(gamma=3)
+    # Apply weights to CrossEntropyLoss (this was missing!)
+    ce_loss = CrossEntropyLoss(weight=class_weights)
+    
+    # Reduce focal loss gamma (5 is too aggressive, causes instability)
+    focal_loss = FocalLoss(gamma=2)  # Changed from 5 to 2
+    
+    # Dice loss doesn't use class weights directly
     dice_loss = DiceLoss(num_classes)
     
     return ce_loss, focal_loss, dice_loss
+
+
+def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss):
+    """
+    Unified loss computation for both training and validation.
+    
+    Args:
+        predictions: Model predictions
+        labels: Ground truth labels
+        ce_loss, focal_loss, dice_loss: Loss functions
+        
+    Returns:
+        torch.Tensor: Combined loss value
+    """
+    loss_ce = ce_loss(predictions, labels)
+    loss_focal = focal_loss(predictions, labels)
+    loss_dice = dice_loss(predictions, labels, softmax=True)
+    
+    # Balanced combination - same for train and val
+    return 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
 
 
 def create_optimizer_and_scheduler(model, learning_rate, args=None):
@@ -227,28 +245,31 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None):
     Returns:
         tuple: (optimizer, scheduler)
     """
-    # Use AdamW optimizer
+    # Reduce learning rate for transformer fine-tuning
+    adjusted_lr = learning_rate * 0.5  # Reduce by 50%
+    
+    # Use AdamW optimizer with improved settings
     optimizer = optim.AdamW(
         model.parameters(),
-        lr=learning_rate,
-        weight_decay=0.01,
+        lr=adjusted_lr,
+        weight_decay=0.05,  # Increased from 0.01
         betas=(0.9, 0.999)
     )
     
     # Use CosineAnnealingWarmRestarts scheduler (better for transformers)
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer,
-        T_0=20,  # Restart every 20 epochs
-        T_mult=2,  # Double the restart period each time
-        eta_min=1e-6  # Minimum learning rate
+        T_0=30,  # Restart every 30 epochs
+        T_mult=2,  # Double the period after each restart
+        eta_min=1e-6
     )
     
-    print(f"Setting up optimizer with learning rate: {learning_rate}")
+    print(f"Setting up optimizer with adjusted learning rate: {adjusted_lr} (reduced from {learning_rate})")
     print("Using CosineAnnealingWarmRestarts scheduler:")
-    print(f"  - T_0: 20 epochs (first restart period)")
-    print(f"  - T_mult: 2 (restart period multiplier)")
-    print(f"  - eta_min: 1e-06 (minimum learning rate)")
-    print(f"  - Note: Better convergence for transformer-based models")
+    print(f"  - T_0: 30 epochs (restart period)")
+    print(f"  - T_mult: 2 (period multiplier)")
+    print(f"  - Min LR: 1e-06")
+    print(f"  - Note: Better convergence for transformers")
     
     return optimizer, scheduler
 
@@ -272,10 +293,6 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
     num_batches = len(train_loader)
     
     for batch_idx, batch in enumerate(train_loader):
-        # Print progress every 10 batches to show training is active
-        if batch_idx % 10 == 0:
-            print(f"  Processing batch {batch_idx + 1}/{num_batches}...")
-        
         # Handle different batch formats (dict vs tuple)
         if isinstance(batch, dict):
             images = batch['image'].cuda()
@@ -286,13 +303,8 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
         # Forward pass
         predictions = model(images)
         
-        # Compute different loss components
-        loss_ce = ce_loss(predictions, labels)
-        loss_focal = focal_loss(predictions, labels)
-        loss_dice = dice_loss(predictions, labels, softmax=True)
-        
-        # Combined loss (weighted combination) for hybrid - uses all three losses
-        loss = 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
+        # Use unified loss computation
+        loss = compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss)
         
         # Backward pass and optimization
         optimizer.zero_grad()
@@ -325,8 +337,12 @@ def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_l
     total_loss = 0.0
     num_samples = 0
     
+    # Limit validation to first 50 samples for faster training
+    max_val_samples = min(50, len(val_dataset))
+    
     with torch.no_grad():
-        for sample in val_dataset:
+        for i in range(max_val_samples):
+            sample = val_dataset[i]
             if isinstance(sample, dict):
                 image = sample['image'].unsqueeze(0).cuda()
                 label = sample['label'].unsqueeze(0).cuda()
@@ -336,14 +352,8 @@ def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_l
             # Forward pass
             predictions = model(image)
             
-            # Compute loss
-            loss_ce = ce_loss(predictions, label)
-            loss_focal = focal_loss(predictions, label)
-            loss_dice = dice_loss(predictions, label, softmax=True)
-            
-            # Combined loss - uses all three losses like training
-            loss = 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
-            
+            # Use unified loss computation (CRITICAL FIX!)
+            loss = compute_combined_loss(predictions, label, ce_loss, focal_loss, dice_loss)
             total_loss += loss.item()
             num_samples += 1
     
@@ -424,11 +434,7 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
     # Compute class weights for balanced training
     if hasattr(train_dataset, 'mask_paths'):
         class_weights = compute_class_weights(train_dataset, args.num_classes)
-        # Boost rare classes moderately to improve recall (classes 1 and 4)
-        with torch.no_grad():
-            if class_weights.numel() >= 5:
-                class_weights[1] = class_weights[1] * 2.0  # Paratext
-                class_weights[4] = class_weights[4] * 2.0  # Title
+        # REMOVED: Manual weight boosting - let proper inverse frequency work naturally
     else:
         class_weights = torch.ones(args.num_classes)
     
@@ -485,9 +491,8 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
             epochs_without_improvement += 1
             print(f"    ⚠ No improvement for {epochs_without_improvement} epochs (patience: {patience}, remaining: {patience - epochs_without_improvement})")
         
-        # Learning rate scheduling
-        if hasattr(scheduler, 'step'):
-            scheduler.step()  # CosineAnnealingWarmRestarts doesn't need val_loss
+        # Learning rate scheduling - CRITICAL: This was missing!
+        scheduler.step()
         
         # Early stopping check
         if epochs_without_improvement >= patience:

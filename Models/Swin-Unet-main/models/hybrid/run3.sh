@@ -23,8 +23,9 @@ mkdir -p ../../logs
 
 # Training configuration for Hybrid2 on DIVAHISDB:
 # - model: hybrid2 (SwinUnet Encoder + Improved EfficientNet Decoder)
+# - efficientnet_variant: b4 (balanced performance)
 # - dataset: DIVAHISDB (4 classes: Background, Comment, Decoration, Main Text)
-# - base_lr: 0.0001 (optimal learning rate)
+# - base_lr: 0.0002 (optimal learning rate)
 # - patience: Early stopping patience
 # - Improvements: CBAM Attention, Smart Skip Connections, Deep Decoder Blocks
 # - Loss weights: 0.3 CE + 0.4 Focal + 0.3 Dice (better rare class handling)
@@ -42,9 +43,10 @@ export CUDA_VISIBLE_DEVICES=0
 MANUSCRIPTS=(CB55 CSG18 CSG863) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
-    echo "=== Training $MANUSCRIPT ==="
+    echo "=== Training Hybrid2 $MANUSCRIPT ==="
     python3 train.py \
         --model hybrid2 \
+        --efficientnet_variant b4 \
         --dataset DIVAHISDB \
         --divahisdb_root "../../DivaHisDB_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -56,9 +58,10 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --patience 50 \
         --output_dir "./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/divahisdb_patch224_hybrid2_${MANUSCRIPT}"
 
-    echo "=== Testing $MANUSCRIPT ==="
+    echo "=== Testing Hybrid2 $MANUSCRIPT ==="
     python3 test.py \
         --model hybrid2 \
+        --efficientnet_variant b4 \
         --dataset DIVAHISDB \
         --divahisdb_root "../../DivaHisDB_patched" \
         --manuscript ${MANUSCRIPT} \

@@ -15,7 +15,6 @@ import torch.backends.cudnn as cudnn
 
 # Add common directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
-sys.path.append(os.path.join(os.path.dirname(__file__), '../../common/datasets'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
 # Suppress warnings for cleaner output
@@ -25,14 +24,9 @@ warnings.filterwarnings("ignore")
 from trainer import trainer_hybrid
 
 # Import dataset classes
+from datasets.dataset_udiadsbib import UDiadsBibDataset
 try:
-    sys.path.append(os.path.join(os.path.dirname(__file__), '../../common/datasets'))
-    from dataset_udiadsbib import UDiadsBibDataset
-except ImportError:
-    print("ERROR: Could not import 'dataset_udiadsbib'. Please ensure the file exists in the '../../common/datasets' directory.")
-    sys.exit(1)
-try:
-    from dataset_divahisdb import DivaHisDBDataset
+    from datasets.dataset_divahisdb import DivaHisDBDataset
     DIVAHISDB_AVAILABLE = True
 except ImportError:
     DivaHisDBDataset = None
