@@ -364,19 +364,123 @@ class BasicLayer_up(nn.Module):
 
 
 # ============================================================================
+# SMART SKIP CONNECTION FOR TRANSFORMER DECODER
+# ============================================================================
+
+class SmartSkipConnectionTransformer(nn.Module):
+    """
+    Smart skip connection for transformer decoder (token space).
+    Equivalent to Hybrid2's ImprovedSmartSkipConnection but operates on tokens.
+    
+    Features:
+    - Linear alignment of encoder tokens to decoder dimension
+    - Multi-head self-attention for skip feature enhancement
+    - MLP fusion of decoder and enhanced skip features
+    """
+    
+    def __init__(self, encoder_dim, decoder_dim, num_heads=8, dropout=0.1):
+        super().__init__()
+        
+        self.encoder_dim = encoder_dim
+        self.decoder_dim = decoder_dim
+        
+        # 1. Align encoder tokens to decoder dimension
+        self.align = nn.Sequential(
+            nn.Linear(encoder_dim, decoder_dim),
+            nn.LayerNorm(decoder_dim),
+            nn.GELU()
+        )
+        
+        # 2. Multi-head self-attention for skip feature enhancement
+        # This is similar to CBAM but for token space
+        self.attention = nn.MultiheadAttention(
+            embed_dim=decoder_dim,
+            num_heads=num_heads,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.norm_attn = nn.LayerNorm(decoder_dim)
+        self.dropout = nn.Dropout(dropout)
+        
+        # 3. Fusion MLP (similar to Hybrid2's fusion convolution)
+        self.fuse = nn.Sequential(
+            nn.Linear(decoder_dim * 2, decoder_dim * 4),
+            nn.LayerNorm(decoder_dim * 4),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(decoder_dim * 4, decoder_dim),
+            nn.LayerNorm(decoder_dim)
+        )
+    
+    def forward(self, encoder_tokens, decoder_tokens):
+        """
+        Smart fusion of encoder skip tokens with decoder tokens.
+        
+        Args:
+            encoder_tokens: Skip features from encoder [B, L, C_enc]
+            decoder_tokens: Features from decoder path [B, L, C_dec]
+        
+        Returns:
+            Fused tokens [B, L, C_dec]
+        """
+        B_enc, L_enc, C_enc = encoder_tokens.shape
+        B_dec, L_dec, C_dec = decoder_tokens.shape
+        
+        # Step 1: Align encoder tokens to decoder dimension
+        skip_tokens = self.align(encoder_tokens)  # [B, L, decoder_dim]
+        
+        # Step 2: Self-attention on skip tokens to enhance important features
+        # This is analogous to CBAM's channel and spatial attention
+        skip_enhanced, _ = self.attention(skip_tokens, skip_tokens, skip_tokens)
+        skip_tokens = self.norm_attn(skip_tokens + self.dropout(skip_enhanced))
+        
+        # Step 3: Ensure spatial alignment
+        if L_enc != L_dec:
+            # Interpolate skip tokens to match decoder resolution
+            # Reshape to 2D, interpolate, then back to tokens
+            h_enc = w_enc = int(L_enc ** 0.5)
+            h_dec = w_dec = int(L_dec ** 0.5)
+            
+            skip_tokens_2d = skip_tokens.view(B_enc, h_enc, w_enc, -1).permute(0, 3, 1, 2)
+            skip_tokens_2d = torch.nn.functional.interpolate(
+                skip_tokens_2d, size=(h_dec, w_dec), 
+                mode='bilinear', align_corners=False
+            )
+            skip_tokens = skip_tokens_2d.permute(0, 2, 3, 1).reshape(B_dec, L_dec, -1)
+        
+        # Step 4: Concatenate and fuse
+        fused = torch.cat([decoder_tokens, skip_tokens], dim=-1)  # [B, L, 2*decoder_dim]
+        output = self.fuse(fused)  # [B, L, decoder_dim]
+        
+        return output
+
+
+# ============================================================================
 # SWIN DECODER
 # ============================================================================
 
 class SwinDecoder(nn.Module):
-    """Self-contained Swin-Unet decoder that works with CNN encoder features."""
+    """
+    Enhanced Swin-Unet decoder with TransUNet best practices.
     
-    def __init__(self, num_classes: int = 5, img_size: int = 224, embed_dim: int = 96):
+    Enhancements:
+    - Deep Supervision (auxiliary outputs)
+    - Multi-Scale Aggregation support (bottleneck)
+    - Better skip connections
+    """
+    
+    def __init__(self, num_classes: int = 5, img_size: int = 224, embed_dim: int = 96, 
+                 use_deep_supervision: bool = False, use_multiscale_agg: bool = False,
+                 use_smart_skip: bool = False):
         super().__init__()
         
         self.num_classes = num_classes
         self.embed_dim = embed_dim
         self.img_size = img_size
         self.patches_resolution = (img_size // 4, img_size // 4)  # Base resolution for 224 input
+        self.use_deep_supervision = use_deep_supervision
+        self.use_multiscale_agg = use_multiscale_agg
+        self.use_smart_skip = use_smart_skip
         
         # Add bottleneck layer with 2 SwinBlocks (missing from original implementation!)
         self.bottleneck_depth = 2  # 2 SwinBlocks for bottleneck processing
@@ -440,7 +544,61 @@ class SwinDecoder(nn.Module):
         self.up = FinalPatchExpand_X4(
             input_resolution=(img_size // 4, img_size // 4),
             dim_scale=4, dim=embed_dim)
-        self.output = nn.Conv2d(in_channels=embed_dim, out_channels=self.num_classes, kernel_size=1, bias=False)
+        
+        # REFERENCE ARCHITECTURE: Conv3×3 → ReLU → Conv1×1
+        self.output = nn.Sequential(
+            nn.Conv2d(in_channels=embed_dim, out_channels=embed_dim, 
+                     kernel_size=3, padding=1, bias=False),  # 3x3 conv for feature refinement
+            nn.BatchNorm2d(embed_dim),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels=embed_dim, out_channels=self.num_classes, 
+                     kernel_size=1, bias=False)  # 1x1 conv for classification
+        )
+        
+        # Deep Supervision: Auxiliary heads for intermediate outputs
+        if use_deep_supervision:
+            # Stages 1, 2, 3 have dimensions: [384, 192, 96]
+            aux_dims = [int(embed_dim * 2 ** (3-i)) for i in range(1, 4)]  # [384, 192, 96]
+            self.aux_heads = nn.ModuleList([
+                nn.Sequential(
+                    nn.LayerNorm(dim),
+                    nn.Linear(dim, num_classes)
+                ) for dim in aux_dims
+            ])
+            print("🚀 Deep Supervision enabled: 3 auxiliary outputs")
+            print(f"   Aux dims: {aux_dims}")
+        
+        # Multi-Scale Aggregation support
+        if use_multiscale_agg:
+            # Projection layers to combine multi-scale CNN features
+            self.multiscale_proj = nn.ModuleList([
+                nn.Linear(int(embed_dim * 2 ** i), self.bottleneck_dim)
+                for i in range(4)  # Project all 4 scales to bottleneck dim
+            ])
+            self.multiscale_fusion = nn.Linear(self.bottleneck_dim * 4, self.bottleneck_dim)
+            print("🚀 Multi-Scale Aggregation enabled in bottleneck")
+        
+        # Smart Skip Connections (OPTIONAL enhancement, disabled by default for baseline)
+        if use_smart_skip:
+            # Create smart skip connections for stages 1, 2, 3
+            skip_dims = [
+                (int(embed_dim * 2 ** (3-i)), int(embed_dim * 2 ** (3-i)))
+                for i in range(1, 4)  # [(384,384), (192,192), (96,96)]
+            ]
+            self.smart_skips = nn.ModuleList([
+                SmartSkipConnectionTransformer(
+                    encoder_dim=enc_dim,
+                    decoder_dim=dec_dim,
+                    num_heads=num_heads[3 - (i+1)],  # Match attention heads
+                    dropout=0.1
+                ) for i, (enc_dim, dec_dim) in enumerate(skip_dims)
+            ])
+            print("🚀 Smart Skip Connections enabled (attention-based fusion)")
+            print(f"   Skip dims: {[(enc, dec) for enc, dec in skip_dims]}")
+        else:
+            # BASELINE: Use naive concatenation (REFERENCE ARCHITECTURE)
+            self.smart_skips = None
+            print("✅ Using BASELINE skip connections (naive concatenation)")
         
         self.apply(self._init_weights)
     
@@ -453,30 +611,89 @@ class SwinDecoder(nn.Module):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
     
-    def forward_bottleneck(self, x):
+    def forward_bottleneck(self, x, all_features=None):
         """
         Forward through bottleneck layer with 2 SwinBlocks.
-        This processes the deepest EfficientNet features (P5) before decoder upsampling.
+        Optionally applies multi-scale aggregation if enabled.
         
         Args:
             x: Deepest feature tokens (B, L, C) where C=768, L=7*7=49
+            all_features: Optional list of all 4 encoder features for multi-scale aggregation
             
         Returns:
             Processed bottleneck features (B, L, C)
         """
+        if self.use_multiscale_agg and all_features is not None:
+            # Apply multi-scale aggregation
+            import torch.nn.functional as F
+            
+            B, L, C = x.shape
+            h = w = int(L ** 0.5)
+            
+            # Project and resize all features to bottleneck size
+            projected = []
+            for i, feat in enumerate(all_features):
+                # feat: [B, L_i, C_i]
+                B_f, L_f, C_f = feat.shape
+                h_f = w_f = int(L_f ** 0.5)
+                
+                # Project to bottleneck dim
+                proj_feat = self.multiscale_proj[i](feat)  # [B, L_i, bottleneck_dim]
+                
+                # Reshape and resize to bottleneck spatial size
+                proj_feat = proj_feat.view(B_f, h_f, w_f, self.bottleneck_dim)
+                proj_feat = proj_feat.permute(0, 3, 1, 2)  # [B, C, H, W]
+                proj_feat = F.interpolate(proj_feat, size=(h, w), mode='bilinear', align_corners=False)
+                proj_feat = proj_feat.permute(0, 2, 3, 1).contiguous()  # [B, H, W, C]
+                proj_feat = proj_feat.view(B, -1, self.bottleneck_dim)  # [B, L, C]
+                
+                projected.append(proj_feat)
+            
+            # Concatenate and fuse
+            aggregated = torch.cat(projected, dim=-1)  # [B, L, bottleneck_dim*4]
+            fused = self.multiscale_fusion(aggregated)  # [B, L, bottleneck_dim]
+            
+            # Add to original features (residual)
+            x = x + fused
+        
         return self.bottleneck(x)
     
     def forward_up_features(self, x, x_downsample):
-        """Forward through decoder with skip connections."""
+        """
+        Forward through decoder with SMART skip connections.
+        
+        Returns:
+            If use_deep_supervision:
+                (final_features, [aux_feat1, aux_feat2, aux_feat3])
+            Else:
+                final_features
+        """
+        aux_features = [] if self.use_deep_supervision else None
+        
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
                 x = layer_up(x)
             else:
-                x = torch.cat([x, x_downsample[3 - inx]], -1)
-                x = self.concat_back_dim[inx](x)
+                # SMART SKIP CONNECTION (attention-based fusion) or fallback to naive
+                if self.smart_skips is not None:
+                    # Use attention-enhanced skip connection
+                    encoder_skip = x_downsample[3 - inx]
+                    x = self.smart_skips[inx - 1](encoder_skip, x)
+                else:
+                    # Fallback to naive concatenation (baseline)
+                    x = torch.cat([x, x_downsample[3 - inx]], -1)
+                    x = self.concat_back_dim[inx](x)
+                
+                # Collect intermediate features BEFORE upsampling for deep supervision
+                if self.use_deep_supervision:
+                    aux_features.append(x)
+                
                 x = layer_up(x)
         
         x = self.norm_up(x)  # B L C
+        
+        if self.use_deep_supervision:
+            return x, aux_features
         return x
     
     def up_x4(self, x):
@@ -490,3 +707,37 @@ class SwinDecoder(nn.Module):
         x = x.permute(0, 3, 1, 2)  # B,C,H,W
         x = self.output(x)
         return x
+    
+    def process_aux_outputs(self, aux_features):
+        """
+        Process auxiliary features for deep supervision.
+        
+        Args:
+            aux_features: List of 3 intermediate features [stage1, stage2, stage3]
+        
+        Returns:
+            List of 3 auxiliary outputs [B, num_classes, H, W]
+        """
+        import torch.nn.functional as F
+        
+        aux_outputs = []
+        H, W = self.patches_resolution
+        
+        for i, aux_feat in enumerate(aux_features):
+            # aux_feat: [B, L, C]
+            B, L, C = aux_feat.shape
+            
+            # Apply auxiliary head
+            aux_out = self.aux_heads[i](aux_feat)  # [B, L, num_classes]
+            
+            # Reshape to spatial
+            h = w = int(L ** 0.5)
+            aux_out = aux_out.view(B, h, w, self.num_classes)
+            aux_out = aux_out.permute(0, 3, 1, 2)  # [B, num_classes, h, w]
+            
+            # Upsample to full resolution
+            aux_out = F.interpolate(aux_out, size=(self.img_size, self.img_size), 
+                                   mode='bilinear', align_corners=False)
+            aux_outputs.append(aux_out)
+        
+        return aux_outputs

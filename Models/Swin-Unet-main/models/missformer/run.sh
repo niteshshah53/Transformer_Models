@@ -29,7 +29,7 @@ mkdir -p ../../logs
 conda activate pytorch2.6-py3.12
 
 # Train all manuscripts one by one (Latin2 Latin14396 Latin16746 Syr341) (CB55, CSG18, CSG863)
-MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341) 
+MANUSCRIPTS=(Syr341) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "=== Training $MANUSCRIPT ==="

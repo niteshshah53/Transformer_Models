@@ -155,6 +155,12 @@ outputs/
 predictions/
 visualizations/
 
+# Optuna results
+optuna_results/
+
+# Results_Optimized_Hyperparameters
+Results_Optimized_Hyperparameters/  # Optimized hyperparameters results
+
 # Dataset directories (usually large and not version controlled)
 DivaHisDB/
 DivaHisDB_patched/

@@ -241,6 +241,15 @@ class UDiadsBibDataset(Dataset):
                 # Simple transforms for all other models (including hybrid)
                 image_patch, mask_class = self.transform(image_patch, mask_class)
                 image_tensor = TF.to_tensor(image_patch)
+                
+                # Apply ImageNet normalization for Hybrid1 (EfficientNet encoder)
+                if self.model_type and self.model_type.lower() == 'hybrid1':
+                    image_tensor = TF.normalize(
+                        image_tensor,
+                        mean=[0.485, 0.456, 0.406],  # ImageNet mean
+                        std=[0.229, 0.224, 0.225]     # ImageNet std
+                    )
+                
                 mask_tensor = torch.from_numpy(mask_class).long()
             
             case_name = f"{os.path.splitext(os.path.basename(img_path))[0]}_x{x}_y{y}"
@@ -261,6 +270,15 @@ class UDiadsBibDataset(Dataset):
                 # For pre-generated patches, apply transforms but don't resize (they're already patch-sized)
                 image, mask_class = self.transform(image, mask_class)
                 image_tensor = TF.to_tensor(image)
+                
+                # Apply ImageNet normalization for Hybrid1 (EfficientNet encoder)
+                if self.model_type and self.model_type.lower() == 'hybrid1':
+                    image_tensor = TF.normalize(
+                        image_tensor,
+                        mean=[0.485, 0.456, 0.406],  # ImageNet mean
+                        std=[0.229, 0.224, 0.225]     # ImageNet std
+                    )
+                
                 mask_tensor = torch.from_numpy(mask_class).long()
             
             # Just use the filename (without extension) as the case name
@@ -287,6 +305,15 @@ class UDiadsBibDataset(Dataset):
                 # Simple transforms for all other models (including hybrid)
                 image, mask_class = self.transform(image, mask_class)
                 image_tensor = TF.to_tensor(image)
+                
+                # Apply ImageNet normalization for Hybrid1 (EfficientNet encoder)
+                if self.model_type and self.model_type.lower() == 'hybrid1':
+                    image_tensor = TF.normalize(
+                        image_tensor,
+                        mean=[0.485, 0.456, 0.406],  # ImageNet mean
+                        std=[0.229, 0.224, 0.225]     # ImageNet std
+                    )
+                
                 mask_tensor = torch.from_numpy(mask_class).long()
             
             case_name = os.path.splitext(os.path.basename(img_path))[0]

@@ -1,4 +1,4 @@
-# Hybrid2 package: Swin-EfficientNet model
-from .hybrid_model import HybridSwinEncoderEfficientNetDecoder, create_hybrid2_model
+# Hybrid2 package: TransUNet-Enhanced Swin Model
+from .hybrid_model_transunet import Hybrid2TransUNet, create_hybrid2_transunet_full
 
-__all__ = ['HybridSwinEncoderEfficientNetDecoder', 'create_hybrid2_model']
+__all__ = ['Hybrid2TransUNet', 'create_hybrid2_transunet_full']

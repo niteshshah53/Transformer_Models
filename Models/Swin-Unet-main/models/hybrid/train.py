@@ -46,21 +46,59 @@ def get_model(args, config=None):
     """
     # Determine which hybrid model to use
     if args.model == 'hybrid1':
-        print("Loading Hybrid1: EfficientNet-Swin model...")
-        from hybrid1.hybrid_model import HybridEfficientNetB4SwinDecoder
-        model = HybridEfficientNetB4SwinDecoder(
-            num_classes=args.num_classes,
-            img_size=args.img_size,
-            pretrained=True
-        )
+        use_enhanced = getattr(args, 'use_enhanced', False)
+        
+        if use_enhanced:
+            print("=" * 80)
+            print("🚀 Loading Enhanced Hybrid1: TransUNet Best Practices")
+            print("=" * 80)
+            from hybrid1.hybrid_model import create_enhanced_hybrid1
+            model = create_enhanced_hybrid1(
+                num_classes=args.num_classes,
+                img_size=args.img_size,
+                pretrained=True
+            )
+        else:
+            print("Loading Hybrid1: EfficientNet-Swin model...")
+            from hybrid1.hybrid_model import HybridEfficientNetB4SwinDecoder
+            model = HybridEfficientNetB4SwinDecoder(
+                num_classes=args.num_classes,
+                img_size=args.img_size,
+                pretrained=True
+            )
     elif args.model == 'hybrid2':
-        print("Loading Hybrid2: Swin-EfficientNet model...")
-        from hybrid2.hybrid_model import create_hybrid2_model
-        model = create_hybrid2_model(
-            num_classes=args.num_classes,
-            img_size=args.img_size,
-            efficientnet_variant=getattr(args, 'efficientnet_variant', 'b4')
-        )
+        # Check which decoder variant to use
+        use_transunet = getattr(args, 'use_transunet', False)
+        use_efficientnet = getattr(args, 'use_efficientnet', False)
+        
+        if use_efficientnet:
+            print("=" * 80)
+            print("🚀 Loading Hybrid2-Enhanced EfficientNet: CNN Decoder + TransUNet")
+            print("=" * 80)
+            from hybrid2.hybrid_model_transunet import create_hybrid2_efficientnet
+            model = create_hybrid2_efficientnet(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            )
+        elif use_transunet:
+            print("=" * 80)
+            print("🚀 Loading Hybrid2-TransUNet: FULL TransUNet Best Practices")
+            print("=" * 80)
+            from hybrid2.hybrid_model_transunet import create_hybrid2_transunet_full
+            model = create_hybrid2_transunet_full(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            )
+        else:
+            print("Loading Hybrid2: Swin-EfficientNet model...")
+            print("🚀 TransUNet Best Practices: Deep Supervision ENABLED")
+            from hybrid2.hybrid_model import create_hybrid2_model
+            model = create_hybrid2_model(
+                num_classes=args.num_classes,
+                img_size=args.img_size,
+                efficientnet_variant=getattr(args, 'efficientnet_variant', 'b4'),
+                use_deep_supervision=True  # TransUNet best practice
+            )
     else:
         raise ValueError(f"Unknown model: {args.model}. Use 'hybrid1' or 'hybrid2'")
     
@@ -186,6 +224,12 @@ def parse_arguments():
                        help='Model type: hybrid1 (EfficientNet-Swin) or hybrid2 (Swin-EfficientNet)')
     parser.add_argument('--efficientnet_variant', type=str, default='b4', choices=['b0', 'b4', 'b5'],
                        help='EfficientNet variant for hybrid2 decoder (b0, b4, b5)')
+    parser.add_argument('--use_transunet', action='store_true', default=False,
+                       help='Use TransUNet-enhanced Hybrid2 (all best practices: GroupNorm, PosEmbed, CrossAttn, MultiScale)')
+    parser.add_argument('--use_efficientnet', action='store_true', default=False,
+                       help='Use Enhanced EfficientNet decoder (Pure CNN + TransUNet improvements, Expected IoU: 0.60-0.65)')
+    parser.add_argument('--use_enhanced', action='store_true', default=False,
+                       help='Use Enhanced Hybrid1 (Deep Supervision + Multi-Scale Aggregation, Expected IoU: 0.50-0.55)')
     parser.add_argument('--img_size', type=int, default=224, help='Input image size')
     parser.add_argument('--num_classes', type=int, default=5, help='Number of classes')
     

@@ -67,6 +67,12 @@ Examples:
                        help='Model architecture to test: hybrid1 (EfficientNet-Swin) or hybrid2 (Swin-EfficientNet)')
     parser.add_argument('--efficientnet_variant', type=str, default='b4', choices=['b0', 'b4', 'b5'],
                        help='EfficientNet variant for hybrid2 decoder (b0, b4, b5)')
+    parser.add_argument('--use_transunet', action='store_true', default=False,
+                       help='Use TransUNet-enhanced Hybrid2 (must match training configuration)')
+    parser.add_argument('--use_efficientnet', action='store_true', default=False,
+                       help='Use Enhanced EfficientNet decoder (must match training configuration)')
+    parser.add_argument('--use_enhanced', action='store_true', default=False,
+                       help='Use Enhanced Hybrid1 (must match training configuration)')
     
     # Dataset configuration
     parser.add_argument('--dataset', type=str, default='UDIADS_BIB',
@@ -173,18 +179,47 @@ def get_model(args, config=None):
     """
     # Determine which hybrid model to use
     if args.model == 'hybrid1':
-        from hybrid1.hybrid_model import create_hybrid_model
-        model = create_hybrid_model(
-            num_classes=args.num_classes,
-            img_size=args.img_size
-        ).cuda()
+        use_enhanced = getattr(args, 'use_enhanced', False)
+        
+        if use_enhanced:
+            print("Loading Enhanced Hybrid1 for testing...")
+            from hybrid1.hybrid_model import create_enhanced_hybrid1
+            model = create_enhanced_hybrid1(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            ).cuda()
+        else:
+            from hybrid1.hybrid_model import create_hybrid_model
+            model = create_hybrid_model(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            ).cuda()
     elif args.model == 'hybrid2':
-        from hybrid2.hybrid_model import create_hybrid2_model
-        model = create_hybrid2_model(
-            num_classes=args.num_classes,
-            img_size=args.img_size,
-            efficientnet_variant=getattr(args, 'efficientnet_variant', 'b4')
-        ).cuda()
+        # Check which decoder variant to use
+        use_transunet = getattr(args, 'use_transunet', False)
+        use_efficientnet = getattr(args, 'use_efficientnet', False)
+        
+        if use_efficientnet:
+            print("Loading Hybrid2-Enhanced EfficientNet for testing...")
+            from hybrid2.hybrid_model_transunet import create_hybrid2_efficientnet
+            model = create_hybrid2_efficientnet(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            ).cuda()
+        elif use_transunet:
+            print("Loading Hybrid2-TransUNet for testing...")
+            from hybrid2.hybrid_model_transunet import create_hybrid2_transunet_full
+            model = create_hybrid2_transunet_full(
+                num_classes=args.num_classes,
+                img_size=args.img_size
+            ).cuda()
+        else:
+            from hybrid2.hybrid_model import create_hybrid2_model
+            model = create_hybrid2_model(
+                num_classes=args.num_classes,
+                img_size=args.img_size,
+                efficientnet_variant=getattr(args, 'efficientnet_variant', 'b4')
+            ).cuda()
     else:
         raise ValueError(f"Unknown model: {args.model}. Use 'hybrid1' or 'hybrid2'")
     
@@ -241,8 +276,16 @@ def load_model_checkpoint(model, args):
         else:
             raise FileNotFoundError(f"No checkpoint found in {args.output_dir}")
     
-    msg = model.load_state_dict(torch.load(checkpoint_path))
+    # Load checkpoint with strict=False to handle minor differences like dynamic positional embeddings
+    checkpoint = torch.load(checkpoint_path)
+    msg = model.load_state_dict(checkpoint, strict=False)
     print(f"Model checkpoint loaded: {msg}")
+    
+    # If there are missing or unexpected keys, print them for debugging
+    if msg.missing_keys:
+        print(f"  Missing keys (will use initialized values): {len(msg.missing_keys)}")
+    if msg.unexpected_keys:
+        print(f"  Unexpected keys (ignored): {len(msg.unexpected_keys)}")
     
     return os.path.basename(checkpoint_path)
 
@@ -443,12 +486,17 @@ def apply_tta_single_patch(model, patch_tensor, num_classes):
     # Original
     with torch.no_grad():
         output = model(patch_tensor)
+        # Handle deep supervision
+        if isinstance(output, tuple):
+            output = output[0]
         predictions.append(torch.softmax(output, dim=1))
     
     # Horizontal flip
     with torch.no_grad():
         flipped = torch.flip(patch_tensor, dims=[3])
         output = model(flipped)
+        if isinstance(output, tuple):
+            output = output[0]
         output = torch.flip(output, dims=[3])
         predictions.append(torch.softmax(output, dim=1))
     
@@ -456,6 +504,8 @@ def apply_tta_single_patch(model, patch_tensor, num_classes):
     with torch.no_grad():
         flipped = torch.flip(patch_tensor, dims=[2])
         output = model(flipped)
+        if isinstance(output, tuple):
+            output = output[0]
         output = torch.flip(output, dims=[2])
         predictions.append(torch.softmax(output, dim=1))
     
@@ -463,6 +513,8 @@ def apply_tta_single_patch(model, patch_tensor, num_classes):
     with torch.no_grad():
         rotated = torch.rot90(patch_tensor, k=1, dims=[2, 3])
         output = model(rotated)
+        if isinstance(output, tuple):
+            output = output[0]
         output = torch.rot90(output, k=-1, dims=[2, 3])
         predictions.append(torch.softmax(output, dim=1))
     
@@ -511,6 +563,9 @@ def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patc
             # Standard inference
             with torch.no_grad():
                 output = model(patch_tensor)
+                # Handle deep supervision (tuple of main + aux outputs)
+                if isinstance(output, tuple):
+                    output = output[0]  # Use only main output for inference
                 pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
         
         # Add to prediction map with boundary checking

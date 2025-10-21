@@ -1,13 +1,12 @@
 #!/bin/bash -l
-#SBATCH --job-name=hybrid_train_test
+#SBATCH --job-name=hybrid2_divahisdb
 #SBATCH --output=./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/train_test_all_%j.out
 #SBATCH --error=./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/train_test_all_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --gres=gpu:v100:1
-#SBATCH --partition=v100
+#SBATCH --gres=gpu:1
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -23,17 +22,11 @@ mkdir -p ../../logs
 
 # Training configuration for Hybrid2 on DIVAHISDB:
 # - model: hybrid2 (SwinUnet Encoder + Improved EfficientNet Decoder)
-# - efficientnet_variant: b4 (balanced performance)
 # - dataset: DIVAHISDB (4 classes: Background, Comment, Decoration, Main Text)
 # - base_lr: 0.0002 (optimal learning rate)
 # - patience: Early stopping patience
-# - Improvements: CBAM Attention, Smart Skip Connections, Deep Decoder Blocks
-# - Loss weights: 0.3 CE + 0.4 Focal + 0.3 Dice (better rare class handling)
-# - Scheduler: CosineAnnealingWarmRestarts (better for transformers)
-# - Augmentation: Enhanced pipeline with rotations, color jittering, random erasing
-# - TTA: Test-time augmentation enabled for inference (+2-4% mIoU)
 
-conda activate pytorch2.6-py3.12
+conda activate base
 
 # Set PyTorch CUDA memory optimization
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
@@ -43,25 +36,25 @@ export CUDA_VISIBLE_DEVICES=0
 MANUSCRIPTS=(CB55 CSG18 CSG863) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
-    echo "=== Training Hybrid2 $MANUSCRIPT ==="
+    echo "=== Training Hybrid2-Swin-EfficientNet $MANUSCRIPT ==="
     python3 train.py \
         --model hybrid2 \
-        --efficientnet_variant b4 \
+    --use_efficientnet \
         --dataset DIVAHISDB \
         --divahisdb_root "../../DivaHisDB_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --num_classes 4 \
-        --batch_size 16 \
+        --batch_size 8 \
         --max_epochs 300 \
         --base_lr 0.0002 \
         --patience 50 \
-        --output_dir "./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/divahisdb_patch224_hybrid2_${MANUSCRIPT}"
+        --output_dir "./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/hybrid2_${MANUSCRIPT}"
 
-    echo "=== Testing Hybrid2 $MANUSCRIPT ==="
+    echo "=== Testing Hybrid2-Swin-EfficientNet $MANUSCRIPT ==="
     python3 test.py \
         --model hybrid2 \
-        --efficientnet_variant b4 \
+        --use_efficientnet \
         --dataset DIVAHISDB \
         --divahisdb_root "../../DivaHisDB_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -69,5 +62,5 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --num_classes 4 \
         --is_savenii \
         --use_tta \
-        --output_dir "./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/divahisdb_patch224_hybrid2_${MANUSCRIPT}"
+        --output_dir "./All_Results_with_No_FocalLoss/hybrid2/DIVAHISDB/hybrid2_${MANUSCRIPT}"
 done

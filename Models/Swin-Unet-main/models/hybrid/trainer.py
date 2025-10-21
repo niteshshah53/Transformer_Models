@@ -216,21 +216,48 @@ def create_loss_functions(class_weights, num_classes):
 def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss):
     """
     Unified loss computation for both training and validation.
+    Supports deep supervision with auxiliary outputs.
     
     Args:
-        predictions: Model predictions
+        predictions: Model predictions (logits or tuple of (logits, aux_outputs))
         labels: Ground truth labels
         ce_loss, focal_loss, dice_loss: Loss functions
         
     Returns:
         torch.Tensor: Combined loss value
     """
-    loss_ce = ce_loss(predictions, labels)
-    loss_focal = focal_loss(predictions, labels)
-    loss_dice = dice_loss(predictions, labels, softmax=True)
-    
-    # Balanced combination - same for train and val
-    return 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
+    # Handle deep supervision (tuple of main + auxiliary outputs)
+    if isinstance(predictions, tuple):
+        logits, aux_outputs = predictions
+        
+        # Main loss (full weight)
+        loss_ce = ce_loss(logits, labels)
+        loss_focal = focal_loss(logits, labels)
+        loss_dice = dice_loss(logits, labels, softmax=True)
+        main_loss = 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
+        
+        # Auxiliary losses (decreasing weights for deeper layers)
+        # TransUNet practice: [0.4, 0.3, 0.2] for 3 aux outputs
+        aux_weights = [0.4, 0.3, 0.2][:len(aux_outputs)]
+        aux_loss = 0.0
+        
+        for weight, aux_output in zip(aux_weights, aux_outputs):
+            aux_ce = ce_loss(aux_output, labels)
+            aux_focal = focal_loss(aux_output, labels)
+            aux_dice = dice_loss(aux_output, labels, softmax=True)
+            aux_combined = 0.3 * aux_ce + 0.4 * aux_focal + 0.3 * aux_dice
+            aux_loss += weight * aux_combined
+        
+        # Total loss: main + weighted auxiliary
+        return main_loss + aux_loss
+    else:
+        # Standard single output
+        loss_ce = ce_loss(predictions, labels)
+        loss_focal = focal_loss(predictions, labels)
+        loss_dice = dice_loss(predictions, labels, softmax=True)
+        
+        # Balanced combination - same for train and val
+        return 0.3 * loss_ce + 0.4 * loss_focal + 0.3 * loss_dice
 
 
 def create_optimizer_and_scheduler(model, learning_rate, args=None):
@@ -245,31 +272,66 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None):
     Returns:
         tuple: (optimizer, scheduler)
     """
-    # Reduce learning rate for transformer fine-tuning
-    adjusted_lr = learning_rate * 0.5  # Reduce by 50%
+    # TransUNet Best Practice: Differential Learning Rates
+    # Pretrained encoder gets 10x smaller LR to preserve learned features
+    # Decoder gets base LR for faster convergence
     
-    # Use AdamW optimizer with improved settings
+    encoder_params = []
+    decoder_params = []
+    adapter_params = []
+    
+    # Separate parameters by module
+    for name, param in model.named_parameters():
+        if 'encoder' in name.lower():
+            encoder_params.append(param)
+        elif 'adapter' in name.lower() or 'align' in name.lower() or 'attention' in name.lower():
+            adapter_params.append(param)
+        else:
+            decoder_params.append(param)
+    
+    # Parameter groups with differential LR and weight decay
+    param_groups = [
+        {
+            'params': encoder_params,
+            'lr': learning_rate * 0.1,  # 10x smaller for pretrained
+            'weight_decay': 1e-3,  # Light regularization for pretrained
+            'name': 'encoder'
+        },
+        {
+            'params': adapter_params,
+            'lr': learning_rate * 0.5,  # Medium LR for adapters
+            'weight_decay': 5e-3,  # Medium regularization
+            'name': 'adapters'
+        },
+        {
+            'params': decoder_params,
+            'lr': learning_rate,  # Full LR for new modules
+            'weight_decay': 1e-2,  # Strong regularization for new modules
+            'name': 'decoder'
+        }
+    ]
+    
+    # Use AdamW optimizer with differential LR
     optimizer = optim.AdamW(
-        model.parameters(),
-        lr=adjusted_lr,
-        weight_decay=0.05,  # Increased from 0.01
-        betas=(0.9, 0.999)
+        param_groups,
+        betas=(0.9, 0.999),
+        eps=1e-8
     )
     
-    # Use CosineAnnealingWarmRestarts scheduler (better for transformers)
+    # CosineAnnealingWarmRestarts scheduler for all groups
     scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
         optimizer,
-        T_0=30,  # Restart every 30 epochs
-        T_mult=2,  # Double the period after each restart
+        T_0=50,  # Restart every 50 epochs
+        T_mult=2,  # Double period after each restart
         eta_min=1e-6
     )
     
-    print(f"Setting up optimizer with adjusted learning rate: {adjusted_lr} (reduced from {learning_rate})")
-    print("Using CosineAnnealingWarmRestarts scheduler:")
-    print(f"  - T_0: 30 epochs (restart period)")
-    print(f"  - T_mult: 2 (period multiplier)")
-    print(f"  - Min LR: 1e-06")
-    print(f"  - Note: Better convergence for transformers")
+    print("🚀 TransUNet Best Practice: Differential Learning Rates")
+    print(f"  📊 Encoder LR:  {learning_rate * 0.1:.6f} (10x smaller, {len(encoder_params)} params)")
+    print(f"  📊 Adapter LR:  {learning_rate * 0.5:.6f} (5x smaller, {len(adapter_params)} params)")
+    print(f"  📊 Decoder LR:  {learning_rate:.6f} (base LR, {len(decoder_params)} params)")
+    print(f"  ⚙️  Scheduler: CosineAnnealingWarmRestarts (T_0=50, T_mult=2)")
+    print(f"  ⚙️  Weight decay: Encoder=1e-3, Adapters=5e-3, Decoder=1e-2")
     
     return optimizer, scheduler
 

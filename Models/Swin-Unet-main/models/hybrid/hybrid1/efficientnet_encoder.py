@@ -78,10 +78,12 @@ class EfficientNetEncoder(nn.Module):
 
 class EfficientNetEncoderWithAdapters(nn.Module):
     """
-    EfficientNet encoder with channel adapters for Swin decoder compatibility.
+    EfficientNet encoder with bottleneck adapter for Swin decoder compatibility.
     
-    This version includes 1x1 conv adapters that map EfficientNet channels
-    to the expected Swin decoder channel dimensions [96, 192, 384, 768].
+    REFERENCE ARCHITECTURE COMPLIANCE:
+    - Returns RAW encoder features C1, C2, C3 (for skip connections)
+    - Only adapts C4 (deepest feature) via 1x1 conv to embed_dim*8 (768 for embed_dim=96)
+    - This matches: "1×1 Conv (from C4_channels → embed_dim*8)"
     """
     
     def __init__(self, target_dims: list[int] = [96, 192, 384, 768], pretrained: bool = True):
@@ -92,33 +94,52 @@ class EfficientNetEncoderWithAdapters(nn.Module):
         
         # Get source channels from EfficientNet
         source_channels = self.encoder.get_channels()
+        # For EfficientNet-B4: [24, 32, 56, 160] at strides [4, 8, 16, 32]
         
-        # Build channel adapters
-        self.adapters = nn.ModuleList([
+        # REFERENCE COMPLIANCE: Only adapt C4 (bottleneck) to decoder embedding dimension
+        # Skip connections use encoder features with adapter to match decoder dimensions
+        self.skip_adapters = nn.ModuleList([
             Conv1x1BNAct(in_ch=source_channels[i], out_ch=target_dims[i]) 
-            for i in range(4)
+            for i in range(3)  # Only for C1, C2, C3 (skip connections)
         ])
         
-        self.target_dims = target_dims
+        # Bottleneck adapter: C4 (160 channels) → target_dims[3] (768 channels)
+        self.bottleneck_adapter = Conv1x1BNAct(
+            in_ch=source_channels[3],  # 160 for EfficientNet-B4
+            out_ch=target_dims[3]      # 768 (embed_dim * 8)
+        )
         
-        print(f"EfficientNet channels: {source_channels}")
-        print(f"Target dimensions: {target_dims}")
+        self.target_dims = target_dims
+        self.source_channels = source_channels
+        
+        print(f"✅ REFERENCE ARCHITECTURE MODE:")
+        print(f"   EfficientNet channels: {source_channels}")
+        print(f"   Skip adapters (C1-C3): {source_channels[:3]} → {target_dims[:3]}")
+        print(f"   Bottleneck adapter (C4): {source_channels[3]} → {target_dims[3]}")
     
     def forward(self, x: torch.Tensor) -> list[torch.Tensor]:
         """
-        Forward pass with channel adaptation.
+        Forward pass with bottleneck-only adaptation.
         
         Args:
             x: Input tensor of shape (B, 3, H, W)
             
         Returns:
-            List of 4 adapted feature maps with target channel dimensions
+            List of 4 feature maps:
+            - features[0-2]: Skip features (C1, C2, C3) - adapted to target dims
+            - features[3]: Bottleneck feature (C4) - adapted to embed_dim*8
         """
         # Get features from EfficientNet
         features = self.encoder(x)
+        # features[i]: (B, source_channels[i], H/(2^(i+2)), W/(2^(i+2)))
         
-        # Adapt channels to target dimensions
-        adapted_features = [self.adapters[i](features[i]) for i in range(4)]
+        # Adapt skip connection features (C1, C2, C3)
+        adapted_features = [
+            self.skip_adapters[i](features[i]) for i in range(3)
+        ]
+        
+        # Adapt bottleneck feature (C4)
+        adapted_features.append(self.bottleneck_adapter(features[3]))
         
         return adapted_features
     
