@@ -7,6 +7,17 @@ import timm
 import copy
 
 
+def get_norm_layer(channels, norm_type='group', num_groups=32):
+    """Factory function for normalization layers."""
+    if norm_type == 'group':
+        num_groups = min(num_groups, channels)
+        while channels % num_groups != 0:
+            num_groups -= 1
+        return nn.GroupNorm(num_groups=num_groups, num_channels=channels)
+    else:
+        return nn.BatchNorm2d(channels)
+
+
 class Mlp(nn.Module):
     def __init__(self, in_features, hidden_features=None, out_features=None, act_layer=nn.GELU, drop=0.):
         super().__init__()
@@ -232,6 +243,47 @@ class FinalPatchExpand_X4(nn.Module):
         return x
 
 
+class BasicLayer(nn.Module):
+    """A basic Swin Transformer layer for one stage (encoder-style, no upsample).
+    
+    This matches SwinUnet's BasicLayer implementation.
+    """
+    def __init__(self, dim, input_resolution, depth, num_heads, window_size,
+                 mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0.,
+                 drop_path=0., norm_layer=nn.LayerNorm, downsample=None, use_checkpoint=False):
+        super().__init__()
+        self.dim = dim
+        self.input_resolution = input_resolution
+        self.depth = depth
+        self.use_checkpoint = use_checkpoint
+
+        self.blocks = nn.ModuleList([
+            SwinTransformerBlock(dim=dim, input_resolution=input_resolution,
+                                 num_heads=num_heads, window_size=window_size,
+                                 shift_size=0 if (i % 2 == 0) else window_size // 2,
+                                 mlp_ratio=mlp_ratio,
+                                 qkv_bias=qkv_bias, qk_scale=qk_scale,
+                                 drop=drop, attn_drop=attn_drop,
+                                 drop_path=drop_path[i] if isinstance(drop_path, list) else drop_path,
+                                 norm_layer=norm_layer)
+            for i in range(depth)])
+
+        if downsample is not None:
+            self.downsample = downsample(input_resolution, dim=dim, norm_layer=norm_layer)
+        else:
+            self.downsample = None
+
+    def forward(self, x):
+        for blk in self.blocks:
+            if self.use_checkpoint:
+                x = checkpoint.checkpoint(blk, x)
+            else:
+                x = blk(x)
+        if self.downsample is not None:
+            x = self.downsample(x)
+        return x
+
+
 class BasicLayer_up(nn.Module):
     def __init__(self, dim, input_resolution, depth, num_heads, window_size,
                  mlp_ratio=4., qkv_bias=True, qk_scale=None, drop=0., attn_drop=0.,
@@ -271,21 +323,29 @@ class BasicLayer_up(nn.Module):
 
 class CNNFeatureAdapter(nn.Module):
     """Adapts CNN features to transformer format with re-embedding"""
-    def __init__(self, in_channels, out_channels, spatial_size):
+    def __init__(self, in_channels, out_channels, spatial_size, use_groupnorm=False):
         super().__init__()
         self.spatial_size = spatial_size
         self.out_channels = out_channels
+        self.use_groupnorm = use_groupnorm
         
         # Projection layer to match transformer dimensions
-        self.projection = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
-            #nn.BatchNorm2d(out_channels),
-            nn.GELU()
-        )
+        if use_groupnorm:
+            # For CNN features, use GroupNorm
+            self.projection = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+                get_norm_layer(out_channels, 'group'),
+                nn.GELU()
+            )
+        else:
+            self.projection = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=False),
+                nn.GELU()
+            )
         
         # Additional fully connected layer for feature refinement
         self.fc_refine = nn.Linear(out_channels, out_channels)
-        self.norm = nn.LayerNorm(out_channels)
+        self.norm = nn.LayerNorm(out_channels)  # Always LayerNorm for tokens
         
     def forward(self, x):
         # x: (B, C, H, W)
@@ -411,7 +471,22 @@ class FourierFeatureFusion(nn.Module):
 
 
 class EfficientNetEncoder(nn.Module):
-    """EfficientNet encoder with feature extraction at multiple scales using timm"""
+    """
+    EfficientNet encoder with feature extraction at multiple scales using timm.
+    
+    NOTE: EfficientNet-B4 Architecture Comparison:
+    - Network Model Encoder: Uses actual EfficientNet-B4 architecture from timm
+      (tf_efficientnet_b4_ns with MBConv blocks, depthwise separable convolutions, etc.)
+      This is the REAL EfficientNet-B4 encoder architecture.
+    
+    - Hybrid2 Model Decoder: Uses "EfficientNet-B4" channel configuration but NOT the architecture.
+      The decoder uses SimpleDecoderBlock (Conv2d + BatchNorm + ReLU), which is a simple CNN decoder.
+      The "B4" name refers to the channel configuration (decoder_channels=[256, 128, 64, 32]),
+      not the EfficientNet architecture itself.
+    
+    They are NOT the same - Network uses real EfficientNet-B4 encoder, Hybrid2 uses simple CNN decoder
+    with EfficientNet-B4 channel configuration.
+    """
     def __init__(self, model_name='tf_efficientnet_b4_ns', pretrained=True, freeze_bn=False):
         super().__init__()
         
@@ -477,6 +552,77 @@ class SmartSkipConnectionTransformer(nn.Module):
         return self.fuse(fused)
 
 
+class SimpleSkipConnectionTransformer(nn.Module):
+    """
+    Simple skip connection for transformer tokens: Project encoder tokens and concatenate.
+    Matches hybrid2's SimpleSkipConnection pattern but works with tokens instead of CNN features.
+    
+    Pattern (matching hybrid2):
+    1. Project encoder tokens: Linear → LayerNorm → ReLU
+    2. Concatenate: [decoder_tokens, encoder_proj_tokens]
+    3. Fuse: Linear (equivalent to Conv3x3) → LayerNorm → ReLU
+    """
+    def __init__(self, encoder_dim, decoder_dim, use_groupnorm=False):
+        super().__init__()
+        self.encoder_dim = encoder_dim
+        self.decoder_dim = decoder_dim
+        
+        # Project encoder tokens to decoder dimension (equivalent to Conv1x1 in hybrid2)
+        self.proj = nn.Sequential(
+            nn.Linear(encoder_dim, decoder_dim, bias=False),
+            nn.LayerNorm(decoder_dim),
+            nn.ReLU(inplace=True)
+        )
+        
+        # Fuse concatenated tokens (equivalent to Conv3x3 in hybrid2)
+        self.fuse = nn.Sequential(
+            nn.Linear(decoder_dim * 2, decoder_dim, bias=False),
+            nn.LayerNorm(decoder_dim),
+            nn.ReLU(inplace=True)
+        )
+    
+    def forward(self, encoder_tokens, decoder_tokens):
+        """
+        Args:
+            encoder_tokens: (B, L_enc, encoder_dim) - Encoder tokens
+            decoder_tokens: (B, L_dec, decoder_dim) - Decoder tokens
+            
+        Returns:
+            fused: (B, L_dec, decoder_dim) - Fused tokens
+        """
+        B_enc, L_enc, enc_dim = encoder_tokens.shape
+        B_dec, L_dec, dec_dim = decoder_tokens.shape
+        
+        # Project encoder tokens to decoder dimension
+        encoder_proj = self.proj(encoder_tokens)  # (B_enc, L_enc, decoder_dim)
+        
+        # Handle spatial size mismatch (if encoder and decoder have different resolutions)
+        if L_enc != L_dec:
+            h_enc = w_enc = int(L_enc ** 0.5)
+            h_dec = w_dec = int(L_dec ** 0.5)
+            
+            # Reshape to spatial format
+            encoder_proj_2d = encoder_proj.view(B_enc, h_enc, w_enc, dec_dim)
+            encoder_proj_2d = encoder_proj_2d.permute(0, 3, 1, 2)  # (B, C, H, W)
+            
+            # Interpolate to match decoder spatial size
+            encoder_proj_2d = torch.nn.functional.interpolate(
+                encoder_proj_2d, size=(h_dec, w_dec), mode='bilinear', align_corners=False
+            )
+            
+            # Reshape back to tokens
+            encoder_proj_2d = encoder_proj_2d.permute(0, 2, 3, 1)  # (B, H, W, C)
+            encoder_proj = encoder_proj_2d.reshape(B_dec, L_dec, dec_dim)
+        
+        # Concatenate along feature dimension (equivalent to channel dim in CNN)
+        fused = torch.cat([decoder_tokens, encoder_proj], dim=-1)  # (B, L_dec, decoder_dim * 2)
+        
+        # Fuse with Linear → LayerNorm → ReLU (equivalent to Conv3x3 → Norm → ReLU)
+        fused = self.fuse(fused)  # (B, L_dec, decoder_dim)
+        
+        return fused
+
+
 class EfficientNetSwinUNet(nn.Module):
     """
     Hybrid CNN-Transformer UNet with EfficientNet encoder and Swin Transformer decoder
@@ -487,7 +633,7 @@ class EfficientNetSwinUNet(nn.Module):
                  qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0.1, norm_layer=nn.LayerNorm, use_checkpoint=False,
                  use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, 
-                 adapter_mode='external', use_multiscale_agg=False):
+                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False):
         super().__init__()
         
         self.num_classes = num_classes
@@ -498,6 +644,7 @@ class EfficientNetSwinUNet(nn.Module):
         self.use_bottleneck = use_bottleneck
         self.adapter_mode = adapter_mode  # 'external' or 'streaming'
         self.use_multiscale_agg = use_multiscale_agg
+        self.use_groupnorm = use_groupnorm
         
         # EfficientNet Encoder
         self.encoder = EfficientNetEncoder(model_name=efficientnet_model, pretrained=pretrained)
@@ -514,48 +661,72 @@ class EfficientNetSwinUNet(nn.Module):
                 CNNFeatureAdapter(
                     in_channels=self.encoder.stage_channels[i],
                     out_channels=self.decoder_dims[i],
-                    spatial_size=encoder_spatial_sizes[i]
+                    spatial_size=encoder_spatial_sizes[i],
+                    use_groupnorm=use_groupnorm  # Pass GroupNorm flag
                 ) for i in range(4)
             ])
         else:
             self.feature_adapters = None  # streaming mode handles adaptation inline
             # Register streaming adapters (Hybrid1-like): 1x1 conv per stage + GELU (like hybrid1)
-            self.streaming_proj = nn.ModuleList([
-                nn.Sequential(
-                    nn.Conv2d(self.encoder.stage_channels[i], self.decoder_dims[i], kernel_size=1, bias=False),
-                    nn.GELU()
-                ) for i in range(4)
-            ])
+            if use_groupnorm:
+                self.streaming_proj = nn.ModuleList([
+                    nn.Sequential(
+                        nn.Conv2d(self.encoder.stage_channels[i], self.decoder_dims[i], kernel_size=1, bias=False),
+                        get_norm_layer(self.decoder_dims[i], 'group'),
+                        nn.GELU()
+                    ) for i in range(4)
+                ])
+            else:
+                self.streaming_proj = nn.ModuleList([
+                    nn.Sequential(
+                        nn.Conv2d(self.encoder.stage_channels[i], self.decoder_dims[i], kernel_size=1, bias=False),
+                        nn.GELU()
+                    ) for i in range(4)
+                ])
         
         # Bottleneck processing
+        # Aligned to SwinUnet: dim=768, heads=24, BasicLayer, stochastic drop_path
+        bottleneck_dim = self.decoder_dims[-1]  # 768 (matches SwinUnet encoder stage 4)
+        bottleneck_num_heads = num_heads[-1]  # 24 (matches SwinUnet encoder stage 4)
+        
         self.norm = norm_layer(self.decoder_dims[-1])
         if self.use_bottleneck:
-            # 2 Swin blocks at 7x7 with dim=768, heads=24
-            self.bottleneck_layer = BasicLayer_up(
-                dim=self.decoder_dims[-1],
+            # Calculate stochastic drop_path matching SwinUnet
+            # SwinUnet uses depths=[2, 2, 2, 2] for encoder, bottleneck is last 2 blocks
+            # dpr = linspace(0, drop_path_rate, sum(depths)) = linspace(0, 0.1, 8)
+            # Bottleneck uses last 2 values: dpr[6:8] ≈ [0.086, 0.1]
+            depths_encoder = [2, 2, 2, 2]  # Matching SwinUnet encoder depths
+            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_encoder))]
+            # Bottleneck is the last encoder layer (layer 3), uses last 2 blocks
+            bottleneck_drop_path = dpr[sum(depths_encoder[:3]):sum(depths_encoder[:4])]
+            
+            # 2 Swin blocks at 7x7 with dim=768, heads=24 (matching SwinUnet)
+            self.bottleneck_layer = BasicLayer(
+                dim=bottleneck_dim,
                 input_resolution=(img_size // 32, img_size // 32),
                 depth=2,
-                num_heads=num_heads[-1],
+                num_heads=bottleneck_num_heads,
                 window_size=window_size,
                 mlp_ratio=mlp_ratio,
                 qkv_bias=qkv_bias,
                 qk_scale=qk_scale,
                 drop=drop_rate,
                 attn_drop=attn_drop_rate,
-                drop_path=0.0,
+                drop_path=bottleneck_drop_path,  # Stochastic depth matching SwinUnet
                 norm_layer=norm_layer,
-                upsample=None,
+                downsample=None,  # No downsampling in bottleneck
                 use_checkpoint=use_checkpoint
             )
             
-            # Multi-Scale Aggregation support (like hybrid1)
+            # Multi-Scale Aggregation support
             if use_multiscale_agg:
                 # Projection layers to combine multi-scale encoder features
+                # Project all 4 scales to bottleneck dim (768, matching SwinUnet)
                 self.multiscale_proj = nn.ModuleList([
-                    nn.Linear(self.decoder_dims[i], self.decoder_dims[-1])
+                    nn.Linear(self.decoder_dims[i], bottleneck_dim)
                     for i in range(4)  # Project all 4 scales to bottleneck dim (768)
                 ])
-                self.multiscale_fusion = nn.Linear(self.decoder_dims[-1] * 4, self.decoder_dims[-1])
+                self.multiscale_fusion = nn.Linear(bottleneck_dim * 4, bottleneck_dim)
                 print("🚀 Multi-Scale Aggregation enabled in bottleneck")
         
         # Fusion method for decoder
@@ -589,9 +760,20 @@ class EfficientNetSwinUNet(nn.Module):
                 SmartSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96,  num_heads=num_heads[0]),
             ])
             self.skip_fusions = None
-        else:
+        elif fusion_method == 'simple':
+            # Simple skip connections matching hybrid2's SimpleSkipConnection pattern
+            self.simple_skips = nn.ModuleList([
+                SimpleSkipConnectionTransformer(encoder_dim=384, decoder_dim=384),
+                SimpleSkipConnectionTransformer(encoder_dim=192, decoder_dim=192),
+                SimpleSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96),
+            ])
             self.skip_fusions = None
             self.smart_skips = None
+        else:
+            # Default: no special fusion (fallback to original simple concat)
+            self.skip_fusions = None
+            self.smart_skips = None
+            self.simple_skips = None
         
         # Swin Transformer Decoder
         self.num_layers = 4
@@ -643,15 +825,40 @@ class EfficientNetSwinUNet(nn.Module):
             dim=embed_dim
         )
         
-        # self.output = nn.Conv2d(in_channels=embed_dim, out_channels=num_classes, kernel_size=1, bias=False)
-        # REFERENCE ARCHITECTURE: Conv3×3 → ReLU → Conv1×1 (no BatchNorm, like hybrid1)
-        self.output = nn.Sequential(
-            nn.Conv2d(in_channels=embed_dim, out_channels=embed_dim, 
-                    kernel_size=3, padding=1, bias=False),  # 3x3 conv for feature refinement
-            nn.ReLU(inplace=True),
-            nn.Conv2d(in_channels=embed_dim, out_channels=num_classes, 
-                    kernel_size=1, bias=False)  # 1x1 conv for classification
-        )
+        # Projection layer to reduce channels from embed_dim to 64 (matching Hybrid2's decoder4)
+        # This matches Hybrid2 baseline: decoder4 reduces channels to 64 before seg_head
+        if use_groupnorm:
+            self.final_proj = nn.Sequential(
+                nn.Conv2d(in_channels=embed_dim, out_channels=64, kernel_size=3, padding=1, bias=False),
+                get_norm_layer(64, 'group'),
+                nn.ReLU(inplace=True)
+            )
+        else:
+            self.final_proj = nn.Sequential(
+                nn.Conv2d(in_channels=embed_dim, out_channels=64, kernel_size=3, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True)
+            )
+        
+        # Segmentation head - Baseline style (exactly matching hybrid2 baseline)
+        if use_groupnorm:
+            # Baseline segmentation head with GroupNorm (matching Hybrid2 baseline)
+            self.output = nn.Sequential(
+                nn.Conv2d(64, 64, 3, padding=1, bias=False),  # 64 -> 64 (matching Hybrid2)
+                get_norm_layer(64, 'group'),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(0.1),
+                nn.Conv2d(64, num_classes, 1)  # bias=True by default (matching Hybrid2)
+            )
+        else:
+            # Original segmentation head (fallback for non-groupnorm mode)
+            self.output = nn.Sequential(
+                nn.Conv2d(64, 64, 3, padding=1, bias=False),
+                nn.BatchNorm2d(64),
+                nn.ReLU(inplace=True),
+                nn.Dropout2d(0.1),
+                nn.Conv2d(64, num_classes, 1)
+            )
         
         # Deep Supervision: Auxiliary heads for intermediate outputs
         if use_deep_supervision:
@@ -756,10 +963,10 @@ class EfficientNetSwinUNet(nn.Module):
         x = self.norm(adapted_features[-1])
         if self.use_bottleneck:
             if self.use_multiscale_agg:
-                # Multi-scale aggregation: project all 4 encoder scales to bottleneck
+                # Multi-scale aggregation matching SwinUnet pattern
                 import torch.nn.functional as F
                 
-                B, L, C = x.shape
+                B, L, C = x.shape  # C is bottleneck_dim (768)
                 h = w = int(L ** 0.5)
                 
                 # Project and resize all features to bottleneck size
@@ -769,26 +976,26 @@ class EfficientNetSwinUNet(nn.Module):
                     B_f, L_f, C_f = feat.shape
                     h_f = w_f = int(L_f ** 0.5)
                     
-                    # Project to bottleneck dim
+                    # Project to bottleneck dim (768)
                     proj_feat = self.multiscale_proj[i](feat)  # [B, L_i, bottleneck_dim]
                     
                     # Reshape and resize to bottleneck spatial size
-                    proj_feat = proj_feat.view(B_f, h_f, w_f, self.decoder_dims[-1])
+                    proj_feat = proj_feat.view(B_f, h_f, w_f, C)  # C is bottleneck_dim (768)
                     proj_feat = proj_feat.permute(0, 3, 1, 2)  # [B, C, H, W]
                     proj_feat = F.interpolate(proj_feat, size=(h, w), mode='bilinear', align_corners=False)
                     proj_feat = proj_feat.permute(0, 2, 3, 1).contiguous()  # [B, H, W, C]
-                    proj_feat = proj_feat.view(B, -1, self.decoder_dims[-1])  # [B, L, C]
+                    proj_feat = proj_feat.view(B, -1, C)  # [B, L, bottleneck_dim]
                     
                     projected.append(proj_feat)
                 
-                # Concatenate and fuse
+                # Concatenate along feature dimension
                 aggregated = torch.cat(projected, dim=-1)  # [B, L, bottleneck_dim*4]
                 fused = self.multiscale_fusion(aggregated)  # [B, L, bottleneck_dim]
                 
-                # Add to original features (residual)
+                # Add to original features (residual connection)
                 x = x + fused
             
-            x = self.bottleneck_layer(x)
+            x = self.bottleneck_layer(x)  # [B, L, 768] - aligned to SwinUnet, no projection needed
         
         # Decoder with skip connections
         aux_features = [] if self.use_deep_supervision else None
@@ -804,8 +1011,11 @@ class EfficientNetSwinUNet(nn.Module):
                     x = self.skip_fusions[inx - 1](x, skip_features)
                 elif self.fusion_method == 'smart' and self.smart_skips is not None:
                     x = self.smart_skips[inx - 1](skip_features, x)
+                elif self.fusion_method == 'simple' and self.simple_skips is not None:
+                    # Use simple skip connection matching hybrid2 pattern
+                    x = self.simple_skips[inx - 1](skip_features, x)
                 else:
-                    # Simple concatenation fusion (original)
+                    # Fallback: Simple concatenation fusion (original)
                     x = torch.cat([x, skip_features], -1)
                     x = self.concat_back_dim[inx](x)
                 
@@ -825,6 +1035,11 @@ class EfficientNetSwinUNet(nn.Module):
         x = self.up(x)
         x = x.view(B, 4 * H, 4 * W, -1)
         x = x.permute(0, 3, 1, 2)  # B, C, H, W
+        
+        # Project from embed_dim to 64 channels (matching Hybrid2's decoder4)
+        x = self.final_proj(x)
+        
+        # Segmentation head (matching Hybrid2 baseline)
         x = self.output(x)
         
         # Process auxiliary outputs for deep supervision
@@ -837,9 +1052,13 @@ class EfficientNetSwinUNet(nn.Module):
     def process_aux_outputs(self, aux_features):
         """
         Process auxiliary features for deep supervision.
+        Matches hybrid2's pattern: uses scale_factor for upsampling.
         
         Args:
             aux_features: List of 3 intermediate features [stage1, stage2, stage3]
+            Stage 1: H/16 resolution (after layer 0)
+            Stage 2: H/8 resolution (after layer 1)
+            Stage 3: H/4 resolution (after layer 2)
         
         Returns:
             List of 3 auxiliary outputs [B, num_classes, H, W]
@@ -847,8 +1066,9 @@ class EfficientNetSwinUNet(nn.Module):
         import torch.nn.functional as F
         
         aux_outputs = []
-        patches_resolution = (self.img_size // 4, self.img_size // 4)
-        H, W = patches_resolution
+        
+        # Scale factors matching hybrid2: [16, 8, 4] for resolutions [H/16, H/8, H/4] -> H
+        scale_factors = [16, 8, 4]
         
         for i, aux_feat in enumerate(aux_features):
             # aux_feat: [B, L, C]
@@ -862,8 +1082,8 @@ class EfficientNetSwinUNet(nn.Module):
             aux_out = aux_out.view(B, h, w, self.num_classes)
             aux_out = aux_out.permute(0, 3, 1, 2)  # [B, num_classes, h, w]
             
-            # Upsample to full resolution
-            aux_out = F.interpolate(aux_out, size=(self.img_size, self.img_size), 
+            # Upsample using scale_factor (matching hybrid2 pattern)
+            aux_out = F.interpolate(aux_out, scale_factor=scale_factors[i], 
                                    mode='bilinear', align_corners=False)
             aux_outputs.append(aux_out)
         
@@ -885,8 +1105,14 @@ def create_model(config):
         'depths_decoder': [2, 2, 2, 2],
         'num_heads': [3, 6, 12, 24],
         'window_size': 7,
-        'drop_rate': 0.0,
-        'drop_path_rate': 0.1,
+        'batch_size': 8,
+        'phase_epochs': 20,  # Epochs per phase
+        'phase0_lr': 1e-3,  # Learning rate for phase 0
+        'phase1_lr': 5e-4,  # Learning rate for phase 1
+        'phase2_lr': 1e-4,  # Learning rate for phase 2
+        'weight_decay': 0.01,
+        'checkpoint_dir': './checkpoints',
+        'save_freq': 5  # Save checkpoint every N epochs
     }
     """
     model = EfficientNetSwinUNet(
@@ -905,6 +1131,7 @@ def create_model(config):
         use_bottleneck=config.get('use_bottleneck', False),
         adapter_mode=config.get('adapter_mode', 'external'),
         use_multiscale_agg=config.get('use_multiscale_agg', False),
+        use_groupnorm=config.get('use_groupnorm', False),
     )
     return model
 
@@ -955,108 +1182,31 @@ class ProgressiveTrainer:
 
 
 if __name__ == '__main__':
+    # Example usage code - commented out as it requires external dependencies
+    # Uncomment and modify if you want to test the model directly
+    """
     # Configuration
     config = {
         'img_size': 224,
-        'num_classes': 6,  # Adjust based on your dataset
-        'efficientnet_model': 'tf_efficientnet_b4_ns',  # EfficientNet-B4 (same as Hybrid1)
+        'num_classes': 6,
+        'efficientnet_model': 'tf_efficientnet_b4_ns',
         'pretrained': True,
         'embed_dim': 96,
         'depths_decoder': [2, 2, 2, 2],
         'num_heads': [3, 6, 12, 24],
         'window_size': 7,
         'batch_size': 8,
-        'phase_epochs': 20,  # Epochs per phase
-        'phase0_lr': 1e-3,  # Learning rate for phase 0
-        'phase1_lr': 5e-4,  # Learning rate for phase 1
-        'phase2_lr': 1e-4,  # Learning rate for phase 2
+        'phase_epochs': 20,
+        'phase0_lr': 1e-3,
+        'phase1_lr': 5e-4,
+        'phase2_lr': 1e-4,
         'weight_decay': 0.01,
         'checkpoint_dir': './checkpoints',
-        'save_freq': 5  # Save checkpoint every N epochs
+        'save_freq': 5
     }
     
-    # Setup device
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
-    
     # Create model
-    from efficientnet_swin_unet import create_model  # Import your model
     model = create_model(config)
-    
-    # Create datasets and dataloaders
-    # Replace with your actual data paths
-    train_image_paths = []  # List of training image paths
-    train_mask_paths = []   # List of training mask paths
-    val_image_paths = []    # List of validation image paths
-    val_mask_paths = []     # List of validation mask paths
-    
-    train_dataset = SegmentationDataset(
-        train_image_paths, train_mask_paths,
-        img_size=config['img_size'], augment=True
-    )
-    val_dataset = SegmentationDataset(
-        val_image_paths, val_mask_paths,
-        img_size=config['img_size'], augment=False
-    )
-    
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=config['batch_size'],
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True
-    )
-    val_loader = DataLoader(
-        val_dataset,
-        batch_size=config['batch_size'],
-        shuffle=False,
-        num_workers=4,
-        pin_memory=True
-    )
-    
-    # Create trainer
-    trainer = ProgressiveTrainingPipeline(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        config=config,
-        device=device
-    )
-    
-    # Run complete training
-    history = trainer.run_complete_training()
-    
-    # Plot training curves (optional)
-    import matplotlib.pyplot as plt
-    
-    fig, axes = plt.subplots(1, 3, figsize=(18, 5))
-    
-    axes[0].plot(history['train_loss'], label='Train Loss')
-    axes[0].plot(history['val_loss'], label='Val Loss')
-    axes[0].set_xlabel('Epoch')
-    axes[0].set_ylabel('Loss')
-    axes[0].set_title('Training and Validation Loss')
-    axes[0].legend()
-    axes[0].grid(True)
-    
-    axes[1].plot(history['train_iou'], label='Train IoU')
-    axes[1].plot(history['val_iou'], label='Val IoU')
-    axes[1].set_xlabel('Epoch')
-    axes[1].set_ylabel('IoU')
-    axes[1].set_title('Training and Validation IoU')
-    axes[1].legend()
-    axes[1].grid(True)
-    
-    axes[2].plot(history['train_dice'], label='Train Dice')
-    axes[2].plot(history['val_dice'], label='Val Dice')
-    axes[2].set_xlabel('Epoch')
-    axes[2].set_ylabel('Dice Score')
-    axes[2].set_title('Training and Validation Dice Score')
-    axes[2].legend()
-    axes[2].grid(True)
-    
-    plt.tight_layout()
-    plt.savefig(os.path.join(config['checkpoint_dir'], 'training_curves.png'))
-    plt.close()
-    
-    print("\n✓ Training curves saved!")
+    print("Model created successfully!")
+    """
+    pass

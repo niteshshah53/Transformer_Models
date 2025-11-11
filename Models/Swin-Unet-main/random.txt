@@ -1,0 +1,18 @@
+show the architecture diagram of network model with all thier components all the model 
+related flags if possible show the baseline architecture of network model along with 
+fusion methods implemented like fourier, smart skip connection and many more. show all components which are controlled through flag. 
+
+if i want to run baseline with this features
+EfficientNetB4 Encoder → bottleneck(with 2 swin blocks) - SwinTranformer Decoder
+- Basic CNN encoder blocks
+- Simple concatenation skip connections like hybrid2 model's baseline skip connection
+- GroupNorms(--use_groupnorm as implemented in hybrid2 model ) instead of BatchNorms(groupnorms are controllable by flag in hybrid2) as default
+- all three losses(ce, dice and focal)
+--keep segmentation head same as that of baseline model of hybrid2
+- No smart skip connection(keep the functionality but controllable by flag)
+- No fourier feature fusion
+- No multi-scale aggregation
+- no deep supervision
+- differential lr for cnn encoder, bottleneck with 2 swin block and transformer decoder.
+- keep adapter_mode streaming as default for baseline network model.
+then how do i run? are there flags for baseline, flags for fourier fusion, smart skip connection, multi-scale aggregation, deep supervision, Freezing if yes then keep the component controllable by command line arguments flags

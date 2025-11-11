@@ -457,4 +457,3 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, efficientnet_variant='b
 
 Hybrid2BestPractices = Hybrid2Enhanced
 create_hybrid2_best = create_hybrid2_enhanced_full
-

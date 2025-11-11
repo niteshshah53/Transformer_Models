@@ -1491,4 +1491,3 @@ def create_enhanced_efficientnet_decoder(encoder_channels, num_classes=6,
         use_cross_attn=use_cross_attn,
         use_multiscale_agg=use_multiscale_agg
     )
-

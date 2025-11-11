@@ -23,7 +23,9 @@ class CNNTransformerUnet(nn.Module):
     to provide a consistent interface with the existing training/testing pipeline.
     """
     
-    def __init__(self, config, img_size=224, num_classes=6, zero_head=False, vis=False, use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, adapter_mode='external', use_multiscale_agg=False):
+    def __init__(self, config, img_size=224, num_classes=6, zero_head=False, vis=False, 
+                 use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, 
+                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False):
         """
         Initialize CNN-Transformer U-Net model.
         
@@ -34,7 +36,11 @@ class CNNTransformerUnet(nn.Module):
             zero_head: Whether to zero initialize the head (not used, kept for compatibility)
             vis: Whether to enable visualization (not used, kept for compatibility)
             use_deep_supervision: Whether to enable deep supervision (default: False)
-            fusion_method: Feature fusion method - 'simple' or 'fourier' (default: 'simple')
+            fusion_method: Feature fusion method - 'simple', 'fourier', or 'smart' (default: 'simple')
+            use_bottleneck: Whether to use bottleneck (default: False)
+            adapter_mode: Adapter mode - 'external' or 'streaming' (default: 'external')
+            use_multiscale_agg: Whether to use multi-scale aggregation (default: False)
+            use_groupnorm: Whether to use GroupNorm in adapters (default: False)
         """
         super(CNNTransformerUnet, self).__init__()
         
@@ -45,6 +51,7 @@ class CNNTransformerUnet(nn.Module):
         self.use_bottleneck = use_bottleneck
         self.adapter_mode = adapter_mode
         self.use_multiscale_agg = use_multiscale_agg
+        self.use_groupnorm = use_groupnorm
         
         # Create model configuration
         model_config = {
@@ -63,6 +70,7 @@ class CNNTransformerUnet(nn.Module):
             'use_bottleneck': use_bottleneck,
             'adapter_mode': adapter_mode,
             'use_multiscale_agg': use_multiscale_agg,
+            'use_groupnorm': use_groupnorm,  # Pass GroupNorm flag
         }
         
         # Create the CNN-Transformer model
@@ -82,6 +90,10 @@ class CNNTransformerUnet(nn.Module):
         if use_multiscale_agg:
             print(f"  - ✅ Multi-Scale Aggregation: ENABLED (bottleneck)")
         print(f"  - Adapter Mode: {adapter_mode.upper()}")
+        if use_groupnorm:
+            print(f"  - ✅ GroupNorm: ENABLED (in adapters)")
+        else:
+            print(f"  - GroupNorm: DISABLED (using LayerNorm)")
         
     def forward(self, x):
         """

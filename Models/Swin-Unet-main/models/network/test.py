@@ -1,19 +1,7 @@
 """
 Testing Script for CNN-Transformer Historical Document Segmentation Models
 
-This script evaluates trained CNN-Transformer models on historical document test datasets by:
-- Loading trained model checkpoints
-- Running inference on test images using patch-based approach
-- Computing segmentation metrics (IoU, Precision, Recall, F1)
-- Saving prediction visualizations
-
-Supported datasets: U-DIADS-Bib, DIVAHISDB
-
-Usage:
-    # For CNN-Transformer:
-    python test.py --output_dir ./models/ --manuscript Latin2 --is_savenii
-    
-Author: Clean Code Version
+This script evaluates trained CNN-Transformer models on historical document test datasets.
 """
 
 import argparse
@@ -23,6 +11,7 @@ import random
 import sys
 import warnings
 import glob
+import json
 
 import numpy as np
 import torch
@@ -31,11 +20,9 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 
-# Add common directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
-# Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
 
 
@@ -46,124 +33,88 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Test on U-DIADS-Bib dataset with CNN-Transformer
-  python test.py --output_dir ./models/ \\
-                 --dataset UDIADS_BIB --manuscript Latin2 --is_savenii
-  
-  # Test on DIVAHISDB dataset with CNN-Transformer
-  python test.py --dataset DIVAHISDB \\
-                 --output_dir ./models/ --manuscript Latin2
+  python test.py --output_dir ./models/ --dataset UDIADS_BIB --manuscript Latin2 --is_savenii
+  python test.py --dataset DIVAHISDB --output_dir ./models/ --manuscript Latin2
         """
     )
     
-    # Core arguments
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Directory containing trained model checkpoints')
-    
-    # Dataset configuration
     parser.add_argument('--dataset', type=str, default='UDIADS_BIB',
                        choices=['UDIADS_BIB', 'DIVAHISDB'],
                        help='Dataset to test on')
     parser.add_argument('--manuscript', type=str, required=True,
-                       help='Manuscript to test (e.g., Latin2, Latin14396, Latin16746, Syr341, Latin2FS, etc.)')
+                       help='Manuscript to test')
     parser.add_argument('--udiadsbib_root', type=str, default='../../U-DIADS-Bib-MS',
                        help='Root directory for U-DIADS-Bib dataset')
     parser.add_argument('--divahisdb_root', type=str, default='../../DivaHisDB',
                        help='Root directory for DIVAHISDB dataset')
     parser.add_argument('--use_patched_data', action='store_true',
                        help='Use pre-generated patches instead of full images')
-    
-    # Model parameters
     parser.add_argument('--num_classes', type=int, default=None,
-                       help='Number of segmentation classes (auto-detected from dataset)')
+                       help='Number of segmentation classes (auto-detected)')
     parser.add_argument('--img_size', type=int, default=224,
                        help='Input patch size for inference')
     parser.add_argument('--batch_size', type=int, default=24,
                        help='Batch size for testing')
+    # Baseline flag (matching train.py)
+    parser.add_argument('--use_baseline', action='store_true', default=False,
+                       help='Use baseline CNN-Transformer (EfficientNet-B4 encoder + bottleneck + Swin decoder)')
     
-    # Model enhancement flags
+    # Baseline enhancement flags (matching train.py, only used with --use_baseline)
     parser.add_argument('--deep_supervision', action='store_true', default=False, 
-                       help='Enable deep supervision (must match training configuration)')
+                       help='Enable deep supervision with 3 auxiliary outputs (requires --use_baseline)')
     parser.add_argument('--fusion_method', type=str, default='simple',
                        choices=['simple', 'fourier', 'smart'],
-                       help='Feature fusion method (must match training configuration)')
-    parser.add_argument('--adapter_mode', type=str, default='external', choices=['external', 'streaming'],
-                       help='Adapter placement: external adapters or streaming (must match training)')
-    parser.add_argument('--bottleneck', action='store_true', default=False,
-                       help='Enable bottleneck with 2 Swin blocks (must match training)')
+                       help='Feature fusion: simple (concat), fourier (FFT-based), smart (attention-based smart skip connections) (requires --use_baseline)')
     parser.add_argument('--use_multiscale_agg', action='store_true', default=False,
-                       help='Enable multi-scale aggregation (must match training)')
+                       help='Enable multi-scale aggregation in bottleneck (requires --use_baseline)')
+    parser.add_argument('--use_groupnorm', action='store_true', default=True,
+                       help='Use GroupNorm instead of LayerNorm (default: True for baseline, requires --use_baseline)')
+    parser.add_argument('--no_groupnorm', dest='use_groupnorm', action='store_false',
+                       help='Disable GroupNorm (use LayerNorm instead)')
     
-    # Freezing configuration
+    # Legacy flags (for backward compatibility, ignored when --use_baseline is set)
+    parser.add_argument('--adapter_mode', type=str, default='external', 
+                       choices=['external', 'streaming'],
+                       help='[DEPRECATED: Use --use_baseline instead] Adapter placement mode')
+    parser.add_argument('--bottleneck', action='store_true', default=False,
+                       help='[DEPRECATED: Use --use_baseline instead] Enable bottleneck with 2 Swin blocks')
+    
     parser.add_argument('--freeze_encoder', action='store_true', default=False,
-                       help='Freeze encoder during testing (for inference speed)')
-    
-    # Output options
+                       help='Freeze encoder during testing')
     parser.add_argument('--is_savenii', action="store_true",
                        help='Save prediction results during inference')
     parser.add_argument('--test_save_dir', type=str, default='../predictions',
                        help='Directory to save prediction results')
-    
-    # Test-time augmentation
     parser.add_argument('--use_tta', action='store_true', default=False,
-                       help='Enable test-time augmentation: predict on augmented versions (original, hflip, vflip, rot90) and average')
-    
-    # CRF post-processing
+                       help='Enable test-time augmentation')
     parser.add_argument('--use_crf', action='store_true', default=False,
-                       help='Enable CRF post-processing: refine predictions using DenseCRF for spatial coherence')
-    
-    # System configuration
+                       help='Enable CRF post-processing')
     parser.add_argument('--deterministic', type=int, default=1,
                        help='Use deterministic testing')
     parser.add_argument('--seed', type=int, default=1234,
                        help='Random seed for reproducibility')
-    
-    # Advanced options (required by config.py)
-    parser.add_argument('--opts', nargs='+', default=None,
-                       help='Modify config options')
-    parser.add_argument('--zip', action='store_true',
-                       help='Use zipped dataset')
-    parser.add_argument('--cache-mode', type=str, default='part',
-                       choices=['no', 'full', 'part'],
-                       help='Dataset caching strategy')
-    parser.add_argument('--resume', help='Resume from checkpoint')
-    parser.add_argument('--accumulation-steps', type=int,
-                       help='Gradient accumulation steps')
-    parser.add_argument('--use-checkpoint', action='store_true',
-                       help='Use gradient checkpointing')
-    parser.add_argument('--amp-opt-level', type=str, default='O1',
-                       choices=['O0', 'O1', 'O2'],
-                       help='Mixed precision optimization level')
-    parser.add_argument('--tag', help='Experiment tag')
-    parser.add_argument('--eval', action='store_true',
-                       help='Evaluation only mode')
-    parser.add_argument('--throughput', action='store_true',
-                       help='Test throughput only')
+    # Testing-specific flags (not in train.py, but needed for testing)
+    # Note: Legacy/unused flags removed for clarity
     
     return parser.parse_args()
 
 
 def validate_arguments(args):
     """Validate and normalize command line arguments."""
-    # Check for suspicious command line tokens
     bad_tokens = [t for t in sys.argv[1:] if t.lstrip('-').startswith('mg_')]
     if bad_tokens:
-        print(f"Warning: suspicious argv tokens detected: {bad_tokens}")
-        print("Did you accidentally paste a continuation fragment?")
+        logging.warning(f"Suspicious argv tokens detected: {bad_tokens}")
     
-    # Validate required paths
     if not os.path.exists(args.output_dir):
         raise ValueError(f"Output directory not found: {args.output_dir}")
     
-    # Set dataset-specific parameters
     if args.dataset.upper() == "UDIADS_BIB":
-        # Determine number of classes based on manuscript
         if args.manuscript in ['Syr341FS', 'Syr341']:
             args.num_classes = 5
-            print("Detected Syriaque341 manuscript: using 5 classes (no Chapter Headings)")
         else:
             args.num_classes = 6
-            print(f"Using 6 classes for manuscript: {args.manuscript}")
         
         if not os.path.exists(args.udiadsbib_root):
             raise ValueError(f"U-DIADS-Bib dataset path not found: {args.udiadsbib_root}")
@@ -174,42 +125,91 @@ def validate_arguments(args):
     else:
         raise ValueError(f"Unsupported dataset: {args.dataset}")
     
-    print("All arguments validated successfully!")
+    # Validate baseline flag usage (matching train.py)
+    use_baseline = getattr(args, 'use_baseline', False)
+    
+    # Component flags that should only work with --use_baseline
+    component_flags = [
+        ('use_deep_supervision', getattr(args, 'deep_supervision', False)),
+        ('use_fourier_fusion', getattr(args, 'fusion_method', 'simple') == 'fourier'),
+        ('use_smart_fusion', getattr(args, 'fusion_method', 'simple') == 'smart'),
+        ('use_multiscale_agg', getattr(args, 'use_multiscale_agg', False)),
+        ('use_groupnorm', getattr(args, 'use_groupnorm', False) if not use_baseline else False),
+    ]
+    
+    # Check if component flags are used without --use_baseline
+    if not use_baseline:
+        used_flags = [name for name, used in component_flags if used]
+        if used_flags:
+            logging.warning(f"Component flags {used_flags} are typically used with --use_baseline flag")
+            logging.warning("Consider using --use_baseline for baseline configuration")
+    
+    # Warn if legacy flags are used with --use_baseline
+    if use_baseline:
+        if getattr(args, 'adapter_mode', 'external') != 'external' or getattr(args, 'bottleneck', False):
+            logging.warning("--use_baseline is set: --adapter_mode and --bottleneck flags will be ignored")
+            logging.warning("Baseline uses: adapter_mode='streaming', bottleneck=True")
 
 
 def get_model(args, config):
-    """
-    Create and load the CNN-Transformer model.
-    
-    Args:
-        args: Command line arguments
-        config: Model configuration (not used for CNN-Transformer)
-        
-    Returns:
-        torch.nn.Module: Initialized model
-    """
+    """Create and load the CNN-Transformer model."""
     from vision_transformer_cnn import CNNTransformerUnet as ViT_seg
-    # Create model with same deep supervision and fusion settings as training
-    model = ViT_seg(
-        None,
-        img_size=args.img_size,
-        num_classes=args.num_classes,
-        use_deep_supervision=getattr(args, 'deep_supervision', False),
-        fusion_method=getattr(args, 'fusion_method', 'simple'),
-        use_bottleneck=getattr(args, 'bottleneck', False),
-        adapter_mode=getattr(args, 'adapter_mode', 'external'),
-        use_multiscale_agg=getattr(args, 'use_multiscale_agg', False)
-    )
     
-    # Move to GPU if available
+    use_baseline = getattr(args, 'use_baseline', False)
+    
+    if use_baseline:
+        print("=" * 80)
+        print("🚀 Loading CNN-Transformer BASELINE for Testing")
+        print("=" * 80)
+        print("Baseline Configuration:")
+        print("  ✓ EfficientNet-B4 Encoder")
+        print("  ✓ Bottleneck: 2 Swin Transformer blocks")
+        print("  ✓ Swin Transformer Decoder")
+        print("  ✓ Simple concatenation skip connections")
+        print("  ✓ Adapter mode: streaming (default)")
+        print("  ✓ GroupNorm: {}".format(getattr(args, 'use_groupnorm', True)))
+        print("=" * 80)
+        
+        # Baseline defaults (matching train.py exactly)
+        adapter_mode = 'streaming'  # Default for baseline
+        use_bottleneck = True  # Always enabled for baseline
+        fusion_method = getattr(args, 'fusion_method', 'simple')
+        
+        model = ViT_seg(
+            None,
+            img_size=args.img_size,
+            num_classes=args.num_classes,
+            use_deep_supervision=getattr(args, 'deep_supervision', False),
+            fusion_method=fusion_method,
+            use_bottleneck=use_bottleneck,
+            adapter_mode=adapter_mode,
+            use_multiscale_agg=getattr(args, 'use_multiscale_agg', False),
+            use_groupnorm=getattr(args, 'use_groupnorm', True)  # Default True for baseline (matching train.py)
+        )
+    else:
+        # Original non-baseline mode (backward compatibility)
+        # Use legacy flags if provided, otherwise use defaults
+        adapter_mode = getattr(args, 'adapter_mode', 'external')
+        use_bottleneck = getattr(args, 'bottleneck', False)
+        
+        model = ViT_seg(
+            None,
+            img_size=args.img_size,
+            num_classes=args.num_classes,
+            use_deep_supervision=getattr(args, 'deep_supervision', False),
+            fusion_method=getattr(args, 'fusion_method', 'simple'),
+            use_bottleneck=use_bottleneck,
+            adapter_mode=adapter_mode,
+            use_multiscale_agg=getattr(args, 'use_multiscale_agg', False),
+            use_groupnorm=getattr(args, 'use_groupnorm', False)  # Default False for non-baseline
+        )
+    
     if torch.cuda.is_available():
         model = model.cuda()
     else:
-        print("CUDA not available, using CPU")
+        logging.warning("CUDA not available, using CPU")
     
-    # Freeze encoder if requested
     if getattr(args, 'freeze_encoder', False):
-        print("🔒 Freezing encoder for testing")
         model.model.freeze_encoder()
     
     model.load_from(None)
@@ -246,149 +246,86 @@ def setup_reproducible_testing(args):
 
 
 def load_model_checkpoint(model, args):
-    """
-    Load trained model checkpoint.
-    
-    Args:
-        model: Model to load weights into
-        args: Command line arguments
-        
-    Returns:
-        str: Name of loaded checkpoint file
-    """
+    """Load trained model checkpoint."""
     checkpoint_path = os.path.join(args.output_dir, 'best_model_latest.pth')
     
     if not os.path.exists(checkpoint_path):
-        # Try alternative checkpoint names
         alt_path = os.path.join(args.output_dir, 'best_model.pth')
         if os.path.exists(alt_path):
             checkpoint_path = alt_path
         else:
             raise FileNotFoundError(f"No checkpoint found in {args.output_dir}")
     
-    # Load checkpoint with appropriate strictness based on architecture match
     checkpoint = torch.load(checkpoint_path, map_location='cpu')
     
-    # Extract model_state from checkpoint (checkpoint may be a dict with 'model_state' key or direct state_dict)
     if isinstance(checkpoint, dict) and 'model_state' in checkpoint:
         model_state_dict = checkpoint['model_state']
     else:
-        # If checkpoint is already a state_dict, use it directly
         model_state_dict = checkpoint
     
-    # Check if checkpoint has deep supervision auxiliary heads
     has_aux_heads = any('aux_heads' in key for key in model_state_dict.keys())
-    
-    # Check if checkpoint has fusion modules (fourier or smart)
     has_skip_fusions = any('skip_fusions' in key for key in model_state_dict.keys())
     has_smart_skips = any('smart_skips' in key for key in model_state_dict.keys())
-    
-    # Check if checkpoint has bottleneck layer
-    has_bottleneck = any('bottleneck_layer' in key and 'upsample' not in key for key in model_state_dict.keys())
-    
-    # Check adapter mode: checkpoint has feature_adapters (external) or streaming_proj (streaming)
+    has_bottleneck = any('bottleneck_layer' in key and 'upsample' not in key 
+                        for key in model_state_dict.keys())
     has_feature_adapters = any('feature_adapters' in key for key in model_state_dict.keys())
     has_streaming_proj = any('streaming_proj' in key for key in model_state_dict.keys())
+    has_multiscale_agg = any('multiscale_proj' in key or 'multiscale_fusion' in key 
+                            for key in model_state_dict.keys())
     
-    # Check multi-scale aggregation
-    has_multiscale_agg = any('multiscale_proj' in key or 'multiscale_fusion' in key for key in model_state_dict.keys())
+    ds_mismatch = (has_aux_heads != model.model.use_deep_supervision)
     
-    # Determine if there's a mismatch in architecture components
-    ds_mismatch = (has_aux_heads and not model.model.use_deep_supervision) or \
-                  (not has_aux_heads and model.model.use_deep_supervision)
-    
-    # Check adapter mode mismatch
     adapter_mismatch = False
     if model.model.adapter_mode == 'external':
         adapter_mismatch = not has_feature_adapters or has_streaming_proj
     elif model.model.adapter_mode == 'streaming':
         adapter_mismatch = not has_streaming_proj or has_feature_adapters
     
-    # Check fusion method mismatch
     fusion_mismatch = False
     if model.model.fusion_method == 'fourier':
         fusion_mismatch = not has_skip_fusions
     elif model.model.fusion_method == 'smart':
         fusion_mismatch = not has_smart_skips
-    else:  # 'simple'
+    else:
         fusion_mismatch = (has_skip_fusions or has_smart_skips)
     
-    # Check bottleneck mismatch
-    bottleneck_mismatch = (has_bottleneck and not model.model.use_bottleneck) or \
-                         (not has_bottleneck and model.model.use_bottleneck)
+    bottleneck_mismatch = (has_bottleneck != model.model.use_bottleneck)
+    multiscale_mismatch = (has_multiscale_agg != model.model.use_multiscale_agg)
     
-    # Check multi-scale aggregation mismatch
-    multiscale_mismatch = (has_multiscale_agg and not model.model.use_multiscale_agg) or \
-                         (not has_multiscale_agg and model.model.use_multiscale_agg)
-    
-    # Use strict=False if there's any mismatch
     if ds_mismatch or fusion_mismatch or bottleneck_mismatch or adapter_mismatch or multiscale_mismatch:
-        print(f"Note: Checkpoint and model have architecture differences")
-        print(f"  - Deep Supervision: checkpoint={has_aux_heads}, model={model.model.use_deep_supervision}")
-        print(f"  - Adapter Mode: checkpoint has feature_adapters={has_feature_adapters}, streaming_proj={has_streaming_proj}, model={model.model.adapter_mode}")
-        print(f"  - Fusion Method: checkpoint has skip_fusions={has_skip_fusions}, smart_skips={has_smart_skips}, model={model.model.fusion_method}")
-        print(f"  - Bottleneck: checkpoint={has_bottleneck}, model={model.model.use_bottleneck}")
-        print(f"  - Multi-Scale Aggregation: checkpoint={has_multiscale_agg}, model={model.model.use_multiscale_agg}")
-        print(f"  - Loading with strict=False to handle mismatches")
-        
+        logging.info("Checkpoint and model have architecture differences - loading with strict=False")
         msg = model.load_state_dict(model_state_dict, strict=False)
         
         if msg.unexpected_keys:
-            print(f"Warning: Ignored unexpected keys: {msg.unexpected_keys[:3]}... ({len(msg.unexpected_keys)} total)")
+            logging.warning(f"Ignored {len(msg.unexpected_keys)} unexpected keys")
         if msg.missing_keys:
-            print(f"Warning: Missing keys (may be expected due to architecture differences):")
             missing_fusion = [k for k in msg.missing_keys if 'skip_fusions' in k or 'smart_skips' in k]
             missing_other = [k for k in msg.missing_keys if 'skip_fusions' not in k and 'smart_skips' not in k]
             if missing_fusion:
-                print(f"  - Fusion-related: {missing_fusion[0]}... ({len(missing_fusion)} total)")
+                logging.warning(f"Missing {len(missing_fusion)} fusion-related keys")
             if missing_other:
-                print(f"  - Other: {missing_other[0]}... ({len(missing_other)} total)")
+                logging.warning(f"Missing {len(missing_other)} other keys")
     else:
-        # Perfect match, use strict=True for exact loading
-        print(f"Checkpoint and model architecture match - loading with strict=True")
-        msg = model.load_state_dict(model_state_dict, strict=True)
-    
-    print(f"Model checkpoint loaded successfully")
+        model.load_state_dict(model_state_dict, strict=True)
     
     return os.path.basename(checkpoint_path)
 
 
 def get_dataset_info(dataset_type, manuscript=None):
-    """
-    Get dataset-specific information.
-    
-    Args:
-        dataset_type (str): Type of dataset
-        manuscript (str): Manuscript name for class-specific logic
-        
-    Returns:
-        tuple: (class_colors, class_names, rgb_to_class_function)
-    """
+    """Get dataset-specific information."""
     if dataset_type.upper() == "UDIADS_BIB":
         from datasets.dataset_udiadsbib import rgb_to_class
         
         class_colors = [
-            (0, 0, 0),         # 0: Background (black)
-            (255, 255, 0),     # 1: Paratext (yellow)
-            (0, 255, 255),     # 2: Decoration (cyan)  
-            (255, 0, 255),     # 3: Main Text (magenta)
-            (255, 0, 0),       # 4: Title (red)
-            (0, 255, 0),       # 5: Chapter Headings (lime)
+            (0, 0, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
+            (255, 0, 0), (0, 255, 0)
         ]
         
-        # Adjust class names based on manuscript
         if manuscript in ['Syr341', 'Syr341FS']:
-            # Syr341 manuscripts don't have Chapter Headings
-            class_names = [
-                'Background', 'Paratext', 'Decoration', 
-                'Main Text', 'Title'
-            ]
-            class_colors = class_colors[:5]  # Only first 5 colors
+            class_names = ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title']
+            class_colors = class_colors[:5]
         else:
-            class_names = [
-                'Background', 'Paratext', 'Decoration', 
-                'Main Text', 'Title', 'Chapter Headings'
-            ]
+            class_names = ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title', 'Chapter Headings']
         
         return class_colors, class_names, rgb_to_class
         
@@ -396,16 +333,10 @@ def get_dataset_info(dataset_type, manuscript=None):
         try:
             from datasets.dataset_divahisdb import rgb_to_class
         except ImportError:
-            print("Warning: DIVAHISDB dataset class not available")
+            logging.warning("DIVAHISDB dataset class not available")
             rgb_to_class = None
         
-        class_colors = [
-            (0, 0, 0),      # 0: Background (black)
-            (0, 255, 0),    # 1: Comment (green)
-            (255, 0, 0),    # 2: Decoration (red)
-            (0, 0, 255),    # 3: Main Text (blue)
-        ]
-        
+        class_colors = [(0, 0, 0), (0, 255, 0), (255, 0, 0), (0, 0, 255)]
         class_names = ['Background', 'Comment', 'Decoration', 'Main Text']
         
         return class_colors, class_names, rgb_to_class
@@ -415,15 +346,7 @@ def get_dataset_info(dataset_type, manuscript=None):
 
 
 def get_dataset_paths(args):
-    """
-    Get dataset-specific file paths.
-    
-    Args:
-        args: Command line arguments
-        
-    Returns:
-        tuple: (patch_dir, mask_dir, original_img_dir, original_mask_dir)
-    """
+    """Get dataset-specific file paths."""
     manuscript_name = args.manuscript
     
     if args.dataset.upper() == "UDIADS_BIB":
@@ -434,8 +357,6 @@ def get_dataset_paths(args):
             patch_dir = f'{args.udiadsbib_root}/{manuscript_name}/img-{manuscript_name}/test'
             mask_dir = f'{args.udiadsbib_root}/{manuscript_name}/pixel-level-gt-{manuscript_name}/test'
         
-        # Use the original dataset directory (before patching) for original images
-        # Extract the base directory name from the patched data root
         base_dir = args.udiadsbib_root.replace('_patched', '')
         original_img_dir = f'{base_dir}/{manuscript_name}/img-{manuscript_name}/test'
         original_mask_dir = f'{base_dir}/{manuscript_name}/pixel-level-gt-{manuscript_name}/test'
@@ -448,8 +369,6 @@ def get_dataset_paths(args):
             patch_dir = f'{args.divahisdb_root}/img/{manuscript_name}/test'
             mask_dir = f'{args.divahisdb_root}/pixel-level-gt/{manuscript_name}/test'
         
-        # Use the original dataset directory (before patching) for original images
-        # Extract the base directory name from the patched data root
         base_dir = args.divahisdb_root.replace('_patched', '')
         original_img_dir = f'{base_dir}/img/{manuscript_name}/test'
         original_mask_dir = f'{base_dir}/pixel-level-gt/{manuscript_name}/test'
@@ -458,15 +377,7 @@ def get_dataset_paths(args):
 
 
 def process_patch_groups(patch_files):
-    """
-    Group patch files by their original image names.
-    
-    Args:
-        patch_files (list): List of patch file paths
-        
-    Returns:
-        tuple: (patch_groups, patch_positions) dictionaries
-    """
+    """Group patch files by their original image names."""
     patch_groups = {}
     patch_positions = {}
     
@@ -487,38 +398,21 @@ def process_patch_groups(patch_files):
 
 
 def estimate_image_dimensions(original_name, original_img_dir, patches, patch_positions, patch_size=224):
-    """
-    Estimate original image dimensions from patch information.
-    
-    Args:
-        original_name (str): Name of original image
-        original_img_dir (str): Directory containing original images
-        patches (list): List of patch paths
-        patch_positions (dict): Mapping of patch paths to positions
-        patch_size (int): Size of each patch
-        
-    Returns:
-        tuple: (width, height, patches_per_row)
-    """
-    # Try to find original image for exact dimensions
+    """Estimate original image dimensions from patch information."""
     for ext in ['.jpg', '.png', '.tif', '.tiff']:
         orig_path = os.path.join(original_img_dir, f"{original_name}{ext}")
         if os.path.exists(orig_path):
             with Image.open(orig_path) as img:
                 orig_width, orig_height = img.size
             
-            patches_per_row = orig_width // patch_size
-            if patches_per_row == 0:
-                patches_per_row = 1
-            
+            patches_per_row = max(orig_width // patch_size, 1)
             max_x = ((orig_width // patch_size) + (1 if orig_width % patch_size else 0)) * patch_size
             max_y = ((orig_height // patch_size) + (1 if orig_height % patch_size else 0)) * patch_size
             
             return max_x, max_y, patches_per_row
     
-    # Estimate from patch positions if original not found
     logging.warning(f"Could not find original image for {original_name}, estimating dimensions")
-    patches_per_row = 10  # Default fallback
+    patches_per_row = 10
     max_patch_id = max([patch_positions[p] for p in patches])
     max_x = ((max_patch_id % patches_per_row) + 1) * patch_size
     max_y = ((max_patch_id // patches_per_row) + 1) * patch_size
@@ -527,161 +421,84 @@ def estimate_image_dimensions(original_name, original_img_dir, patches, patch_po
 
 
 def predict_patch_with_tta(patch_tensor, model, return_probs=False):
-    """
-    Predict patch with test-time augmentation.
-    
-    Applies augmentations (original, horizontal flip, vertical flip, rotation 90°),
-    gets predictions for each, reverses augmentations, and averages probabilities.
-    
-    Args:
-        patch_tensor: Input patch tensor [1, 3, H, W]
-        model: Neural network model
-        return_probs: If True, return averaged probabilities instead of argmax prediction
-        
-    Returns:
-        numpy.ndarray: Averaged prediction map [H, W] or probabilities [C, H, W]
-    """
+    """Predict patch with test-time augmentation."""
     import torchvision.transforms.functional as TF
     
     device = patch_tensor.device
     augmented_outputs = []
     
-    # 1. Original (no augmentation)
-    with torch.no_grad():
-        output = model(patch_tensor)
-        if isinstance(output, tuple):
-            output = output[0]  # Use main output for inference
-        # Apply softmax to get probabilities
-        probs = torch.softmax(output, dim=1)
-        augmented_outputs.append(probs)
+    transforms = [
+        ('original', lambda x: x, lambda x: x),
+        ('hflip', TF.hflip, TF.hflip),
+        ('vflip', TF.vflip, TF.vflip),
+        ('rot90', lambda x: TF.rotate(x, angle=-90), lambda x: TF.rotate(x, angle=90))
+    ]
     
-    # 2. Horizontal flip
-    patch_hflip = TF.hflip(patch_tensor.squeeze(0)).unsqueeze(0)
-    with torch.no_grad():
-        output = model(patch_hflip.to(device))
-        if isinstance(output, tuple):
-            output = output[0]
-        probs = torch.softmax(output, dim=1)
-        # Reverse horizontal flip on probabilities
-        probs_reversed = TF.hflip(probs.squeeze(0)).unsqueeze(0)
-        augmented_outputs.append(probs_reversed)
+    for name, forward_transform, reverse_transform in transforms:
+        if name == 'original':
+            transformed = patch_tensor
+        else:
+            transformed = forward_transform(patch_tensor.squeeze(0)).unsqueeze(0)
+        
+        with torch.no_grad():
+            output = model(transformed.to(device))
+            if isinstance(output, tuple):
+                output = output[0]
+            probs = torch.softmax(output, dim=1)
+            
+            if name != 'original':
+                probs = reverse_transform(probs.squeeze(0)).unsqueeze(0)
+            
+            augmented_outputs.append(probs)
     
-    # 3. Vertical flip
-    patch_vflip = TF.vflip(patch_tensor.squeeze(0)).unsqueeze(0)
-    with torch.no_grad():
-        output = model(patch_vflip.to(device))
-        if isinstance(output, tuple):
-            output = output[0]
-        probs = torch.softmax(output, dim=1)
-        # Reverse vertical flip on probabilities
-        probs_reversed = TF.vflip(probs.squeeze(0)).unsqueeze(0)
-        augmented_outputs.append(probs_reversed)
-    
-    # 4. Rotation 90°
-    patch_rot90 = TF.rotate(patch_tensor.squeeze(0), angle=-90).unsqueeze(0)
-    with torch.no_grad():
-        output = model(patch_rot90.to(device))
-        if isinstance(output, tuple):
-            output = output[0]
-        probs = torch.softmax(output, dim=1)
-        # Reverse rotation 90° (rotate back by +90°)
-        probs_reversed = TF.rotate(probs.squeeze(0), angle=90).unsqueeze(0)
-        augmented_outputs.append(probs_reversed)
-    
-    # Average all probabilities (all tensors are on the same device)
     averaged_probs = torch.stack(augmented_outputs).mean(dim=0)
     
     if return_probs:
-        # Return probabilities [C, H, W]
         return averaged_probs.squeeze(0).cpu().numpy()
     else:
-        # Take argmax to get final prediction
-        pred_patch = torch.argmax(averaged_probs, dim=1).squeeze(0).cpu().numpy()
-        return pred_patch
+        return torch.argmax(averaged_probs, dim=1).squeeze(0).cpu().numpy()
 
 
 def apply_crf_postprocessing(prob_map, rgb_image, num_classes=6, 
                               spatial_weight=3.0, spatial_x_stddev=3.0, spatial_y_stddev=3.0,
-                              color_weight=10.0, color_stddev=50.0,
-                              num_iterations=10):
-    """
-    Apply DenseCRF post-processing to refine segmentation predictions.
-    
-    Args:
-        prob_map: Probability map [H, W, C] with class probabilities
-        rgb_image: Original RGB image [H, W, 3] for pairwise potentials
-        num_classes: Number of segmentation classes
-        spatial_weight: Weight for spatial pairwise potentials
-        spatial_x_stddev: Standard deviation for spatial x dimension
-        spatial_y_stddev: Standard deviation for spatial y dimension
-        color_weight: Weight for color pairwise potentials
-        color_stddev: Standard deviation for color similarity
-        num_iterations: Number of CRF iterations
-        
-    Returns:
-        numpy.ndarray: Refined prediction map [H, W] with class indices
-    """
+                              color_weight=10.0, color_stddev=50.0, num_iterations=10):
+    """Apply DenseCRF post-processing to refine segmentation predictions."""
     try:
-        # pydensecrf2 package installs as 'pydensecrf' module
         try:
             import pydensecrf2.densecrf as dcrf
             from pydensecrf2.utils import unary_from_softmax, create_pairwise_bilateral, create_pairwise_gaussian
         except ImportError:
-            # Fallback: try importing as pydensecrf (actual module name)
             import pydensecrf.densecrf as dcrf
             from pydensecrf.utils import unary_from_softmax, create_pairwise_bilateral, create_pairwise_gaussian
     except ImportError:
-        error_msg = (
-            "pydensecrf2 is not installed. CRF post-processing requires this package.\n"
-            "Installation options:\n"
-            "  1. pip install pydensecrf2\n"
-            "  2. conda install -c conda-forge pydensecrf2\n"
-            "  3. python3 -m pip install pydensecrf2\n"
-            "Note: The package installs as 'pydensecrf' module even though pip package is 'pydensecrf2'.\n"
-            "Note: If using conda and encountering symbol errors, try: conda install libgcc"
-        )
-        logging.error(error_msg)
+        logging.error("pydensecrf2 is required for CRF post-processing")
         raise ImportError("pydensecrf2 is required for CRF post-processing")
     
     H, W = prob_map.shape[:2]
     
-    # Ensure probabilities are in correct format and range
     if prob_map.shape[2] != num_classes:
         raise ValueError(f"Probability map has {prob_map.shape[2]} classes but expected {num_classes}")
     
-    # Ensure prob_map is C-contiguous (required by pydensecrf)
     prob_map = np.ascontiguousarray(prob_map, dtype=np.float32)
     
-    # Resize RGB image if dimensions don't match
     if rgb_image.shape[:2] != (H, W):
         rgb_image_resized = np.array(Image.fromarray(rgb_image).resize((W, H), Image.BILINEAR))
     else:
         rgb_image_resized = rgb_image.copy()
     
-    # Ensure RGB image is uint8 and C-contiguous (required by pydensecrf)
     if rgb_image_resized.dtype != np.uint8:
         rgb_image_resized = np.clip(rgb_image_resized, 0, 255).astype(np.uint8)
     rgb_image_resized = np.ascontiguousarray(rgb_image_resized, dtype=np.uint8)
     
-    # Transpose probability map to [C, H, W] format for DenseCRF
-    prob_map_transposed = prob_map.transpose(2, 0, 1)  # [C, H, W]
-    # Ensure transposed array is C-contiguous (required by pydensecrf)
-    prob_map_transposed = np.ascontiguousarray(prob_map_transposed, dtype=np.float32)
+    prob_map_transposed = np.ascontiguousarray(prob_map.transpose(2, 0, 1), dtype=np.float32)
     
-    # Create CRF model
     crf = dcrf.DenseCRF2D(W, H, num_classes)
-    
-    # Set unary potentials (negative log probabilities)
     unary = unary_from_softmax(prob_map_transposed)
     crf.setUnaryEnergy(unary)
     
-    # Add pairwise potentials
-    
-    # 1. Spatial pairwise potential (encourages nearby pixels to have same label)
     pairwise_gaussian = create_pairwise_gaussian(sdims=(spatial_y_stddev, spatial_x_stddev), shape=(H, W))
     crf.addPairwiseEnergy(pairwise_gaussian, compat=spatial_weight)
     
-    # 2. Bilateral pairwise potential (encourages similar colored pixels to have same label)
     pairwise_bilateral = create_pairwise_bilateral(
         sdims=(spatial_y_stddev, spatial_x_stddev),
         schan=(color_stddev, color_stddev, color_stddev),
@@ -690,10 +507,7 @@ def apply_crf_postprocessing(prob_map, rgb_image, num_classes=6,
     )
     crf.addPairwiseEnergy(pairwise_bilateral, compat=color_weight)
     
-    # Run inference
     Q = crf.inference(num_iterations)
-    
-    # Get refined probabilities and convert to prediction
     refined_probs = np.array(Q).reshape((num_classes, H, W)).transpose(1, 2, 0)
     refined_pred = np.argmax(refined_probs, axis=2).astype(np.uint8)
     
@@ -701,96 +515,64 @@ def apply_crf_postprocessing(prob_map, rgb_image, num_classes=6,
 
 
 def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patch_size, model, use_tta=False, return_probs=False):
-    """
-    Stitch together patch predictions into full image.
-    
-    Args:
-        patches (list): List of patch file paths
-        patch_positions (dict): Mapping of patch paths to positions
-        max_x, max_y (int): Maximum image dimensions
-        patches_per_row (int): Number of patches per row
-        patch_size (int): Size of each patch
-        model: Neural network model
-        use_tta (bool): Whether to use test-time augmentation
-        return_probs (bool): If True, also return softmax probabilities (needed for CRF)
-        
-    Returns:
-        numpy.ndarray: Stitched prediction map
-        Optional[numpy.ndarray]: Stitched probability map [H, W, C] if return_probs=True
-    """
+    """Stitch together patch predictions into full image."""
     import torchvision.transforms.functional as TF
     
     pred_full = np.zeros((max_y, max_x), dtype=np.int32)
     count_map = np.zeros((max_y, max_x), dtype=np.int32)
     
     if return_probs:
-        # Initialize probability map (will be accumulated)
         num_classes = None
         prob_full = None
     
     for patch_path in patches:
         patch_id = patch_positions[patch_path]
-        
-        # Calculate patch position
         x = (patch_id % patches_per_row) * patch_size
         y = (patch_id // patches_per_row) * patch_size
         
-        # Load and process patch
         patch = Image.open(patch_path).convert("RGB")
         patch_tensor = TF.to_tensor(patch).unsqueeze(0).cuda()
         
-        # Use TTA if enabled, otherwise use standard prediction
         if use_tta:
             if return_probs:
-                # Get averaged probabilities from TTA
-                probs = predict_patch_with_tta(patch_tensor, model, return_probs=True)  # [C, H, W]
+                probs = predict_patch_with_tta(patch_tensor, model, return_probs=True)
                 if prob_full is None:
                     num_classes = probs.shape[0]
                     prob_full = np.zeros((max_y, max_x, num_classes), dtype=np.float32)
-                pred_patch = np.argmax(probs, axis=0)  # [H, W]
+                pred_patch = np.argmax(probs, axis=0)
             else:
                 pred_patch = predict_patch_with_tta(patch_tensor, model, return_probs=False)
         else:
             with torch.no_grad():
                 output = model(patch_tensor)
-                
-                # Handle deep supervision output (tuple) vs regular output (tensor)
                 if isinstance(output, tuple):
-                    # Deep supervision: output is (main_logits, aux_outputs)
-                    output = output[0]  # Use main output for inference
+                    output = output[0]
                 
                 if return_probs:
-                    probs = torch.softmax(output, dim=1).cpu().numpy()[0]  # [C, H, W]
+                    probs = torch.softmax(output, dim=1).cpu().numpy()[0]
                     if prob_full is None:
                         num_classes = probs.shape[0]
                         prob_full = np.zeros((max_y, max_x, num_classes), dtype=np.float32)
                 
                 pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
         
-        # Add to prediction map with boundary checking
         if y + patch_size <= pred_full.shape[0] and x + patch_size <= pred_full.shape[1]:
             pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
             count_map[y:y+patch_size, x:x+patch_size] += 1
             if return_probs:
-                # Convert probabilities from [C, H, W] to [H, W, C] format
-                # probs is always [C, H, W] format from model output
                 prob_full[y:y+patch_size, x:x+patch_size, :] += probs.transpose(1, 2, 0)
         else:
-            # Handle edge cases
             valid_h = min(patch_size, pred_full.shape[0] - y)
             valid_w = min(patch_size, pred_full.shape[1] - x)
             if valid_h > 0 and valid_w > 0:
                 pred_full[y:y+valid_h, x:x+valid_w] += pred_patch[:valid_h, :valid_w]
                 count_map[y:y+valid_h, x:x+valid_w] += 1
                 if return_probs:
-                    # probs is [C, H, W], slice and transpose to [H, W, C]
                     prob_full[y:y+valid_h, x:x+valid_w, :] += probs[:, :valid_h, :valid_w].transpose(1, 2, 0)
     
-    # Normalize by count map
     pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
     
     if return_probs:
-        # Normalize probabilities by count map
         prob_full = prob_full / np.maximum(count_map[:, :, np.newaxis], 1)
         return pred_full, prob_full
     else:
@@ -801,14 +583,10 @@ def save_prediction_results(pred_full, original_name, class_colors, result_dir):
     """Save prediction results as RGB image."""
     if result_dir is not None:
         os.makedirs(result_dir, exist_ok=True)
-        
-        # Convert class indices to RGB
         rgb_mask = np.zeros((pred_full.shape[0], pred_full.shape[1], 3), dtype=np.uint8)
         for idx, color in enumerate(class_colors):
             rgb_mask[pred_full == idx] = color
-        
-        pred_png_path = os.path.join(result_dir, f"{original_name}.png")
-        Image.fromarray(rgb_mask).save(pred_png_path)
+        Image.fromarray(rgb_mask).save(os.path.join(result_dir, f"{original_name}.png"))
 
 
 def save_comparison_visualization(pred_full, gt_class, original_name, original_img_dir, 
@@ -817,11 +595,9 @@ def save_comparison_visualization(pred_full, gt_class, original_name, original_i
     compare_dir = os.path.join(test_save_path, 'compare')
     os.makedirs(compare_dir, exist_ok=True)
     
-    # Create colormap
     cmap = ListedColormap(class_colors)
     n_classes = len(class_colors)
     
-    # Resize ground truth if dimensions don't match
     if gt_class.shape != pred_full.shape:
         logging.warning(f"Resizing ground truth for {original_name}")
         gt_class_resized = np.zeros_like(pred_full)
@@ -830,10 +606,8 @@ def save_comparison_visualization(pred_full, gt_class, original_name, original_i
         gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
         gt_class = gt_class_resized
     
-    # Create visualization
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
     
-    # Find and load original image
     orig_img_path = None
     for ext in ['.jpg', '.png', '.tif', '.tiff']:
         test_path = os.path.join(original_img_dir, f"{original_name}{ext}")
@@ -851,31 +625,21 @@ def save_comparison_visualization(pred_full, gt_class, original_name, original_i
     
     axs[0].set_title('Original Image')
     axs[0].axis('off')
-    
     axs[1].imshow(pred_full, cmap=cmap, vmin=0, vmax=(n_classes - 1))
     axs[1].set_title('Prediction')
     axs[1].axis('off')
-    
     axs[2].imshow(gt_class, cmap=cmap, vmin=0, vmax=(n_classes - 1))
     axs[2].set_title('Ground Truth')
     axs[2].axis('off')
     
     plt.tight_layout()
-    save_img_path = os.path.join(compare_dir, f"{original_name}_compare.png")
-    plt.savefig(save_img_path, bbox_inches='tight', dpi=150)
+    plt.savefig(os.path.join(compare_dir, f"{original_name}_compare.png"), 
+                bbox_inches='tight', dpi=150)
     plt.close(fig)
 
 
 def compute_segmentation_metrics(pred_full, gt_class, n_classes, TP, FP, FN):
-    """
-    Compute segmentation metrics for each class.
-    
-    Args:
-        pred_full: Prediction array
-        gt_class: Ground truth array
-        n_classes: Number of classes
-        TP, FP, FN: Arrays to accumulate metrics
-    """
+    """Compute segmentation metrics for each class."""
     for cls in range(n_classes):
         pred_c = (pred_full == cls)
         gt_c = (gt_class == cls)
@@ -913,36 +677,57 @@ def print_final_metrics(TP, FP, FN, class_names, num_processed_images):
     logging.info(f"Mean IoU: {np.mean(iou_per_class):.4f}")
 
 
-def inference(args, model, test_save_path=None):
-    """
-    Run inference on historical document dataset.
+def save_metrics_to_file(args, TP, FP, FN, class_names, num_processed_images):
+    """Save metrics to a JSON file for later aggregation."""
+    n_classes = len(class_names)
     
-    Args:
-        args: Command line arguments
-        model: Trained neural network model
-        test_save_path: Path to save test results
+    if num_processed_images > 0:
+        precision = TP / (TP + FP + 1e-8)
+        recall = TP / (TP + FN + 1e-8)
+        f1 = 2 * precision * recall / (precision + recall + 1e-8)
+        iou_per_class = TP / (TP + FP + FN + 1e-8)
         
-    Returns:
-        str: Status message
-    """
+        mean_precision = float(np.mean(precision))
+        mean_recall = float(np.mean(recall))
+        mean_f1 = float(np.mean(f1))
+        mean_iou = float(np.mean(iou_per_class))
+    else:
+        mean_precision = mean_recall = mean_f1 = mean_iou = 0.0
+    
+    parent_dir = os.path.dirname(args.output_dir) if os.path.basename(args.output_dir) == args.manuscript else args.output_dir
+    os.makedirs(parent_dir, exist_ok=True)
+    
+    metrics_file = os.path.join(parent_dir, f"metrics_{args.manuscript}.json")
+    
+    metrics_data = {
+        "manuscript": args.manuscript,
+        "mean_precision": mean_precision,
+        "mean_recall": mean_recall,
+        "mean_f1": mean_f1,
+        "mean_iou": mean_iou,
+        "num_images": num_processed_images
+    }
+    
+    with open(metrics_file, 'w') as f:
+        json.dump(metrics_data, f, indent=2)
+    
+    return parent_dir
+
+
+def inference(args, model, test_save_path=None):
+    """Run inference on historical document dataset."""
     logging.info(f"Starting inference on {args.dataset} dataset")
     
-    # Get dataset-specific information
     class_colors, class_names, rgb_to_class_func = get_dataset_info(args.dataset, args.manuscript)
     n_classes = len(class_colors)
-    # Use the actual patch size that the model was trained on (224x224)
-    # args.img_size is the full image size, not the patch size
     patch_size = 224
     
-    # Get dataset paths
     patch_dir, mask_dir, original_img_dir, original_mask_dir = get_dataset_paths(args)
     
-    # Check if directories exist
     if not os.path.exists(patch_dir):
         logging.error(f"Patch directory not found: {patch_dir}")
         return "Testing Failed!"
     
-    # Find patch files
     patch_files = sorted(glob.glob(os.path.join(patch_dir, '*.png')))
     if len(patch_files) == 0:
         logging.info(f"No patch files found in {patch_dir}")
@@ -950,92 +735,72 @@ def inference(args, model, test_save_path=None):
     
     logging.info(f"Found {len(patch_files)} patches for {args.manuscript}")
     
-    # Initialize metrics
     TP = np.zeros(n_classes, dtype=np.float64)
     FP = np.zeros(n_classes, dtype=np.float64)  
     FN = np.zeros(n_classes, dtype=np.float64)
     
-    # Set up result directory
     result_dir = os.path.join(test_save_path, "result") if test_save_path else None
-    
-    # Group patches by original image
     patch_groups, patch_positions = process_patch_groups(patch_files)
-    
-    # Process each original image
     num_processed_images = 0
     
     for original_name, patches in patch_groups.items():
         logging.info(f"Processing: {original_name} ({len(patches)} patches)")
         
-        # Estimate image dimensions
         max_x, max_y, patches_per_row = estimate_image_dimensions(
             original_name, original_img_dir, patches, patch_positions, patch_size
         )
         
-        # Stitch patches together
         use_tta = getattr(args, 'use_tta', False)
         use_crf = getattr(args, 'use_crf', False)
         
+        if use_tta:
+            logging.info(f"🔀 Using Test-Time Augmentation for {original_name}")
+        
         if use_crf:
-            # Get both predictions and probabilities for CRF
             pred_full, prob_full = stitch_patches(
                 patches, patch_positions, max_x, max_y, 
                 patches_per_row, patch_size, model, use_tta=use_tta, return_probs=True
             )
             
-            # Load original RGB image for CRF pairwise potentials
             orig_img_rgb = None
             for ext in ['.jpg', '.png', '.tif', '.tiff']:
                 orig_path = os.path.join(original_img_dir, f"{original_name}{ext}")
                 if os.path.exists(orig_path):
                     orig_img_pil = Image.open(orig_path).convert("RGB")
-                    # Resize to match prediction dimensions
                     if orig_img_pil.size != (max_x, max_y):
                         orig_img_pil = orig_img_pil.resize((max_x, max_y), Image.BILINEAR)
                     orig_img_rgb = np.array(orig_img_pil)
                     break
             
             if orig_img_rgb is not None:
-                logging.info(f"Applying CRF post-processing to {original_name}")
                 try:
-                    # Apply CRF refinement
+                    logging.info(f"🎯 Applying CRF post-processing for {original_name}")
                     pred_full = apply_crf_postprocessing(
-                        prob_full, orig_img_rgb, 
-                        num_classes=n_classes,
-                        spatial_weight=3.0,
-                        spatial_x_stddev=3.0,
-                        spatial_y_stddev=3.0,
-                        color_weight=10.0,
-                        color_stddev=50.0,
-                        num_iterations=10
+                        prob_full, orig_img_rgb, num_classes=n_classes,
+                        spatial_weight=3.0, spatial_x_stddev=3.0, spatial_y_stddev=3.0,
+                        color_weight=10.0, color_stddev=50.0, num_iterations=10
                     )
-                    logging.info(f"CRF post-processing completed for {original_name}")
+                    logging.info(f"✓ CRF post-processing completed for {original_name}")
                 except Exception as e:
                     logging.warning(f"CRF post-processing failed for {original_name}: {e}")
-                    logging.warning("Falling back to non-CRF predictions")
-                    # Fall back to argmax if CRF fails
                     pred_full = np.argmax(prob_full, axis=2).astype(np.uint8)
             else:
-                logging.warning(f"Original image not found for CRF: {original_name}, using non-CRF predictions")
+                logging.warning(f"Original image not found for CRF: {original_name}")
                 pred_full = np.argmax(prob_full, axis=2).astype(np.uint8)
         else:
-            # Standard inference without CRF
             pred_full = stitch_patches(
                 patches, patch_positions, max_x, max_y, 
                 patches_per_row, patch_size, model, use_tta=use_tta, return_probs=False
             )
         
-        # Save prediction results
         save_prediction_results(pred_full, original_name, class_colors, result_dir)
         
-        # Load ground truth for evaluation
         gt_found = False
         for ext in ['.png', '.jpg', '.tif', '.tiff']:
             gt_path = os.path.join(original_mask_dir, f"{original_name}{ext}")
             if os.path.exists(gt_path):
                 gt_pil = Image.open(gt_path).convert("RGB")
                 gt_np = np.array(gt_pil)
-                
                 if rgb_to_class_func:
                     gt_class = rgb_to_class_func(gt_np)
                     gt_found = True
@@ -1045,18 +810,15 @@ def inference(args, model, test_save_path=None):
             logging.warning(f"No ground truth found for {original_name}")
             gt_class = np.zeros_like(pred_full)
         
-        # Save comparison visualization
         if test_save_path and gt_found:
             save_comparison_visualization(
                 pred_full, gt_class, original_name, original_img_dir,
                 test_save_path, class_colors, class_names
             )
         
-        # Compute metrics
         if gt_found:
-            # Ensure ground truth has same dimensions as prediction
             if gt_class.shape != pred_full.shape:
-                logging.warning(f"Resizing ground truth for metrics computation: {gt_class.shape} -> {pred_full.shape}")
+                logging.warning(f"Resizing ground truth: {gt_class.shape} -> {pred_full.shape}")
                 gt_class_resized = np.zeros_like(pred_full)
                 min_h = min(gt_class.shape[0], pred_full.shape[0])
                 min_w = min(gt_class.shape[1], pred_full.shape[1])
@@ -1068,11 +830,66 @@ def inference(args, model, test_save_path=None):
         
         logging.info(f"Completed: {original_name}")
     
-    # Print final metrics
     print_final_metrics(TP, FP, FN, class_names, num_processed_images)
     logging.info(f"Inference completed on {num_processed_images} images")
     
+    save_metrics_to_file(args, TP, FP, FN, class_names, num_processed_images)
+    
     return "Testing Finished!"
+
+
+def calculate_and_display_average_metrics(args):
+    """Calculate and display average metrics across all manuscripts."""
+    if 'FS' in args.manuscript or args.manuscript.endswith('FS'):
+        expected_manuscripts = ['Latin2FS', 'Latin14396FS', 'Latin16746FS', 'Syr341FS']
+    else:
+        expected_manuscripts = ['Latin2', 'Latin14396', 'Latin16746', 'Syr341']
+    
+    parent_dir = os.path.dirname(args.output_dir) if os.path.basename(args.output_dir) == args.manuscript else args.output_dir
+    
+    all_metrics = []
+    found_manuscripts = []
+    metrics_files = []
+    
+    for manuscript in expected_manuscripts:
+        metrics_file = os.path.join(parent_dir, f"metrics_{manuscript}.json")
+        if os.path.exists(metrics_file):
+            try:
+                with open(metrics_file, 'r') as f:
+                    data = json.load(f)
+                    all_metrics.append(data)
+                    found_manuscripts.append(manuscript)
+                    metrics_files.append(metrics_file)
+            except Exception as e:
+                logging.warning(f"Failed to load metrics for {manuscript}: {e}")
+    
+    if len(found_manuscripts) == 4:
+        avg_precision = sum(m['mean_precision'] for m in all_metrics) / len(all_metrics)
+        avg_recall = sum(m['mean_recall'] for m in all_metrics) / len(all_metrics)
+        avg_f1 = sum(m['mean_f1'] for m in all_metrics) / len(all_metrics)
+        avg_iou = sum(m['mean_iou'] for m in all_metrics) / len(all_metrics)
+        
+        print("\n" + "="*80)
+        print("AVERAGE METRICS ACROSS ALL MANUSCRIPTS")
+        print("="*80)
+        print(f"Manuscripts: {', '.join(found_manuscripts)}")
+        print("-"*80)
+        print(f"Mean Precision: {avg_precision:.4f}")
+        print(f"Mean Recall:    {avg_recall:.4f}")
+        print(f"Mean F1-Score:  {avg_f1:.4f}")
+        print(f"Mean IoU:       {avg_iou:.4f}")
+        print("="*80)
+        sys.stdout.flush()
+        
+        for metrics_file in metrics_files:
+            try:
+                os.remove(metrics_file)
+            except Exception as e:
+                logging.warning(f"Failed to delete temporary metrics file {metrics_file}: {e}")
+        
+        return True
+    else:
+        return False
 
 
 def main():
@@ -1080,7 +897,6 @@ def main():
     print("=== Historical Document Segmentation Testing ===")
     print()
     
-    # Parse and validate arguments
     args = parse_arguments()
     
     try:
@@ -1089,13 +905,9 @@ def main():
         print(f"ERROR: {e}")
         sys.exit(1)
     
-    # Set up reproducible testing
     setup_reproducible_testing(args)
-    
-    # Create model (no config needed for CNN-Transformer)
     model = get_model(args, None)
     
-    # Load trained model checkpoint
     try:
         checkpoint_name = load_model_checkpoint(model, args)
         print(f"Loaded checkpoint: {checkpoint_name}")
@@ -1103,45 +915,38 @@ def main():
         print(f"ERROR: Failed to load model checkpoint: {e}")
         sys.exit(1)
     
-    # Set up logging
     log_folder = './test_log/test_log_'
     setup_logging(log_folder, checkpoint_name)
     
     logging.info(str(args))
     logging.info(f"Testing with checkpoint: {checkpoint_name}")
     
-    # Set up test save directory
     if args.is_savenii:
         test_save_path = os.path.join(args.output_dir, "predictions")
         os.makedirs(test_save_path, exist_ok=True)
         logging.info(f"Saving predictions to: {test_save_path}")
     else:
         test_save_path = None
-        logging.info("Not saving prediction files")
     
-    # Run inference
-    print()
-    print("=== Starting Testing ===")
-    print(f"Dataset: {args.dataset}")
-    print(f"Model: CNN-Transformer")
-    print(f"Manuscript: {args.manuscript}")
-    print(f"Save predictions: {args.is_savenii}")
-    print(f"Test-time augmentation: {'Enabled' if args.use_tta else 'Disabled'}")
+    print("\n=== Starting Testing ===")
+    print(f"Dataset: {args.dataset} | Manuscript: {args.manuscript}")
+    print("-" * 80)
+    print("TEST-TIME AUGMENTATION (TTA):", "✓ ENABLED" if args.use_tta else "✗ DISABLED")
     if args.use_tta:
-        print("  - Augmentations: Original, Horizontal flip, Vertical flip, Rotation 90°")
-    print(f"CRF post-processing: {'Enabled' if args.use_crf else 'Disabled'}")
+        print("  → Using 4 augmentations: original, horizontal flip, vertical flip, rotation 90°")
+        print("  → Averaging predictions across all augmentations")
+    print("CRF POST-PROCESSING:", "✓ ENABLED" if args.use_crf else "✗ DISABLED")
     if args.use_crf:
-        print("  - DenseCRF with spatial and color pairwise potentials")
+        print("  → Using DenseCRF with spatial and color pairwise potentials")
+        print("  → Parameters: spatial_weight=3.0, color_weight=10.0, iterations=10")
+    print("-" * 80)
     print()
     
     try:
         result = inference(args, model, test_save_path)
-        print()
-        print("=== TESTING COMPLETED SUCCESSFULLY ===")
-        print(f"Results saved to: {test_save_path if test_save_path else 'No files saved'}")
-        print("="*50)
-        return result
-        
+        calculate_and_display_average_metrics(args)
+        print("\n=== TESTING COMPLETED SUCCESSFULLY ===")
+        print(result)
     except Exception as e:
         print(f"ERROR: Testing failed: {e}")
         import traceback

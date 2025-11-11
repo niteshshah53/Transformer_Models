@@ -1,12 +1,13 @@
 #!/bin/bash -l
-#SBATCH --job-name=bl_ash_ds_aff_bo_fl_crf_tta_freeze           
-#SBATCH --output=./a3/bl_ash_ds_aff_bo_fl_crf_tta_freeze_%j.out
-#SBATCH --error=./a3/bl_ash_ds_aff_bo_fl_crf_tta_freeze_%j.out
+#SBATCH --job-name=h11_baseline2       
+#SBATCH --output=./a1/baseline2_AFF_%j.out
+#SBATCH --error=./a1/baseline2_AFF_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=22:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:rtx3080:1
+#SBATCH --partition=rtx3080
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -19,46 +20,52 @@ module load cudnn
 
 conda activate pytorch2.6-py3.12
 
+# Add user site-packages to PYTHONPATH to find user-installed packages like pydensecrf2
+export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
+
 # ============================================================================
-# ABLATION CONFIGURATION
+# BASELINE NETWORK MODEL CONFIGURATION + SMART SKIP CONNECTIONS
 # ============================================================================
-# Components (based on ablation study):
-# BL  = Baseline (Encoder-Decoder-SegmentationHead)
-# ASH = Alternative Segmentation Head (Conv3x3-ReLU-Conv1x1)
-# DS  = Deep Supervision (auxiliary outputs from decoder layers)
-# FFF = Fourier Feature Fusion (frequency domain fusion)
-# AFF = Attention Feature Fusion (attention-based fusion)
-# Bo  = Bottleneck (2 Swin Transformer blocks)
-# FL  = Focal Loss (in loss combination)
-# freeze = Freeze encoder during training
-# crf = CRF post-processing
-# tta = Test-Time Augmentation
-# CURRENT CONFIGURATION: BL + ASH + DS + AFF + Bo + FL + crf + tta + freeze 
+# Configuration: BASELINE + SMART SKIP
+#   ✓ EfficientNet-B4 Encoder
+#   ✓ Bottleneck: 2 Swin Transformer blocks (automatically enabled)
+#   ✓ Swin Transformer Decoder
+#   ✓ Smart skip connections (attention-based fusion)
+#   ✓ Adapter mode: streaming (default)
+#   ✓ GroupNorm: enabled (default)
+#   ✓ All three losses: CE + Dice + Focal
+#   ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)
+#
+# Components Enabled:
+#   ✓ Smart Skip Connections (fusion_method='smart')
+#
+# Components Disabled:
+#   ✗ Deep Supervision
+#   ✗ Fourier Feature Fusion
+#   ✗ Multi-Scale Aggregation
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER ABLATION STUDY"
+echo "CNN-TRANSFORMER BASELINE NETWORK MODEL + SMART SKIP CONNECTIONS"
 echo "============================================================================"
-echo "Configuration: BL + ASH + DS + AFF + Bo + FL + crf + tta + freeze"
+echo "Configuration: BASELINE + SMART SKIP"
 echo ""
 echo "Component Details:"
-echo "  ✓ BL  (Baseline)              : EfficientNet-B4 encoder + Swin-UNet decoder"
-echo "  ✓ ASH (Alt Seg Head)          : Conv3x3-ReLU-Conv1x1 (richer features)"
-echo "  ✓ DS  (Deep Supervision)      : 3 auxiliary outputs [384, 192, 96]"
-echo "  ✓ AFF (Attention Feature Fusion): Attention-based fusion"
-echo "  ✓ Bo  (Bottleneck)            : 2 Swin blocks at encoder-decoder bridge"
-echo "  ✓ FL  (Focal Loss)            : In combination (0.3*CE + 0.2*FL + 0.5*Dice)"
-echo "  ✓ freeze (Freeze encoder)      : Freeze encoder during training"
-echo "  ✓ crf (CRF post-processing)    : CRF post-processing"
-echo "  ✓ tta (Test-Time Augmentation)  : Test-Time Augmentation"
+echo "  ✓ EfficientNet-B4 Encoder"
+echo "  ✓ Bottleneck: 2 Swin Transformer blocks"
+echo "  ✓ Swin Transformer Decoder"
+echo "  ✓ Smart skip connections (attention-based fusion: fusion_method='smart')"
+echo "  ✓ Adapter mode: streaming"
+echo "  ✓ GroupNorm: enabled"
+echo "  ✓ Loss: CE + Dice + Focal (0.3*CE + 0.2*Focal + 0.5*Dice)"
+echo "  ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)"
 echo ""
 echo "Training Parameters:"
 echo "  - Batch Size: 4"
 echo "  - Max Epochs: 300"
 echo "  - Learning Rate: 0.0001"
-echo "  - Scheduler: CosineAnnealingWarmRestarts (better for longer training)"
-echo "  - Early Stopping: 50 epochs patience"
-echo "  - Adapter Mode: streaming"
+echo "  - Scheduler: CosineAnnealingWarmRestarts"
+echo "  - Early Stopping: 100 epochs patience"
 echo "============================================================================"
 echo ""
 
@@ -68,30 +75,26 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TRAINING: $MANUSCRIPT"
+    echo "║  TRAINING BASELINE + SMART SKIP: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Active Components: BL + ASH + DS + AFF + Bo + FL + crf + tta + freeze"
-    echo "Output Directory: ./a3/${MANUSCRIPT}"
+    echo "Configuration: BASELINE + SMART SKIP"
+    echo "Output Directory: ./a1/${MANUSCRIPT}"
     echo ""
     
     python3 train.py \
+        --use_baseline \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --fusion_method smart \
-        --deep_supervision \
-        --adapter_mode streaming \
-        --bottleneck \
-        --freeze_encoder \
-        --freeze_epochs 30 \
         --scheduler_type CosineAnnealingWarmRestarts \
         --batch_size 4 \
         --max_epochs 300 \
         --base_lr 0.0001 \
-        --patience 50 \
-        --output_dir "./a3/${MANUSCRIPT}"
+        --patience 100 \
+        --fusion_method smart \
+        --output_dir "./a1/${MANUSCRIPT}"
     
     TRAIN_EXIT_CODE=$?
     
@@ -105,24 +108,21 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         echo ""
         
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  TESTING: $MANUSCRIPT"
+        echo "║  TESTING BASELINE + SMART SKIP: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
         
         python3 test.py \
+            --use_baseline \
+            --fusion_method smart \
             --dataset UDIADS_BIB \
             --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
             --manuscript ${MANUSCRIPT} \
             --use_patched_data \
-            --fusion_method smart \
-            --deep_supervision \
-            --adapter_mode streaming \
-            --bottleneck \
-            --freeze_encoder \
             --is_savenii \
             --use_tta \
             --use_crf \
-            --output_dir "./a3/${MANUSCRIPT}"
+            --output_dir "./a1/${MANUSCRIPT}"
         
         TEST_EXIT_CODE=$?
         
@@ -154,6 +154,6 @@ echo ""
 echo "============================================================================"
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: BL + ASH + DS + AFF + Bo + FL + crf + tta + freeze"
-echo "Results Location: ./a3/"
+echo "Configuration Used: BASELINE + SMART SKIP"
+echo "Results Location: ./a1/"
 echo "============================================================================"

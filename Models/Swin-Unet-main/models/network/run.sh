@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=bl_ash_ds_fff_bo_fl_msa_freeze           
-#SBATCH --output=./a4/bl_ash_ds_fff_bo_fl_msa_freeze_%j.out
-#SBATCH --error=./a4/bl_ash_ds_fff_bo_fl_msa_freeze_%j.out
+#SBATCH --job-name=h1_baseline2           
+#SBATCH --output=./UDIADS_BIB_MS/baseline2_%j.out
+#SBATCH --error=./UDIADS_BIB_MS/baseline2_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -23,43 +23,46 @@ conda activate pytorch2.6-py3.12
 export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 
 # ============================================================================
-# ABLATION CONFIGURATION
+# BASELINE NETWORK MODEL CONFIGURATION
 # ============================================================================
-# Components (based on ablation study):
-# BL  = Baseline (Encoder-Decoder-SegmentationHead)
-# ASH = Alternative Segmentation Head (Conv3x3-ReLU-Conv1x1)
-# DS  = Deep Supervision (auxiliary outputs from decoder layers)
-# FFF = Fourier Feature Fusion (frequency domain fusion)
-# AFF = Attention Feature Fusion (attention-based fusion)
-# Bo  = Bottleneck (2 Swin Transformer blocks)
-# FL  = Focal Loss (in loss combination)
-# MSA = Multi-Scale Aggregation (like hybrid1)
-# freeze = Freeze encoder during training
-# CURRENT CONFIGURATION: BL + ASH + DS + FFF + Bo + FL
+# Baseline Configuration:
+#   ✓ EfficientNet-B4 Encoder
+#   ✓ Bottleneck: 2 Swin Transformer blocks (automatically enabled)
+#   ✓ Swin Transformer Decoder
+#   ✓ Simple concatenation skip connections
+#   ✓ Adapter mode: streaming (default)
+#   ✓ GroupNorm: enabled (default)
+#   ✓ All three losses: CE + Dice + Focal
+#   ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)
+#
+# Components Disabled (baseline):
+#   ✗ Deep Supervision
+#   ✗ Smart Skip Connections
+#   ✗ Fourier Feature Fusion
+#   ✗ Multi-Scale Aggregation
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER ABLATION STUDY"
+echo "CNN-TRANSFORMER BASELINE NETWORK MODEL"
 echo "============================================================================"
-echo "Configuration: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
+echo "Configuration: BASELINE ONLY"
 echo ""
 echo "Component Details:"
-echo "  ✓ BL  (Baseline)              : EfficientNet-B4 encoder + Swin-UNet decoder"
-echo "  ✓ ASH (Alt Seg Head)          : Conv3x3-ReLU-Conv1x1 (richer features)"
-echo "  ✓ DS  (Deep Supervision)      : 3 auxiliary outputs [384, 192, 96]"
-echo "  ✓ FFF (Fourier Feature Fusion): Frequency domain skip connections"
-echo "  ✓ Bo  (Bottleneck)            : 2 Swin blocks at encoder-decoder bridge"
-echo "  ✓ FL  (Focal Loss)            : In combination (0.3*CE + 0.2*FL + 0.5*Dice)"
-echo "  ✓ MSA (Multi-Scale Aggregation): Like hybrid1"
-echo "  ✓ freeze (Freeze encoder)      : Freeze encoder during training"
+echo "  ✓ EfficientNet-B4 Encoder"
+echo "  ✓ Bottleneck: 2 Swin Transformer blocks"
+echo "  ✓ Swin Transformer Decoder"
+echo "  ✓ Simple concatenation skip connections"
+echo "  ✓ Adapter mode: streaming"
+echo "  ✓ GroupNorm: enabled"
+echo "  ✓ Loss: CE + Dice + Focal (0.3*CE + 0.2*Focal + 0.5*Dice)"
+echo "  ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)"
 echo ""
 echo "Training Parameters:"
 echo "  - Batch Size: 4"
-echo "  - Max Epochs: 400"
+echo "  - Max Epochs: 300"
 echo "  - Learning Rate: 0.0001"
-echo "  - Scheduler: CosineAnnealingWarmRestarts (better for longer training)"
+echo "  - Scheduler: CosineAnnealingWarmRestarts"
 echo "  - Early Stopping: 100 epochs patience"
-echo "  - Adapter Mode: streaming"
 echo "============================================================================"
 echo ""
 
@@ -69,31 +72,25 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TRAINING: $MANUSCRIPT"
+    echo "║  TRAINING BASELINE: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Active Components: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
-    echo "Output Directory: ./a4/${MANUSCRIPT}"
+    echo "Configuration: BASELINE ONLY"
+    echo "Output Directory: ./UDIADS_BIB_MS/${MANUSCRIPT}"
     echo ""
     
     python3 train.py \
+        --use_baseline \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --fusion_method smart \
-        --deep_supervision \
-        --adapter_mode streaming \
-        --use_multiscale_agg \
-        --bottleneck \
-        --freeze_encoder \
-        --freeze_epochs 30 \
         --scheduler_type CosineAnnealingWarmRestarts \
         --batch_size 4 \
         --max_epochs 300 \
         --base_lr 0.0001 \
-        --patience 50 \
-        --output_dir "./a4/${MANUSCRIPT}"
+        --patience 100 \
+        --output_dir "./UDIADS_BIB_MS/${MANUSCRIPT}"
     
     TRAIN_EXIT_CODE=$?
     
@@ -107,25 +104,24 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         echo ""
         
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  TESTING: $MANUSCRIPT"
+        echo "║  TESTING BASELINE: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "Test Configuration:"
+        echo "  ✓ Test-Time Augmentation (TTA): ENABLED"
+        echo "  ✓ CRF Post-processing: ENABLED"
         echo ""
         
         python3 test.py \
+            --use_baseline \
             --dataset UDIADS_BIB \
             --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
             --manuscript ${MANUSCRIPT} \
             --use_patched_data \
-            --fusion_method smart \
-            --deep_supervision \
-            --adapter_mode streaming \
-            --bottleneck \
-            --use_multiscale_agg \
-            --freeze_encoder \
             --is_savenii \
             --use_tta \
             --use_crf \
-            --output_dir "./a4/${MANUSCRIPT}"
+            --output_dir "./UDIADS_BIB_MS/${MANUSCRIPT}"
         
         TEST_EXIT_CODE=$?
         
@@ -157,6 +153,6 @@ echo ""
 echo "============================================================================"
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
-echo "Results Location: ./a4/"
+echo "Configuration Used: BASELINE ONLY"
+echo "Results Location: ./UDIADS_BIB_MS/"
 echo "============================================================================"

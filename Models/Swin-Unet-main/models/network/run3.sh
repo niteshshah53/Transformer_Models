@@ -1,12 +1,13 @@
 #!/bin/bash -l
-#SBATCH --job-name=bl_ash_ds_fff_bo_fl_msa_freeze_test           
-#SBATCH --output=./a4/bl_ash_ds_fff_bo_fl_msa_freeze_test_%j.out
-#SBATCH --error=./a4/bl_ash_ds_fff_bo_fl_msa_freeze_test_%j.out
+#SBATCH --job-name=h111_baseline2       
+#SBATCH --output=./a2/baseline2_FF_%j.out
+#SBATCH --error=./a2/baseline2_FF_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=4:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --time=22:00:00
+#SBATCH --gres=gpu:rtx3080:1
+#SBATCH --partition=rtx3080
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -23,94 +24,136 @@ conda activate pytorch2.6-py3.12
 export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 
 # ============================================================================
-# TESTING CONFIGURATION
+# BASELINE NETWORK MODEL CONFIGURATION + FOURIER FUSION
 # ============================================================================
-# Components:
-#   BL  = Baseline (EfficientNet-B4 encoder + Swin-UNet decoder)
-#   ASH = Alternative Segmentation Head (Conv3x3-ReLU-Conv1x1)
-#   DS  = Deep Supervision (3 auxiliary outputs [384, 192, 96])
-#   FFF = Fourier Feature Fusion (frequency domain skip connections)
-#   Bo  = Bottleneck (2 Swin Transformer blocks at encoder-decoder bridge)
-#   FL  = Focal Loss (in combination: 0.3*CE + 0.2*FL + 0.5*Dice)
-#   MSA = Multi-Scale Aggregation (like hybrid1)
-#   freeze = Freeze encoder during testing
-# 
-# Current Configuration: BL + ASH + DS + FFF + Bo + FL + MSA + freeze
+# Configuration: BASELINE + FOURIER FUSION
+#   ✓ EfficientNet-B4 Encoder
+#   ✓ Bottleneck: 2 Swin Transformer blocks (automatically enabled)
+#   ✓ Swin Transformer Decoder
+#   ✓ Fourier feature fusion (FFT-based fusion)
+#   ✓ Adapter mode: streaming (default)
+#   ✓ GroupNorm: enabled (default)
+#   ✓ All three losses: CE + Dice + Focal
+#   ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)
+#
+# Components Enabled:
+#   ✓ Fourier Feature Fusion (fusion_method='fourier')
+#
+# Components Disabled:
+#   ✗ Deep Supervision
+#   ✗ Smart Skip Connections
+#   ✗ Multi-Scale Aggregation
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER TESTING"
+echo "CNN-TRANSFORMER BASELINE NETWORK MODEL + FOURIER FUSION"
 echo "============================================================================"
-echo "Configuration: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
+echo "Configuration: BASELINE + FOURIER FUSION"
 echo ""
 echo "Component Details:"
-echo "  ✓ BL  (Baseline)              : EfficientNet-B4 encoder + Swin-UNet decoder"
-echo "  ✓ ASH (Alt Seg Head)          : Conv3x3-ReLU-Conv1x1 (richer features)"
-echo "  ✓ DS  (Deep Supervision)      : 3 auxiliary outputs [384, 192, 96]"
-echo "  ✓ FFF (Fourier Feature Fusion): Frequency domain skip connections"
-echo "  ✓ Bo  (Bottleneck)            : 2 Swin blocks at encoder-decoder bridge"
-echo "  ✓ FL  (Focal Loss)            : In combination (0.3*CE + 0.2*FL + 0.5*Dice)"
-echo "  ✓ MSA (Multi-Scale Aggregation): Like hybrid1"
-echo "  ✓ freeze (Freeze encoder)      : Freeze encoder during testing"
+echo "  ✓ EfficientNet-B4 Encoder"
+echo "  ✓ Bottleneck: 2 Swin Transformer blocks"
+echo "  ✓ Swin Transformer Decoder"
+echo "  ✓ Fourier feature fusion (FFT-based fusion: fusion_method='fourier')"
+echo "  ✓ Adapter mode: streaming"
+echo "  ✓ GroupNorm: enabled"
+echo "  ✓ Loss: CE + Dice + Focal (0.3*CE + 0.2*Focal + 0.5*Dice)"
+echo "  ✓ Differential LR: Encoder (0.1x), Bottleneck (0.5x), Decoder (1.0x)"
 echo ""
-echo "Testing Parameters:"
-echo "  - Test-Time Augmentation: Enabled"
-echo "  - CRF Post-processing: Enabled"
-echo "  - Adapter Mode: streaming"
+echo "Training Parameters:"
+echo "  - Batch Size: 4"
+echo "  - Max Epochs: 300"
+echo "  - Learning Rate: 0.0001"
+echo "  - Scheduler: CosineAnnealingWarmRestarts"
+echo "  - Early Stopping: 100 epochs patience"
 echo "============================================================================"
 echo ""
 
-# Test all manuscripts sequentially
+# Train all manuscripts one by one
 MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TESTING: $MANUSCRIPT"
+    echo "║  TRAINING BASELINE + FOURIER FUSION: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Active Components: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
-    echo "Output Directory: ./a4/${MANUSCRIPT}"
+    echo "Configuration: BASELINE + FOURIER FUSION"
+    echo "Output Directory: ./a2/${MANUSCRIPT}"
     echo ""
     
-    python3 test.py \
+    python3 train.py \
+        --use_baseline \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --fusion_method smart \
-        --deep_supervision \
-        --adapter_mode streaming \
-        --bottleneck \
-        --use_multiscale_agg \
-        --freeze_encoder \
-        --is_savenii \
-        --use_tta \
-        --use_crf \
-        --output_dir "./a4/${MANUSCRIPT}"
+        --scheduler_type CosineAnnealingWarmRestarts \
+        --batch_size 4 \
+        --max_epochs 300 \
+        --base_lr 0.0001 \
+        --patience 100 \
+        --fusion_method fourier \
+        --output_dir "./a2/${MANUSCRIPT}"
     
-    TEST_EXIT_CODE=$?
+    TRAIN_EXIT_CODE=$?
     
-    # Report testing status
-    if [ $TEST_EXIT_CODE -eq 0 ]; then
+    if [ $TRAIN_EXIT_CODE -eq 0 ]; then
         echo ""
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  ✓ TESTING COMPLETED: $MANUSCRIPT"
+        echo "║  ✓ TRAINING COMPLETED: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
+        echo "Proceeding to testing..."
+        echo ""
+        
+        echo "╔════════════════════════════════════════════════════════════════════════╗"
+        echo "║  TESTING BASELINE + FOURIER FUSION: $MANUSCRIPT"
+        echo "╚════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        
+        python3 test.py \
+            --use_baseline \
+            --fusion_method fourier \
+            --dataset UDIADS_BIB \
+            --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
+            --manuscript ${MANUSCRIPT} \
+            --use_patched_data \
+            --is_savenii \
+            --use_tta \
+            --use_crf \
+            --output_dir "./a2/${MANUSCRIPT}"
+        
+        TEST_EXIT_CODE=$?
+        
+        if [ $TEST_EXIT_CODE -eq 0 ]; then
+            echo ""
+            echo "╔════════════════════════════════════════════════════════════════════════╗"
+            echo "║  ✓ TESTING COMPLETED: $MANUSCRIPT"
+            echo "╚════════════════════════════════════════════════════════════════════════╝"
+            echo ""
+        else
+            echo ""
+            echo "╔════════════════════════════════════════════════════════════════════════╗"
+            echo "║  ✗ TESTING FAILED: $MANUSCRIPT (Exit Code: $TEST_EXIT_CODE)"
+            echo "╚════════════════════════════════════════════════════════════════════════╝"
+            echo ""
+        fi
     else
         echo ""
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  ✗ TESTING FAILED: $MANUSCRIPT (Exit Code: $TEST_EXIT_CODE)"
+        echo "║  ✗ TRAINING FAILED: $MANUSCRIPT (Exit Code: $TRAIN_EXIT_CODE)"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "Skipping testing for $MANUSCRIPT due to training failure."
         echo ""
     fi
 done
 
 echo ""
 echo "============================================================================"
-echo "ALL MANUSCRIPTS TESTED"
+echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: BL + ASH + DS + FFF + Bo + FL + MSA + freeze"
-echo "Results Location: ./a4/"
+echo "Configuration Used: BASELINE + FOURIER FUSION"
+echo "Results Location: ./a2/"
 echo "============================================================================"

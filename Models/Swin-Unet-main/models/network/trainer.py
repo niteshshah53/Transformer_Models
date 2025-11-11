@@ -8,7 +8,8 @@ import torch.optim as optim
 from torch.nn import CrossEntropyLoss
 from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
-from torch.cuda.amp import autocast, GradScaler
+from collections import defaultdict
+import warnings
 
 # Add common directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
@@ -39,117 +40,150 @@ def setup_logging(output_path):
     return logger
 
 
-def compute_class_weights(train_dataset, num_classes):
+def compute_class_weights(train_dataset, num_classes, smoothing=0.1):
     """
-    Compute class weights based on inverse frequency.
-    Normalized to sum to num_classes for balanced weighting.
+    Compute balanced class weights using effective number of samples.
+    
+    Uses the formula from "Class-Balanced Loss Based on Effective Number of Samples"
+    (Cui et al., 2019): weight = (1 - beta) / (1 - beta^n)
+    
+    Args:
+        train_dataset: Training dataset with .mask_paths attribute
+        num_classes (int): Number of segmentation classes
+        smoothing (float): Smoothing factor to prevent extreme weights (default: 0.1)
+        
+    Returns:
+        torch.Tensor: Normalized class weights on GPU if available
     """
-    print("\nComputing class weights...")
+    print("\n" + "="*80)
+    print("COMPUTING CLASS WEIGHTS")
+    print("="*80)
 
     # Define color maps
-    if num_classes == 6:
-        COLOR_MAP = {
+    COLOR_MAPS = {
+        6: {  # UDIADS-BIB (standard manuscripts)
             (0, 0, 0): 0,        # Background
             (255, 255, 0): 1,    # Paratext
             (0, 255, 255): 2,    # Decoration
             (255, 0, 255): 3,    # Main text
             (255, 0, 0): 4,      # Title
             (0, 255, 0): 5,      # Chapter Heading
-        }
-    elif num_classes == 5:
-        COLOR_MAP = {
+        },
+        5: {  # UDIADS-BIB Syriaque341 (no Chapter Headings)
             (0, 0, 0): 0,        # Background
             (255, 255, 0): 1,    # Paratext
             (0, 255, 255): 2,    # Decoration
             (255, 0, 255): 3,    # Main text
             (255, 0, 0): 4,      # Title
-        }
-    elif num_classes == 4:
-        COLOR_MAP = {
+        },
+        4: {  # DivaHisDB
             (0, 0, 0): 0,        # Background
             (0, 255, 0): 1,      # Comment
             (255, 0, 0): 2,      # Decoration
             (0, 0, 255): 3,      # Main Text
         }
-    else:
+    }
+    
+    if num_classes not in COLOR_MAPS:
         raise ValueError(f"Unsupported number of classes: {num_classes}")
-
-    # Accumulate pixel counts per class efficiently by converting each
-    # RGB mask into a single-label map once per image, then using
-    # np.bincount to accumulate counts.
-    class_counts = np.zeros(num_classes, dtype=np.int64)
-
-    # Build integer mapping for color tuples -> class index
-    mapping = {k: v for k, v in COLOR_MAP.items()}
-    map_int = { (r << 16) | (g << 8) | b: cls for (r, g, b), cls in mapping.items() }
-
+    
+    COLOR_MAP = COLOR_MAPS[num_classes]
+    
+    # Count pixels per class
+    class_counts = np.zeros(num_classes, dtype=np.float64)
+    unmapped_count = 0
+    chapter_heading_count = 0
+    
+    # Count pixels silently (no progress messages)
     for mask_path in train_dataset.mask_paths:
-        mask = np.array(Image.open(mask_path).convert("RGB"))
-        # vectorize RGB to single integer per pixel
-        rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (
-            mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
+        try:
+            mask = np.array(Image.open(mask_path).convert("RGB"))
+        except Exception as e:
+            warnings.warn(f"Failed to load mask {mask_path}: {e}")
+            continue
+        
+        mapped_mask = np.zeros(mask.shape[:2], dtype=bool)
+        
+        # Count pixels for each class
+        for rgb, cls in COLOR_MAP.items():
+            matches = np.all(mask == rgb, axis=-1)
+            class_counts[cls] += np.sum(matches)
+            mapped_mask[matches] = True
+        
+        # Track unmapped pixels (including Chapter Headings in 5-class mode)
+        if num_classes == 5:
+            chapter_matches = np.all(mask == (0, 255, 0), axis=-1)
+            if np.any(chapter_matches):
+                chapter_heading_count += np.sum(chapter_matches)
+                mapped_mask[chapter_matches] = True
+        
+        unmapped_pixels = ~mapped_mask
+        if np.any(unmapped_pixels):
+            unmapped_count += np.sum(unmapped_pixels)
 
-        flat = rgb_int.ravel()
-        # Initialize flat labels to -1 (unknown)
-        label_flat = np.full(flat.shape, -1, dtype=np.int32)
-
-        # Iterate keys (few - number of classes) and set corresponding labels
-        for rgb_val, cls in map_int.items():
-            if np.any(flat == rgb_val):
-                label_flat[flat == rgb_val] = int(cls)
-
-        # Count only valid labels (>=0)
-        valid = label_flat >= 0
-        if np.any(valid):
-            counts = np.bincount(label_flat[valid].astype(np.int64), minlength=num_classes)
-            class_counts += counts
-
-    # Avoid zero-total case
+    # Report findings
     total_pixels = class_counts.sum()
     if total_pixels == 0:
-        # fallback to uniform weights
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        return torch.ones(num_classes, dtype=torch.float32, device=device)
-
-    # Compute per-class frequency
-    class_freq = class_counts.astype(np.float64) / float(total_pixels)
-
-    # Log-scaled inverse-frequency weights to avoid extreme values
-    # This helps when one class is <0.01% of data
-    eps = 1e-6
-    weights = np.log(1 + (1.0 / (class_freq + eps)))
-    weights = weights / weights.mean()
-
-    # Rarity-based proportional boost: boost classes whose frequency is below
-    # the lower quartile. Scale boost factor up to `max_boost`.
-    try:
-        lower_q = np.percentile(class_freq, 25)
-    except Exception:
-        lower_q = class_freq.min()
-
-    max_boost = 4.0
-    boost_mask = class_freq < lower_q
-    if np.any(boost_mask):
-        # factor = min(max_boost, lower_q / freq)
-        factors = np.ones_like(weights)
-        factors[boost_mask] = np.minimum(max_boost, (lower_q + eps) / (class_freq[boost_mask] + eps))
-        weights = weights * factors
-
-    # Re-normalize to mean=1 after boosting
-    weights = weights / weights.mean()
-
-    # Print analysis
-    print("\n" + "-" * 80)
-    print("CLASS DISTRIBUTION ANALYSIS")
-    print("-" * 80)
-    print(f"{'Class':<6} {'Count':<12} {'Frequency':<15} {'Weight':<15}")
-    print("-" * 80)
+        raise ValueError("No valid pixels found in training masks!")
+    
+    if num_classes == 5 and chapter_heading_count > 0:
+        print(f"\n⚠️  WARNING: Found {chapter_heading_count:,} Chapter Heading pixels")
+        print(f"   These will be mapped to Background (class 0)")
+    
+    if unmapped_count > 0:
+        print(f"⚠️  WARNING: {unmapped_count:,} unmapped pixels (mapped to Background)")
+    
+    # Compute class frequencies
+    class_freq = class_counts / total_pixels
+    
+    # Effective Number of Samples (ENS) weighting
+    # beta = 0.9999 for highly imbalanced datasets, 0.99 for moderate imbalance
+    beta = 0.9999 if np.min(class_freq[class_freq > 0]) < 0.001 else 0.99
+    
+    effective_num = 1.0 - np.power(beta, class_counts)
+    weights = (1.0 - beta) / (effective_num + 1e-8)
+    
+    # Apply smoothing to prevent extreme weights
+    if smoothing > 0:
+        # Linear interpolation between computed weights and uniform weights
+        uniform_weights = np.ones(num_classes)
+        weights = (1 - smoothing) * weights + smoothing * uniform_weights
+    
+    # Normalize to sum to num_classes (maintains balanced loss scale)
+    weights = weights / weights.sum() * num_classes
+    
+    # Cap maximum weight to prevent dominance (max 10x the minimum)
+    max_weight_ratio = 10.0
+    min_weight = weights.min()
+    weights = np.minimum(weights, min_weight * max_weight_ratio)
+    
+    # Re-normalize after capping
+    weights = weights / weights.sum() * num_classes
+    
+    # Define class names for display
+    CLASS_NAMES = {
+        6: ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title', 'Chapter Heading'],
+        5: ['Background', 'Paratext', 'Decoration', 'Main Text', 'Title'],
+        4: ['Background', 'Comment', 'Decoration', 'Main Text']
+    }
+    
+    class_names = CLASS_NAMES.get(num_classes, [f'Class {i}' for i in range(num_classes)])
+    
+    # Print simplified analysis
+    print("\n" + "-"*60)
+    print(f"{'Class Name':<20} {'Percentage':<15} {'Weight':<15}")
+    print("-"*60)
     for cls in range(num_classes):
-        print(f"{cls:<6} {class_counts[cls]:<12d} {class_freq[cls]:<15.6f} {weights[cls]:<15.6f}")
-    print("-" * 80 + "\n")
-
+        percentage = class_freq[cls] * 100
+        weight = weights[cls]
+        print(f"{class_names[cls]:<20} {percentage:>6.2f}%       {weight:>6.4f}")
+    print("-"*60)
+    print(f"Total pixels: {total_pixels:,}")
+    print(f"Weight ratio (max/min): {weights.max()/weights.min():.2f}")
+    print("="*80 + "\n")
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    return torch.tensor(weights.astype(np.float32), dtype=torch.float32, device=device)
+    return torch.tensor(weights, dtype=torch.float32, device=device)
 
 
 def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, seed, sampler=None):
@@ -294,214 +328,232 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
     return sampler
 
 
-def create_loss_functions(class_weights, num_classes):
+def create_loss_functions(class_weights, num_classes, focal_gamma=2.0):
     """
-    Create loss functions with class weights.
-    Based on ablation: Focal Loss is beneficial in full configuration.
-    """
-    ce_loss = CrossEntropyLoss(weight=class_weights, label_smoothing=0.05)
-    focal_loss = FocalLoss(gamma=3.0, weight=class_weights)
-    dice_loss = DiceLoss(num_classes, weight=class_weights, smooth=1e-4)
+    Create properly weighted loss functions.
+    Matches hybrid2's pattern.
     
-    print("✓ Loss functions initialized")
-    print("  - CrossEntropyLoss: weighted, label_smoothing=0.1")
-    print("  - FocalLoss: gamma=3.0, weighted")
-    print("  - DiceLoss: weighted, smooth=1e-4\n")
+    Args:
+        class_weights (torch.Tensor): Per-class weights
+        num_classes (int): Number of classes
+        focal_gamma (float): Focal loss focusing parameter (default: 2.0)
+        
+    Returns:
+        tuple: (ce_loss, focal_loss, dice_loss)
+    """
+    # CrossEntropyLoss with class weights (matching hybrid2: label_smoothing=0.1)
+    ce_loss = CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
+    
+    # Focal loss with moderate gamma (2.0 is standard, matching hybrid2)
+    focal_loss = FocalLoss(gamma=focal_gamma, weight=class_weights)
+    
+    # Dice loss (handles class imbalance internally, matching hybrid2: no weight, no smooth)
+    dice_loss = DiceLoss(num_classes)
+    
+    print(f"✓ Loss functions created: CE (weighted), Focal (γ={focal_gamma}), Dice")
     
     return ce_loss, focal_loss, dice_loss
 
 
-def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss):
+def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss, 
+                          ce_weight=0.3, focal_weight=0.2, dice_weight=0.5):
+    """
+    Compute combined loss with support for deep supervision.
+    Matches hybrid2's pattern but keeps network model's weight values.
+    
+    Args:
+        predictions: Model output (logits or tuple with auxiliary outputs)
+        labels: Ground truth labels
+        ce_loss, focal_loss, dice_loss: Loss functions
+        ce_weight, focal_weight, dice_weight: Loss combination weights (default: 0.3, 0.2, 0.5)
+        
+    Returns:
+        tuple: (total_loss, loss_dict) where loss_dict contains individual losses
+    """
+    loss_dict = {}
+    
+    # Handle deep supervision
     if isinstance(predictions, tuple):
         logits, aux_outputs = predictions
+        
+        # Main branch losses
         loss_ce = ce_loss(logits, labels)
         loss_focal = focal_loss(logits, labels)
         loss_dice = dice_loss(logits, labels, softmax=True)
-
-        main_loss = 0.3 * loss_ce + 0.2 * loss_focal + 0.5 * loss_dice
-
-        aux_weights = [0.4, 0.3, 0.2][:len(aux_outputs)]
+        
+        main_loss = ce_weight * loss_ce + focal_weight * loss_focal + dice_weight * loss_dice
+        loss_dict['main'] = main_loss.item()
+        loss_dict['ce'] = loss_ce.item()
+        loss_dict['focal'] = loss_focal.item()
+        loss_dict['dice'] = loss_dice.item()
+        
+        # Auxiliary losses with exponentially decaying weights (matching hybrid2 pattern)
+        aux_weights = [0.4 * (0.8 ** i) for i in range(len(aux_outputs))]
         aux_loss = 0.0
-
-        for weight, aux_output in zip(aux_weights, aux_outputs):
+        
+        for i, (weight, aux_output) in enumerate(zip(aux_weights, aux_outputs)):
             aux_ce = ce_loss(aux_output, labels)
             aux_focal = focal_loss(aux_output, labels)
             aux_dice = dice_loss(aux_output, labels, softmax=True)
-            aux_combined = 0.3 * aux_ce + 0.2 * aux_focal + 0.5 * aux_dice
+            aux_combined = ce_weight * aux_ce + focal_weight * aux_focal + dice_weight * aux_dice
             aux_loss += weight * aux_combined
-
+            loss_dict[f'aux_{i}'] = (weight * aux_combined).item()
+        
         total_loss = main_loss + aux_loss
-        return total_loss
+        loss_dict['total'] = total_loss.item()
+        
     else:
+        # Single output
         loss_ce = ce_loss(predictions, labels)
         loss_focal = focal_loss(predictions, labels)
         loss_dice = dice_loss(predictions, labels, softmax=True)
-        total_loss = 0.3 * loss_ce + 0.2 * loss_focal + 0.5 * loss_dice
-        return total_loss
-
-
-
-def create_optimizer_and_scheduler(model, learning_rate, max_epochs, steps_per_epoch, encoder_lr_factor=0.1, scheduler_type='OneCycleLR'):
-    """
-    Create AdamW optimizer with learning rate scheduler.
+        
+        total_loss = ce_weight * loss_ce + focal_weight * loss_focal + dice_weight * loss_dice
+        
+        loss_dict['ce'] = loss_ce.item()
+        loss_dict['focal'] = loss_focal.item()
+        loss_dict['dice'] = loss_dice.item()
+        loss_dict['total'] = total_loss.item()
     
-    Args:
-        encoder_lr_factor: Multiplier for encoder learning rate (default 0.1 = 10x smaller)
-        scheduler_type: Type of scheduler to use
-            - 'OneCycleLR': Step per batch (requires total_steps)
-            - 'CosineAnnealingWarmRestarts': Step per epoch
-            - 'ReduceLROnPlateau': Step per epoch based on validation loss
-            - 'CosineAnnealingLR': Step per epoch
-    """
-    # Separate encoder and decoder parameters
-    encoder_decay_params = []
-    encoder_no_decay_params = []
-    decoder_decay_params = []
-    decoder_no_decay_params = []
+    return total_loss, loss_dict
 
+
+
+def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader=None):
+    """
+    Create optimizer with differential learning rates and appropriate scheduler.
+    
+    For baseline Hybrid2 model:
+    - Pretrained encoder: 10x smaller LR
+    - Bottleneck (2 Swin blocks): 5x smaller LR  
+    - Decoder (including encoder_projections): full LR
+    - Weight decay for regularization
+    """
+    encoder_params = []
+    bottleneck_params = []
+    decoder_params = []
+    
+    # Separate parameters by component
     for name, param in model.named_parameters():
         if not param.requires_grad:
             continue
-        # treat 1D params (biases, LayerNorm/BatchNorm weights) and explicit '.bias' as no_decay
-        lname = name.lower()
-        is_no_decay = param.dim() == 1 or name.endswith('.bias') or 'norm' in lname or 'bn' in lname or 'ln' in lname
-        
-        # Check if parameter belongs to encoder
-        is_encoder = 'encoder' in name.lower() or 'adapter' in name.lower() or 'streaming_proj' in name.lower() or 'feature_adapters' in name.lower()
-        
-        if is_encoder:
-            if is_no_decay:
-                encoder_no_decay_params.append(param)
-            else:
-                encoder_decay_params.append(param)
+            
+        if 'encoder' in name.lower() and 'decoder' not in name.lower():
+            # Encoder parameters (not decoder.encoder_projections)
+            encoder_params.append(param)
+        elif 'bottleneck' in name.lower():
+            # Bottleneck: 2 Swin Transformer blocks
+            bottleneck_params.append(param)
         else:
-            if is_no_decay:
-                decoder_no_decay_params.append(param)
-            else:
-                decoder_decay_params.append(param)
-
-    # Create parameter groups with differential learning rates
-    param_groups = []
-    if encoder_decay_params:
-        param_groups.append({
-            'params': encoder_decay_params, 
-            'weight_decay': 0.01,
-            'lr': learning_rate * encoder_lr_factor,
-            'initial_lr': learning_rate * encoder_lr_factor,
-            'name': 'encoder_decay'
-        })
-    if encoder_no_decay_params:
-        param_groups.append({
-            'params': encoder_no_decay_params, 
-            'weight_decay': 0.0,
-            'lr': learning_rate * encoder_lr_factor,
-            'initial_lr': learning_rate * encoder_lr_factor,
-            'name': 'encoder_no_decay'
-        })
-    if decoder_decay_params:
-        param_groups.append({
-            'params': decoder_decay_params, 
-            'weight_decay': 0.01,
-            'lr': learning_rate,
-            'initial_lr': learning_rate,
-            'name': 'decoder_decay'
-        })
-    if decoder_no_decay_params:
-        param_groups.append({
-            'params': decoder_no_decay_params, 
-            'weight_decay': 0.0,
-            'lr': learning_rate,
-            'initial_lr': learning_rate,
-            'name': 'decoder_no_decay'
-        })
-
-    optimizer = optim.AdamW(param_groups, betas=(0.9, 0.999))
+            # Decoder parameters (including encoder_projections, decoder blocks, etc.)
+            decoder_params.append(param)
     
-    # Create scheduler based on scheduler_type
-    scheduler_name = ""
-    if scheduler_type == 'OneCycleLR':
-        # Calculate total_steps and validate
+    # Parameter groups with differential learning rates
+    param_groups = [
+        {
+            'params': encoder_params,
+            'lr': learning_rate * 0.1,
+            'weight_decay': 1e-4,
+            'name': 'encoder'
+        },
+        {
+            'params': bottleneck_params,
+            'lr': learning_rate * 0.5,
+            'weight_decay': 5e-4,
+            'name': 'bottleneck'
+        },
+        {
+            'params': decoder_params,
+            'lr': learning_rate,
+            'weight_decay': 1e-3,
+            'name': 'decoder'
+        }
+    ]
+    
+    # Filter out empty groups
+    param_groups = [g for g in param_groups if len(g['params']) > 0]
+    
+    # AdamW optimizer
+    optimizer = optim.AdamW(
+        param_groups,
+        betas=(0.9, 0.999),
+        eps=1e-8
+    )
+    
+    # Choose scheduler
+    scheduler_type = getattr(args, 'scheduler_type', 'CosineAnnealingWarmRestarts')
+    max_epochs = getattr(args, 'max_epochs', 300)
+    warmup_epochs = getattr(args, 'warmup_epochs', 10)
+    
+    if scheduler_type == 'OneCycleLR' and train_loader is not None:
+        steps_per_epoch = len(train_loader)
         total_steps = max_epochs * steps_per_epoch
         
-        # Validate that total_steps matches expected training steps
-        if total_steps <= 0:
-            raise ValueError(f"Invalid total_steps: {total_steps} (max_epochs={max_epochs}, steps_per_epoch={steps_per_epoch})")
+        # Get max LRs for each group
+        max_lrs = [g['lr'] * 10 for g in param_groups]
         
         scheduler = optim.lr_scheduler.OneCycleLR(
             optimizer,
-            max_lr=learning_rate,
+            max_lr=max_lrs,
             total_steps=total_steps,
-            pct_start=0.3,  # 30% warmup
+            pct_start=warmup_epochs / max_epochs,
             anneal_strategy='cos',
-            div_factor=25.0,  # Initial LR = max_lr/25
-            final_div_factor=10000.0  # Final LR = max_lr/10000
+            div_factor=10,
+            final_div_factor=100
         )
-        scheduler_name = f"OneCycleLR (total_steps={total_steps}, warmup=30%)"
+        scheduler_name = f"OneCycleLR (warmup: {warmup_epochs} epochs)"
         
-    elif scheduler_type == 'CosineAnnealingWarmRestarts':
+    elif scheduler_type == 'CosineAnnealingLR':
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=max_epochs - warmup_epochs,
+            eta_min=1e-7
+        )
+        scheduler_name = f"CosineAnnealingLR (T_max={max_epochs - warmup_epochs})"
+        
+    else:  # Default: CosineAnnealingWarmRestarts
         scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer,
             T_0=50,
             T_mult=2,
             eta_min=1e-7
         )
-        scheduler_name = "CosineAnnealingWarmRestarts (T_0=50, T_mult=2)"
-        
-    elif scheduler_type == 'ReduceLROnPlateau':
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer,
-            mode='min',
-            factor=0.5,
-            patience=15,
-            min_lr=1e-6,
-            verbose=False
-        )
-        scheduler_name = "ReduceLROnPlateau (factor=0.5, patience=15)"
-        
-    elif scheduler_type == 'CosineAnnealingLR':
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer,
-            T_max=max_epochs,
-            eta_min=1e-6
-        )
-        scheduler_name = f"CosineAnnealingLR (T_max={max_epochs})"
-        
-    else:
-        raise ValueError(f"Unknown scheduler type: {scheduler_type}. "
-                        f"Supported: OneCycleLR, CosineAnnealingWarmRestarts, ReduceLROnPlateau, CosineAnnealingLR")
+        scheduler_name = "CosineAnnealingWarmRestarts (T_0=50)"
     
-    print(f"\n🔧 Optimizer: AdamW (lr={learning_rate}, weight_decay=0.01)")
-    if encoder_decay_params or encoder_no_decay_params:
-        print(f"   - Encoder LR: {learning_rate * encoder_lr_factor:.6f} ({encoder_lr_factor}x)")
-    print(f"   - Decoder LR: {learning_rate:.6f} (1.0x)")
-    print(f"📈 Scheduler: {scheduler_name}")
-    if scheduler_type == 'OneCycleLR':
-        print(f"   - Total steps: {max_epochs * steps_per_epoch} ({steps_per_epoch} steps/epoch × {max_epochs} epochs)")
-        print(f"   - Max LR: {learning_rate:.6f}")
-        print(f"   - Initial LR: {learning_rate/25:.6f}")
-        print(f"   - Final LR: {learning_rate/10000:.6f}")
-        print(f"   - Warmup: 30% of training")
-    print()
+    # Print configuration
+    print("\n" + "="*80)
+    print("OPTIMIZER CONFIGURATION")
+    print("="*80)
+    for group in param_groups:
+        num_params = sum(p.numel() for p in group['params'])
+        print(f"{group['name'].capitalize():12}: LR={group['lr']:.6f}, "
+              f"WD={group['weight_decay']:.6f}, Params={num_params:,}")
+    print(f"Scheduler:   {scheduler_name}")
+    print("="*80 + "\n")
     
     return optimizer, scheduler
 
 
 def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, 
-                       optimizer, scheduler, scaler=None, scheduler_type='OneCycleLR'):
-    """Run one training epoch with gradient clipping and optional AMP.
+                       optimizer, scheduler, scheduler_type='OneCycleLR'):
+    """Run one training epoch with gradient clipping.
+    Matches hybrid2's pattern: returns loss_dict.
 
-    scaler: torch.cuda.amp.GradScaler or None
     scheduler_type: Type of scheduler - determines when to step
         - 'OneCycleLR': Step per batch
         - Others: Step per epoch (caller handles)
     """
+    import math
+    
     model.train()
-    total_loss = 0.0
-    num_batches = 0
-    valid_batches = 0
+    
+    epoch_losses = defaultdict(float)
+    num_batches = len(train_loader)
     skipped_loss_nan = 0
     skipped_grad_nan = 0
-    scheduler_warning_printed = False  # Track if scheduler warning was printed
+    scheduler_warning_printed = False
+    
+    optimizer.zero_grad()
     
     for batch_idx, batch in enumerate(train_loader):
         # Get data
@@ -514,128 +566,85 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
         if torch.cuda.is_available():
             images = images.cuda()
             labels = labels.cuda()
+
+        # Forward pass
+        predictions = model(images)
+        loss, loss_dict = compute_combined_loss(
+            predictions, labels, ce_loss, focal_loss, dice_loss,
+            ce_weight=0.3, focal_weight=0.2, dice_weight=0.5
+        )
         
-        # Zero grads
+        # Check for NaN/Inf loss
+        if torch.isnan(loss) or torch.isinf(loss):
+            skipped_loss_nan += 1
+            continue
+        
+        loss.backward()
+        
+        # Check for NaN/Inf gradients before clipping
+        has_nan_grad = False
+        for param in model.parameters():
+            if param.grad is not None:
+                if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                    has_nan_grad = True
+                    break
+        
+        if has_nan_grad:
+            skipped_grad_nan += 1
+            optimizer.zero_grad()
+            continue
+        
+        # Gradient clipping for stability
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        optimizer.step()
         optimizer.zero_grad()
-
-        # Forward (AMP if scaler provided and CUDA available)
-        if scaler is not None and torch.cuda.is_available():
-            with autocast():
-                predictions = model(images)
-                loss = compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss)
-
-            # Check for NaN/Inf loss
-            if torch.isnan(loss) or torch.isinf(loss):
-                skipped_loss_nan += 1
-                continue
-
-            # Scaled backward, then unscale for clipping
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-            
-            # Check for NaN/Inf gradients before clipping
-            has_nan_grad = False
-            for param in model.parameters():
-                if param.grad is not None:
-                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                        has_nan_grad = True
-                        break
-            
-            if has_nan_grad:
-                # Gradients contain Inf/NaN - scaler will skip step and reduce scale
-                skipped_grad_nan += 1
-                scaler.update()  # This reduces the scale factor automatically
-                continue
-            
-            # Gradients are valid, proceed with clipping and step
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            scaler.step(optimizer)
-            scaler.update()
-            
-            # Scheduler step per batch (OneCycleLR expects step every batch)
-            # Only step if scheduler hasn't reached max steps
-            # Other schedulers are stepped per epoch by the caller
-            if scheduler_type == 'OneCycleLR':
-                if hasattr(scheduler, 'total_steps') and scheduler.last_epoch + 1 < scheduler.total_steps:
-                    scheduler.step()
-                elif hasattr(scheduler, 'total_steps') and not scheduler_warning_printed:
-                    if scheduler.last_epoch + 1 >= scheduler.total_steps:
-                        print("⚠️  Scheduler reached max steps, stopping LR updates.")
-                        scheduler_warning_printed = True
-            
-            # Track valid loss
-            loss_val = float(loss.item())
-            if not (np.isnan(loss_val) or np.isinf(loss_val)):
-                total_loss += loss_val
-                valid_batches += 1
-        else:
-            predictions = model(images)
-            loss = compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss)
-            
-            # Check for NaN/Inf loss
-            if torch.isnan(loss) or torch.isinf(loss):
-                skipped_loss_nan += 1
-                continue
-            
-            loss.backward()
-            
-            # Check for NaN/Inf gradients before clipping
-            has_nan_grad = False
-            for param in model.parameters():
-                if param.grad is not None:
-                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                        has_nan_grad = True
-                        break
-            
-            if has_nan_grad:
-                skipped_grad_nan += 1
-                optimizer.zero_grad()  # Clear gradients
-                continue
-            
-            # Gradient clipping for stability
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            
-            # Scheduler step per batch (OneCycleLR expects step every batch)
-            # Only step if scheduler hasn't reached max steps
-            # Other schedulers are stepped per epoch by the caller
-            if scheduler_type == 'OneCycleLR':
-                if hasattr(scheduler, 'total_steps') and scheduler.last_epoch + 1 < scheduler.total_steps:
-                    scheduler.step()
-                elif hasattr(scheduler, 'total_steps') and not scheduler_warning_printed:
-                    if scheduler.last_epoch + 1 >= scheduler.total_steps:
-                        print("⚠️  Scheduler reached max steps, stopping LR updates.")
-                        scheduler_warning_printed = True
-            
-            # Track valid loss
-            loss_val = float(loss.item())
-            if not (np.isnan(loss_val) or np.isinf(loss_val)):
-                total_loss += loss_val
-                valid_batches += 1
-
-        num_batches += 1
+        
+        # Scheduler step per batch (OneCycleLR expects step every batch)
+        if scheduler_type == 'OneCycleLR':
+            if hasattr(scheduler, 'total_steps') and scheduler.last_epoch + 1 < scheduler.total_steps:
+                scheduler.step()
+            elif hasattr(scheduler, 'total_steps') and not scheduler_warning_printed:
+                if scheduler.last_epoch + 1 >= scheduler.total_steps:
+                    print("⚠️  Scheduler reached max steps, stopping LR updates.")
+                    scheduler_warning_printed = True
+        
+        # Accumulate losses
+        for key, value in loss_dict.items():
+            epoch_losses[key] += value
     
     # Print summary only if batches were skipped
     if skipped_loss_nan > 0 or skipped_grad_nan > 0:
         total_skipped = skipped_loss_nan + skipped_grad_nan
         print(f"  ⚠️  Skipped {total_skipped} batches ({skipped_loss_nan} NaN/Inf loss, {skipped_grad_nan} NaN/Inf gradients)")
     
-    return total_loss / valid_batches if valid_batches > 0 else float('inf')
+    # Average losses
+    for key in epoch_losses:
+        epoch_losses[key] /= num_batches
+    
+    return epoch_losses
 
 
-def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss):
+def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss, max_batches=None):
     """
-    Validate model on full validation set using data loader.
-    More efficient than processing samples individually.
+    Validate model on validation set.
+    Matches hybrid2's pattern: returns loss_dict with NaN checking.
+    
+    Args:
+        max_batches: Optional limit on number of batches to validate
     """
+    import math
+    
     model.eval()
-    total_loss = 0.0
+    
+    epoch_losses = defaultdict(float)
     num_batches = 0
-    valid_batches = 0
     
     with torch.no_grad():
-        for batch in val_loader:
-            # Get data
+        for batch_idx, batch in enumerate(val_loader):
+            if max_batches is not None and batch_idx >= max_batches:
+                break
+            
+            # Extract data
             if isinstance(batch, dict):
                 images = batch['image']
                 labels = batch['label']
@@ -646,28 +655,49 @@ def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss):
                 images = images.cuda()
                 labels = labels.cuda()
             
-            # Forward pass (use autocast on GPU for validation too)
-            if torch.cuda.is_available():
-                with autocast():
-                    predictions = model(images)
-                    loss = compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss)
-            else:
-                predictions = model(images)
-                loss = compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss)
+            # Forward pass
+            predictions = model(images)
+            _, loss_dict = compute_combined_loss(
+                predictions, labels, ce_loss, focal_loss, dice_loss,
+                ce_weight=0.3, focal_weight=0.2, dice_weight=0.5
+            )
             
-            # Skip NaN/Inf losses
-            loss_val = loss.item()
-            if not (np.isnan(loss_val) or np.isinf(loss_val)):
-                total_loss += loss_val
-                valid_batches += 1
+            # Check for NaN/Inf in loss_dict before accumulating
+            for key, value in loss_dict.items():
+                if isinstance(value, torch.Tensor):
+                    if torch.isnan(value).any() or torch.isinf(value).any():
+                        logging.warning(f"NaN/Inf detected in validation {key} loss: {value}")
+                        # Skip this batch if NaN/Inf detected
+                        continue
+                elif isinstance(value, (int, float)):
+                    if math.isnan(value) or math.isinf(value):
+                        logging.warning(f"NaN/Inf detected in validation {key} loss: {value}")
+                        # Skip this batch if NaN/Inf detected
+                        continue
+            
+            # Accumulate losses (only if no NaN/Inf detected)
+            for key, value in loss_dict.items():
+                epoch_losses[key] += value
+            
             num_batches += 1
     
-    return total_loss / valid_batches if valid_batches > 0 else float('inf')
+    # Average losses
+    if num_batches > 0:
+        for key in epoch_losses:
+            epoch_losses[key] /= num_batches
+    else:
+        # No valid batches - return default dict with inf
+        epoch_losses['total'] = float('inf')
+        epoch_losses['ce'] = float('inf')
+        epoch_losses['focal'] = float('inf')
+        epoch_losses['dice'] = float('inf')
+    
+    return epoch_losses
 
 
 def save_best_model(model, epoch, val_loss, best_val_loss, snapshot_path,
-                    optimizer=None, scheduler=None, scaler=None):
-    """Save model + optimizer/scheduler/scaler checkpoint if validation loss improved.
+                    optimizer=None, scheduler=None):
+    """Save model + optimizer/scheduler checkpoint if validation loss improved.
 
     Returns (best_val_loss, improvement_made)
     """
@@ -688,14 +718,6 @@ def save_best_model(model, epoch, val_loss, best_val_loss, snapshot_path,
             'scheduler_state': scheduler.state_dict() if scheduler is not None else None,
             'best_val_loss': best_val_loss,
         }
-
-        # Include scaler state if provided (AMP)
-        if scaler is not None:
-            try:
-                checkpoint['scaler_state'] = scaler.state_dict()
-            except Exception:
-                # scaler may not support state_dict in some versions; ignore safely
-                pass
 
         # Save checkpoint
         torch.save(checkpoint, best_model_path)
@@ -735,14 +757,49 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     logger = setup_logging(snapshot_path)
     patience = getattr(args, 'patience', 25)
     
+    # Get actual model configuration
+    if isinstance(model, nn.DataParallel):
+        model_obj = model.module.model
+    else:
+        model_obj = model.model
+    
+    use_deep_supervision = getattr(model_obj, 'use_deep_supervision', False)
+    fusion_method = getattr(model_obj, 'fusion_method', 'simple')
+    use_bottleneck = getattr(model_obj, 'use_bottleneck', False)
+    use_multiscale_agg = getattr(model_obj, 'use_multiscale_agg', False)
+    use_baseline = getattr(args, 'use_baseline', False)
+    
+    # Build configuration string dynamically
+    config_parts = []
+    if use_baseline:
+        config_parts.append("BL")  # Baseline
+    if use_bottleneck:
+        config_parts.append("Bo")  # Bottleneck
+    if use_deep_supervision:
+        config_parts.append("DS")  # Deep Supervision
+    if fusion_method == 'fourier':
+        config_parts.append("FF")  # Fourier Fusion
+    elif fusion_method == 'smart':
+        config_parts.append("AFF")  # Attention Feature Fusion (Smart Skip)
+    if use_multiscale_agg:
+        config_parts.append("MSA")  # Multi-Scale Aggregation
+    config_parts.append("FL")  # Focal Loss (always used)
+    
+    config_str = " + ".join(config_parts) if config_parts else "BASELINE"
+    
     # Print configuration
     print("\n" + "="*80)
-    print("TRAINING CONFIGURATION - FINAL OPTIMIZED VERSION")
+    print("TRAINING CONFIGURATION")
     print("="*80)
     print(f"Dataset: {args.dataset}")
     print(f"Manuscript: {getattr(args, 'manuscript', 'N/A')}")
     print(f"Model: CNN-Transformer (EfficientNet-B4 + Swin-UNet Decoder)")
-    print(f"Configuration: BL + ASH + DS + AFF + Bo + FL (Best from ablation)")
+    print(f"Configuration: {config_str}")
+    print(f"  • Baseline: {'✓' if use_baseline else '✗'}")
+    print(f"  • Bottleneck: {'✓' if use_bottleneck else '✗'}")
+    print(f"  • Deep Supervision: {'✓' if use_deep_supervision else '✗'}")
+    print(f"  • Fusion Method: {fusion_method.upper()}")
+    print(f"  • Multi-Scale Aggregation: {'✓' if use_multiscale_agg else '✗'}")
     print(f"Batch Size: {args.batch_size}")
     print(f"Max Epochs: {args.max_epochs}")
     print(f"Learning Rate: {args.base_lr}")
@@ -798,28 +855,10 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     # Create loss functions, optimizer, scheduler
     ce_loss, focal_loss, dice_loss = create_loss_functions(class_weights, args.num_classes)
     
-    # Validate dataloader length matches expected steps per epoch
-    steps_per_epoch = len(train_loader)
-    if steps_per_epoch == 0:
-        raise ValueError(f"Train loader is empty! Cannot create scheduler.")
-    
-    # Get scheduler type from args
-    scheduler_type = getattr(args, 'scheduler_type', 'OneCycleLR')
-    
     optimizer, scheduler = create_optimizer_and_scheduler(
-        model, args.base_lr, args.max_epochs, steps_per_epoch,
-        encoder_lr_factor=getattr(args, 'encoder_lr_factor', 0.1),
-        scheduler_type=scheduler_type
+        model, args.base_lr, args, train_loader
     )
-    
-    # Verify scheduler total_steps matches expected training steps (only for OneCycleLR)
-    if scheduler_type == 'OneCycleLR' and hasattr(scheduler, 'total_steps'):
-        expected_steps = args.max_epochs * steps_per_epoch
-        if scheduler.total_steps != expected_steps:
-            print(f"⚠️  Warning: Scheduler total_steps ({scheduler.total_steps}) != expected ({expected_steps})")
-            print(f"   This may cause LR misalignment. Check dataloader length consistency.")
-    # Mixed precision scaler (used when CUDA is available)
-    scaler = GradScaler() if torch.cuda.is_available() else None
+    scheduler_type = getattr(args, 'scheduler_type', 'CosineAnnealingWarmRestarts')
     
     # TensorBoard
     writer = SummaryWriter(os.path.join(snapshot_path, 'tensorboard_logs'))
@@ -831,6 +870,10 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     encoder_unfrozen_epoch = None
     
     checkpoint_path = os.path.join(snapshot_path, 'best_model_latest.pth')
+    print(f"\n🔍 Checking for checkpoint at: {checkpoint_path}")
+    print(f"   Absolute path: {os.path.abspath(checkpoint_path)}")
+    print(f"   File exists: {os.path.exists(checkpoint_path)}")
+    
     if os.path.exists(checkpoint_path):
         print(f"\n📂 Found checkpoint: {checkpoint_path}")
         print("   Attempting to resume training...")
@@ -882,17 +925,29 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                     scheduler_type_match = True
                 
                 if scheduler_type_match:
-                    try:
-                        scheduler.load_state_dict(scheduler_state)
-                        print("   ✓ Loaded scheduler state")
-                    except Exception as e:
-                        print(f"   ⚠️  Could not load scheduler state: {e}")
-                        print("   Starting with fresh scheduler state")
-                        # Fast-forward scheduler to current epoch if epoch-based
-                        if current_scheduler_type in ['CosineAnnealingWarmRestarts', 'CosineAnnealingLR']:
-                            for _ in range(checkpoint.get('epoch', 0)):
-                                scheduler.step()
-                            print(f"   ✓ Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
+                    # Special handling for OneCycleLR - cannot resume directly, need to recreate
+                    if current_scheduler_type == 'OneCycleLR':
+                        print(f"   ⚠️  OneCycleLR scheduler cannot be resumed directly")
+                        print(f"   Will recreate scheduler and fast-forward to current step")
+                        # OneCycleLR will be recreated later in the training loop if needed
+                        # For now, just note that we need to fast-forward
+                        checkpoint_epoch = checkpoint.get('epoch', 0)
+                        if checkpoint_epoch > 0:
+                            steps_per_epoch = len(train_loader)
+                            current_step = checkpoint_epoch * steps_per_epoch
+                            print(f"   Note: Will resume OneCycleLR from step {current_step}")
+                    else:
+                        try:
+                            scheduler.load_state_dict(scheduler_state)
+                            print("   ✓ Loaded scheduler state")
+                        except Exception as e:
+                            print(f"   ⚠️  Could not load scheduler state: {e}")
+                            print("   Starting with fresh scheduler state")
+                            # Fast-forward scheduler to current epoch if epoch-based
+                            if current_scheduler_type in ['CosineAnnealingWarmRestarts', 'CosineAnnealingLR']:
+                                for _ in range(checkpoint.get('epoch', 0)):
+                                    scheduler.step()
+                                print(f"   ✓ Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
                 else:
                     print(f"   ⚠️  Scheduler type mismatch (checkpoint has different scheduler type)")
                     print(f"   Starting with fresh scheduler state")
@@ -901,14 +956,6 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                         for _ in range(checkpoint.get('epoch', 0)):
                             scheduler.step()
                         print(f"   ✓ Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
-            
-            # Load scaler state
-            if scaler is not None and 'scaler_state' in checkpoint:
-                try:
-                    scaler.load_state_dict(checkpoint['scaler_state'])
-                    print("   ✓ Loaded scaler state")
-                except Exception:
-                    print("   ⚠️  Could not load scaler state, starting fresh")
             
             # Load training state
             start_epoch = checkpoint.get('epoch', 0) + 1
@@ -923,288 +970,327 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             print(f"   ✓ Best validation loss: {best_val_loss:.4f}")
             print(f"   ✓ Resuming from epoch {start_epoch}\n")
         except Exception as e:
+            import traceback
             print(f"   ⚠️  Failed to load checkpoint: {e}")
+            print(f"   Error type: {type(e).__name__}")
+            print("   Traceback:")
+            traceback.print_exc()
             print("   Starting training from scratch\n")
+    else:
+        print("   No checkpoint found - starting training from scratch\n")
     
     # Training loop
     print("="*80)
     print("🚀 STARTING TRAINING")
     print("="*80)
-    print(f"Loss: 0.3*CE + 0.2*Focal + 0.5*Dice (with Deep Supervision)")
+    ds_text = " (with Deep Supervision)" if use_deep_supervision else ""
+    print(f"Loss: 0.3*CE + 0.2*Focal + 0.5*Dice{ds_text}")
     print(f"Early stopping: {patience} epochs patience")
     if start_epoch > 0:
         print(f"Resuming from epoch: {start_epoch}")
     print("="*80 + "\n")
     
     for epoch in range(start_epoch, args.max_epochs):
-        print(f"EPOCH {epoch+1}/{args.max_epochs}")
-        print("-" * 50)
-        
-        # Train
-        train_loss = run_training_epoch(
-            model, train_loader, ce_loss, focal_loss, dice_loss,
-            optimizer, scheduler, scaler=scaler, scheduler_type=scheduler_type
-        )
-        
-        # Validate
-        val_loss = validate_model(model, val_loader, ce_loss, focal_loss, dice_loss)
-        
-        # Log
-        writer.add_scalar('Loss/Train', train_loss, epoch)
-        writer.add_scalar('Loss/Validation', val_loss, epoch)
-        writer.add_scalar('Learning_Rate', optimizer.param_groups[0]['lr'], epoch)
-        
-        # Step scheduler per epoch (for schedulers that step per epoch, not per batch)
-        # OneCycleLR is stepped per batch in run_training_epoch
-        if scheduler_type != 'OneCycleLR':
-            if scheduler_type == 'ReduceLROnPlateau':
-                # ReduceLROnPlateau steps based on validation loss
-                scheduler.step(val_loss)
-            else:
-                # Other epoch-based schedulers
-                scheduler.step()
-        
-        # Print results
-        print(f"Results:")
-        print(f"  • Train Loss: {train_loss:.4f}")
-        print(f"  • Val Loss: {val_loss:.4f}")
-        print(f"  • Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
-        
-        # Unfreeze encoder if requested and epoch reached
-        if getattr(args, 'freeze_encoder', False) and getattr(args, 'freeze_epochs', 0) > 0:
-            if epoch + 1 == args.freeze_epochs:
-                print(f"\n🔓 Unfreezing encoder at epoch {epoch + 1}")
-                if isinstance(model, nn.DataParallel):
-                    model.module.model.unfreeze_encoder()
+        try:
+            print(f"\nEPOCH {epoch + 1}/{args.max_epochs}")
+            print("-" * 50)
+            sys.stdout.flush()  # Force flush for background jobs
+            
+            # Train
+            train_losses = run_training_epoch(
+                model, train_loader, ce_loss, focal_loss, dice_loss,
+                optimizer, scheduler, scheduler_type=scheduler_type
+            )
+            
+            # Check for NaN/Inf in training losses (matching hybrid2 pattern)
+            import math
+            for key, value in train_losses.items():
+                if isinstance(value, torch.Tensor):
+                    if torch.isnan(value).any() or torch.isinf(value).any():
+                        raise ValueError(f"NaN/Inf detected in training {key} loss: {value}")
+                elif isinstance(value, (int, float)):
+                    if math.isnan(value) or math.isinf(value):
+                        raise ValueError(f"NaN/Inf detected in training {key} loss: {value}")
+            
+            # Validate
+            val_losses = validate_model(model, val_loader, ce_loss, focal_loss, dice_loss)
+            
+            # Check for NaN/Inf in validation losses (matching hybrid2 pattern)
+            for key, value in val_losses.items():
+                if isinstance(value, torch.Tensor):
+                    if torch.isnan(value).any() or torch.isinf(value).any():
+                        raise ValueError(f"NaN/Inf detected in validation {key} loss: {value}")
+                elif isinstance(value, (int, float)):
+                    if math.isnan(value) or math.isinf(value):
+                        raise ValueError(f"NaN/Inf detected in validation {key} loss: {value}")
+            
+            val_loss = val_losses.get('total', float('inf'))
+            train_loss = train_losses.get('total', float('inf'))
+            
+            # Logging (matching hybrid2 pattern)
+            for key, value in train_losses.items():
+                writer.add_scalar(f'Train/{key}', value, epoch)
+            for key, value in val_losses.items():
+                writer.add_scalar(f'Val/{key}', value, epoch)
+            writer.add_scalar('LR', optimizer.param_groups[0]['lr'], epoch)
+            
+            # Step scheduler per epoch (for schedulers that step per epoch, not per batch)
+            # OneCycleLR is stepped per batch in run_training_epoch
+            if scheduler_type != 'OneCycleLR':
+                if scheduler_type == 'ReduceLROnPlateau':
+                    # ReduceLROnPlateau steps based on validation loss
+                    # Use a large value if val_loss is inf to avoid issues
+                    scheduler_val_loss = val_loss if not math.isinf(val_loss) else 1e6
+                    scheduler.step(scheduler_val_loss)
                 else:
-                    model.model.unfreeze_encoder()
-                
-                # CRITICAL: Reconfigure optimizer with differential learning rates
-                # Encoder needs much lower LR to prevent gradient explosion
-                # When encoder is frozen, its params aren't in optimizer, so we need to recreate it
-                encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.1)
-                encoder_unfrozen_epoch = epoch + 1  # Track when encoder was unfrozen
-                print(f"🔄 Reconfiguring optimizer with differential learning rates")
-                print(f"   - Encoder LR factor: {encoder_lr_factor:.4f}x (encoder LR will be {args.base_lr * encoder_lr_factor:.6f})")
-                print(f"   - Encoder LR will decay: 0.95^epochs_since_unfreeze")
-                
-                # Save current optimizer state (for decoder params)
-                optimizer_state = optimizer.state_dict()
-                
-                # Recreate optimizer with all parameters (now including encoder)
-                encoder_decay_params = []
-                encoder_no_decay_params = []
-                decoder_decay_params = []
-                decoder_no_decay_params = []
-
-                for name, param in model.named_parameters():
-                    if not param.requires_grad:
-                        continue
-                    lname = name.lower()
-                    is_no_decay = param.dim() == 1 or name.endswith('.bias') or 'norm' in lname or 'bn' in lname or 'ln' in lname
-                    is_encoder = 'encoder' in name.lower() or 'adapter' in name.lower() or 'streaming_proj' in name.lower() or 'feature_adapters' in name.lower()
-                    
-                    if is_encoder:
-                        if is_no_decay:
-                            encoder_no_decay_params.append(param)
-                        else:
-                            encoder_decay_params.append(param)
+                    # Other epoch-based schedulers
+                    scheduler.step()
+            
+            # Print summary in clean format (matching hybrid2)
+            print("Results:")
+            print(f"  • Train Loss: {train_loss:.4f}")
+            print(f"  • Validation Loss: {val_loss:.4f}")
+            print(f"  • Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
+            
+            # Unfreeze encoder if requested and epoch reached
+            if getattr(args, 'freeze_encoder', False) and getattr(args, 'freeze_epochs', 0) > 0:
+                if epoch + 1 == args.freeze_epochs:
+                    print(f"\n🔓 Unfreezing encoder at epoch {epoch + 1}")
+                    if isinstance(model, nn.DataParallel):
+                        model.module.model.unfreeze_encoder()
                     else:
-                        if is_no_decay:
-                            decoder_no_decay_params.append(param)
+                        model.model.unfreeze_encoder()
+                    
+                    # CRITICAL: Reconfigure optimizer with differential learning rates
+                    # Encoder needs much lower LR to prevent gradient explosion
+                    # When encoder is frozen, its params aren't in optimizer, so we need to recreate it
+                    encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.1)
+                    encoder_unfrozen_epoch = epoch + 1  # Track when encoder was unfrozen
+                    print(f"🔄 Reconfiguring optimizer with differential learning rates")
+                    print(f"   - Encoder LR factor: {encoder_lr_factor:.4f}x (encoder LR will be {args.base_lr * encoder_lr_factor:.6f})")
+                    print(f"   - Encoder LR will decay: 0.95^epochs_since_unfreeze")
+                    
+                    # Save current optimizer state (for decoder params)
+                    optimizer_state = optimizer.state_dict()
+                    
+                    # Recreate optimizer with all parameters (now including encoder)
+                    encoder_params = []
+                    bottleneck_params = []
+                    decoder_params = []
+
+                    for name, param in model.named_parameters():
+                        if not param.requires_grad:
+                            continue
+                        lname = name.lower()
+                        is_encoder = 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname
+                        is_bottleneck = 'bottleneck' in lname
+                        
+                        if is_encoder:
+                            encoder_params.append(param)
+                        elif is_bottleneck:
+                            bottleneck_params.append(param)
                         else:
-                            decoder_decay_params.append(param)
+                            decoder_params.append(param)
 
-                param_groups = []
-                if encoder_decay_params:
-                    param_groups.append({
-                        'params': encoder_decay_params, 
-                        'weight_decay': 0.01,
-                        'lr': args.base_lr * encoder_lr_factor,
-                        'initial_lr': args.base_lr * encoder_lr_factor,
-                        'name': 'encoder_decay'
-                    })
-                if encoder_no_decay_params:
-                    param_groups.append({
-                        'params': encoder_no_decay_params, 
-                        'weight_decay': 0.0,
-                        'lr': args.base_lr * encoder_lr_factor,
-                        'initial_lr': args.base_lr * encoder_lr_factor,
-                        'name': 'encoder_no_decay'
-                    })
-                if decoder_decay_params:
-                    param_groups.append({
-                        'params': decoder_decay_params, 
-                        'weight_decay': 0.01,
-                        'lr': args.base_lr,
-                        'initial_lr': args.base_lr,
-                        'name': 'decoder_decay'
-                    })
-                if decoder_no_decay_params:
-                    param_groups.append({
-                        'params': decoder_no_decay_params, 
-                        'weight_decay': 0.0,
-                        'lr': args.base_lr,
-                        'initial_lr': args.base_lr,
-                        'name': 'decoder_no_decay'
-                    })
+                    param_groups = []
+                    if encoder_params:
+                        param_groups.append({
+                            'params': encoder_params, 
+                            'lr': args.base_lr * encoder_lr_factor,
+                            'weight_decay': 1e-4,
+                            'name': 'encoder'
+                        })
+                    if bottleneck_params:
+                        param_groups.append({
+                            'params': bottleneck_params, 
+                            'lr': args.base_lr * encoder_lr_factor, # Bottleneck uses encoder LR
+                            'weight_decay': 5e-4,
+                            'name': 'bottleneck'
+                        })
+                    if decoder_params:
+                        param_groups.append({
+                            'params': decoder_params, 
+                            'lr': args.base_lr,
+                            'weight_decay': 1e-3,
+                            'name': 'decoder'
+                        })
 
-                # Create new optimizer
-                optimizer = optim.AdamW(param_groups, betas=(0.9, 0.999))
-                
-                # Try to load optimizer state (decoder params should match)
-                try:
-                    optimizer.load_state_dict(optimizer_state)
-                    print("   ✓ Preserved optimizer state for decoder parameters")
-                except Exception as e:
-                    print(f"   ⚠️  Could not fully load optimizer state: {e}")
-                    print("   Starting fresh optimizer state (this is OK for encoder)")
-                
-                # Recreate scheduler for new optimizer structure
-                # OneCycleLR needs to be recreated when parameter groups change
-                scheduler_type = getattr(args, 'scheduler_type', 'OneCycleLR')
-                steps_per_epoch = len(train_loader)
-                
-                if scheduler_type == 'OneCycleLR':
-                    # Track current scheduler step to maintain continuity
-                    # OneCycleLR.last_epoch tracks the number of steps taken (since it steps per batch)
-                    # At epoch 30, we've completed 30 epochs, so steps = 30 * steps_per_epoch
-                    current_step = scheduler.last_epoch if hasattr(scheduler, 'last_epoch') else (epoch * steps_per_epoch)
-                    total_steps = args.max_epochs * steps_per_epoch
+                    # Create new optimizer
+                    optimizer = optim.AdamW(param_groups, betas=(0.9, 0.999))
                     
-                    # Create max_lr list matching new parameter groups
-                    # Encoder groups get encoder_lr_factor * base_lr, decoder groups get base_lr
-                    max_lrs = []
-                    for group in param_groups:
-                        max_lrs.append(group['lr'])
+                    # Try to load optimizer state (decoder params should match)
+                    try:
+                        optimizer.load_state_dict(optimizer_state)
+                        print("   ✓ Preserved optimizer state for decoder parameters")
+                    except Exception as e:
+                        print(f"   ⚠️  Could not fully load optimizer state: {e}")
+                        print("   Starting fresh optimizer state (this is OK for encoder)")
                     
-                    # Create scheduler fresh (without last_epoch) to properly initialize max_lr in param groups
-                    # OneCycleLR initialization calls _initial_step() which sets last_epoch to -1 and then steps once
-                    # So after initialization, last_epoch will be 0
-                    scheduler = optim.lr_scheduler.OneCycleLR(
-                        optimizer,
-                        max_lr=max_lrs if len(max_lrs) > 1 else max_lrs[0],
-                        total_steps=total_steps,
-                        pct_start=0.3,
-                        anneal_strategy='cos',
-                        div_factor=25.0,
-                        final_div_factor=10000.0
-                    )
+                    # Recreate scheduler for new optimizer structure (matching hybrid2 pattern)
+                    # OneCycleLR needs to be recreated when parameter groups change
+                    scheduler_type = getattr(args, 'scheduler_type', 'CosineAnnealingWarmRestarts')
+                    warmup_epochs = getattr(args, 'warmup_epochs', 10)
+                    steps_per_epoch = len(train_loader)
                     
-                    # After initialization, last_epoch is 0 (initialization already stepped once)
-                    # We need to fast-forward to current_step
-                    # Set last_epoch to current_step - 1, then step once to reach current_step
-                    if current_step > 0:
-                        scheduler.last_epoch = current_step - 1  # Set to step before current
-                        scheduler.step()  # Step once to advance to current_step and update LRs
-                    # If current_step == 0, scheduler is already at the right position (last_epoch=0 after init)
-                    print(f"   ✓ Recreated OneCycleLR scheduler (resumed from step {current_step}/{total_steps})")
-                elif scheduler_type == 'CosineAnnealingWarmRestarts':
-                    scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
-                        optimizer,
-                        T_0=50,
-                        T_mult=2,
-                        eta_min=1e-7
-                    )
-                    # Fast-forward to current epoch
-                    for _ in range(epoch):
-                        scheduler.step()
-                    print(f"   ✓ Recreated CosineAnnealingWarmRestarts scheduler (fast-forwarded to epoch {epoch})")
-                elif scheduler_type == 'ReduceLROnPlateau':
-                    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-                        optimizer,
-                        mode='min',
-                        factor=0.5,
-                        patience=15,
-                        min_lr=1e-6,
-                        verbose=False
-                    )
-                    print(f"   ✓ Recreated ReduceLROnPlateau scheduler")
-                elif scheduler_type == 'CosineAnnealingLR':
-                    scheduler = optim.lr_scheduler.CosineAnnealingLR(
-                        optimizer,
-                        T_max=args.max_epochs,
-                        eta_min=1e-6
-                    )
-                    # Fast-forward to current epoch
-                    for _ in range(epoch):
-                        scheduler.step()
-                    print(f"   ✓ Recreated CosineAnnealingLR scheduler (fast-forwarded to epoch {epoch})")
+                    if scheduler_type == 'OneCycleLR':
+                        # Track current scheduler step to maintain continuity
+                        # OneCycleLR.last_epoch tracks the number of steps taken (since it steps per batch)
+                        # At epoch 30, we've completed 30 epochs, so steps = 30 * steps_per_epoch
+                        current_step = scheduler.last_epoch if hasattr(scheduler, 'last_epoch') else (epoch * steps_per_epoch)
+                        total_steps = args.max_epochs * steps_per_epoch
+                        
+                        # Get max LRs for each group (matching hybrid2: max_lr = base_lr * 10)
+                        max_lrs = [g['lr'] * 10 for g in param_groups]
+                        
+                        scheduler = optim.lr_scheduler.OneCycleLR(
+                            optimizer,
+                            max_lr=max_lrs,
+                            total_steps=total_steps,
+                            pct_start=warmup_epochs / args.max_epochs,
+                            anneal_strategy='cos',
+                            div_factor=10,
+                            final_div_factor=100
+                        )
+                        
+                        # Fast-forward to current step
+                        if current_step > 0:
+                            scheduler.last_epoch = current_step - 1
+                            scheduler.step()
+                        print(f"   ✓ Recreated OneCycleLR scheduler (resumed from step {current_step}/{total_steps})")
+                    elif scheduler_type == 'CosineAnnealingLR':
+                        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                            optimizer,
+                            T_max=args.max_epochs - warmup_epochs,
+                            eta_min=1e-7
+                        )
+                        # Fast-forward to current epoch
+                        for _ in range(epoch):
+                            scheduler.step()
+                        print(f"   ✓ Recreated CosineAnnealingLR scheduler (fast-forwarded to epoch {epoch})")
+                    else:  # Default: CosineAnnealingWarmRestarts
+                        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+                            optimizer,
+                            T_0=50,
+                            T_mult=2,
+                            eta_min=1e-7
+                        )
+                        # Fast-forward to current epoch
+                        for _ in range(epoch):
+                            scheduler.step()
+                        print(f"   ✓ Recreated CosineAnnealingWarmRestarts scheduler (fast-forwarded to epoch {epoch})")
+                    
+                    print()
+                elif encoder_unfrozen_epoch is not None:
+                    # Encoder was unfrozen in a previous epoch - decay encoder LR factor
+                    epochs_since_unfreeze = (epoch + 1) - encoder_unfrozen_epoch
+                    base_encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.1)
+                    encoder_lr_factor = base_encoder_lr_factor * (0.95 ** epochs_since_unfreeze)
+                    
+                    # Update encoder parameter groups with decayed learning rate
+                    encoder_lr = args.base_lr * encoder_lr_factor
+                    for param_group in optimizer.param_groups:
+                        if 'encoder' in param_group.get('name', ''):
+                            param_group['lr'] = encoder_lr
+                    
+                    # Log encoder LR decay (only every 10 epochs to avoid clutter)
+                    if epochs_since_unfreeze % 10 == 0 or epochs_since_unfreeze == 1:
+                        print(f"   🔄 Encoder LR decay: {encoder_lr_factor:.4f}x (epochs since unfreeze: {epochs_since_unfreeze})")
+            
+            # Save periodic checkpoint (every 100 epochs) - useful for recovery and evaluation
+            # Sometimes the best model by loss isn't best by Dice/IoU
+            if (epoch + 1) % 100 == 0:
+                periodic_checkpoint_path = os.path.join(snapshot_path, f"epoch_{epoch + 1}.pth")
+                model_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
+                periodic_checkpoint = {
+                    'epoch': epoch,
+                    'model_state': model_state,
+                    'optimizer_state': optimizer.state_dict() if optimizer is not None else None,
+                    'scheduler_state': scheduler.state_dict() if scheduler is not None else None,
+                    'best_val_loss': best_val_loss,
+                    'train_loss': train_loss,
+                    'val_loss': val_loss,
+                }
+                torch.save(periodic_checkpoint, periodic_checkpoint_path)
+                print(f"   💾 Periodic checkpoint: epoch_{epoch + 1}.pth")
+                sys.stdout.flush()  # Force flush for background jobs
+            
+            # Save checkpoint (matching hybrid2 pattern)
+            # Call save_best_model BEFORE updating best_val_loss to ensure checkpoint is saved
+            best_val_loss, improvement_made = save_best_model(
+                model, epoch, val_loss, best_val_loss, snapshot_path,
+                optimizer=optimizer, scheduler=scheduler
+            )
+            
+            # Update tracking variables based on improvement
+            if improvement_made:
+                epochs_without_improvement = 0
+                print(f"    ✓ Improvement detected! Resetting patience counter.")
+            else:
+                epochs_without_improvement += 1
+                remaining_patience = patience - epochs_without_improvement
+                print(f"    ⚠ No improvement for {epochs_without_improvement} epochs (patience: {patience}, remaining: {remaining_patience})")
+            
+            sys.stdout.flush()  # Force flush for background jobs
+            
+            # Check early stopping
+            if epochs_without_improvement >= patience:
+                print("\n" + "="*80)
+                print("EARLY STOPPING TRIGGERED")
+                print("="*80)
+                print(f"No improvement for {patience} consecutive epochs")
+                print(f"Best validation loss: {best_val_loss:.4f}")
+                print("="*80 + "\n")
+                break
                 
-                print()
-            elif encoder_unfrozen_epoch is not None:
-                # Encoder was unfrozen in a previous epoch - decay encoder LR factor
-                epochs_since_unfreeze = (epoch + 1) - encoder_unfrozen_epoch
-                base_encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.1)
-                encoder_lr_factor = base_encoder_lr_factor * (0.95 ** epochs_since_unfreeze)
-                
-                # Update encoder parameter groups with decayed learning rate
-                encoder_lr = args.base_lr * encoder_lr_factor
-                for param_group in optimizer.param_groups:
-                    if 'encoder' in param_group.get('name', ''):
-                        param_group['lr'] = encoder_lr
-                
-                # Log encoder LR decay (only every 10 epochs to avoid clutter)
-                if epochs_since_unfreeze % 10 == 0 or epochs_since_unfreeze == 1:
-                    print(f"   🔄 Encoder LR decay: {encoder_lr_factor:.4f}x (epochs since unfreeze: {epochs_since_unfreeze})")
-        
-        # Save periodic checkpoint (every 10 epochs) - useful for recovery and evaluation
-        # Sometimes the best model by loss isn't best by Dice/IoU
-        if (epoch + 1) % 100 == 0:
-            periodic_checkpoint_path = os.path.join(snapshot_path, f"epoch_{epoch + 1}.pth")
-            model_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
-            periodic_checkpoint = {
-                'epoch': epoch,
-                'model_state': model_state,
-                'optimizer_state': optimizer.state_dict() if optimizer is not None else None,
-                'scheduler_state': scheduler.state_dict() if scheduler is not None else None,
-                'best_val_loss': best_val_loss,
-                'train_loss': train_loss,
-                'val_loss': val_loss,
-            }
-            if scaler is not None:
-                try:
-                    periodic_checkpoint['scaler_state'] = scaler.state_dict()
-                except Exception:
-                    pass
-            torch.save(periodic_checkpoint, periodic_checkpoint_path)
-            print(f"   💾 Periodic checkpoint saved: epoch_{epoch + 1}.pth")
-        
-        # Save best and check early stopping (save full checkpoint)
-        best_val_loss, improved = save_best_model(
-            model, epoch, val_loss, best_val_loss, snapshot_path,
-            optimizer=optimizer, scheduler=scheduler, scaler=scaler
-        )
-        
-        if improved:
-            epochs_without_improvement = 0
-            print(f"    ✅ Improvement! Patience reset.")
-        else:
-            epochs_without_improvement += 1
-            remaining = patience - epochs_without_improvement
-            print(f"    ⚠️  No improvement ({epochs_without_improvement}/{patience} epochs, {remaining} remaining)")
-        
-        # Early stopping
-        if epochs_without_improvement >= patience:
-            print("\n" + "="*80)
-            print("⏸️  EARLY STOPPING TRIGGERED")
-            print("="*80)
-            print(f"No improvement for {patience} consecutive epochs.")
-            print(f"Best validation loss: {best_val_loss:.4f}")
-            print(f"Stopped at epoch {epoch+1}/{args.max_epochs}")
-            print("="*80 + "\n")
-            break
-        
-        print()  # Blank line between epochs
+        except RuntimeError as e:
+            if "out of memory" in str(e).lower():
+                print(f"\n❌ CUDA OUT OF MEMORY at epoch {epoch + 1}")
+                print("Attempting to recover...")
+                torch.cuda.empty_cache()
+                # Save emergency checkpoint
+                emergency_path = os.path.join(snapshot_path, f"emergency_epoch_{epoch + 1}.pth")
+                model_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
+                torch.save({
+                    'epoch': epoch,
+                    'model_state': model_state,
+                    'best_val_loss': best_val_loss,
+                }, emergency_path)
+                print(f"Emergency checkpoint saved: {emergency_path}")
+                logger.error(f"CUDA OOM at epoch {epoch + 1}: {e}")
+                raise
+            else:
+                print(f"\n❌ RuntimeError at epoch {epoch + 1}: {e}")
+                logger.error(f"RuntimeError at epoch {epoch + 1}: {e}", exc_info=True)
+                raise
+        except Exception as e:
+            print(f"\n❌ ERROR at epoch {epoch + 1}: {type(e).__name__}: {e}")
+            logger.error(f"Error at epoch {epoch + 1}: {e}", exc_info=True)
+            # Save emergency checkpoint before crashing
+            emergency_path = os.path.join(snapshot_path, f"emergency_epoch_{epoch + 1}.pth")
+            try:
+                model_state = model.module.state_dict() if isinstance(model, nn.DataParallel) else model.state_dict()
+                torch.save({
+                    'epoch': epoch,
+                    'model_state': model_state,
+                    'best_val_loss': best_val_loss,
+                }, emergency_path)
+                print(f"Emergency checkpoint saved: {emergency_path}")
+            except:
+                print("Failed to save emergency checkpoint")
+            raise
     
-    # Training complete
+    # Training complete (matching hybrid2 format)
+    print("\n" + "="*80)
+    print("TRAINING COMPLETED")
     print("="*80)
-    print("✅ TRAINING COMPLETED")
-    print("="*80)
-    print(f"Best Validation Loss: {best_val_loss:.4f}")
-    print(f"Total Epochs: {epoch+1}")
-    print(f"Models Saved: {snapshot_path}")
-    print(f"TensorBoard: {os.path.join(snapshot_path, 'tensorboard_logs')}")
+    print(f"Best Val Loss:  {best_val_loss:.4f}")
+    # Handle case where training loop didn't execute (resumed from final epoch)
+    if start_epoch >= args.max_epochs:
+        print(f"Total Epochs:   {start_epoch}")
+    else:
+        print(f"Total Epochs:   {epoch + 1}")
+    print(f"Models Saved:   {snapshot_path}")
+    print(f"TensorBoard:    {os.path.join(snapshot_path, 'tensorboard_logs')}")
     print("="*80 + "\n")
     
     writer.close()

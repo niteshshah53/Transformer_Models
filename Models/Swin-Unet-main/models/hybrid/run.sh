@@ -1,13 +1,12 @@
 #!/bin/bash -l
-#SBATCH --job-name=Syr341FS_baseline_groupnorm
-#SBATCH --output=./Results/UDIADS_BIB_FS/Syr341FS_baseline_groupnorm_%j.out
-#SBATCH --error=./Results/UDIADS_BIB_FS/Syr341FS_baseline_groupnorm_%j.out
+#SBATCH --job-name=baseline_groupnorm
+#SBATCH --output=./Results/UDIADS_BIB_MS/baseline_groupnorm_%j.out
+#SBATCH --error=./Results/UDIADS_BIB_MS/baseline_groupnorm_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
-#SBATCH --gres=gpu:rtx3080:1
-#SBATCH --partition=rtx3080
+#SBATCH --time=22:00:00
+#SBATCH --gres=gpu:1
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -16,29 +15,11 @@ unset SLURM_EXPORT_ENV
 # HYBRID2 BASELINE TRAINING SCRIPT
 # ============================================================================
 # Model: Hybrid2 Baseline (Swin Transformer Encoder + EfficientNet Decoder)
-# Dataset: U-DIADS-Bib-FS_patched (Full-Size patched dataset)
-# Manuscripts: Latin2FS, Latin14396FS, Latin16746FS, Syr341FS
-# ============================================================================
+# Dataset: U-DIADS-Bib-MS_patched (Full-Size patched dataset)
+# Manuscripts: Latin2, Latin14396, Latin16746, Syr341
 
-# Load modules
-module purge
-module load python/pytorch2.6py3.12
-module load cuda/11.8
-module load cudnn
 
-# Create logs directory 
-mkdir -p ../../logs
-mkdir -p ./Results/UDIADS_BIB_FS
 
-conda activate base
-
-# Set PyTorch CUDA memory optimization
-export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-export CUDA_VISIBLE_DEVICES=0
-
-# ============================================================================
-# MODEL ARCHITECTURE COMPONENTS
-# ============================================================================
 # Hybrid2 Baseline consists of:
 #
 # ENCODER:
@@ -85,15 +66,15 @@ export CUDA_VISIBLE_DEVICES=0
 #   ✓ GroupNorm (--use_groupnorm) - uses BatchNorm instead
 # ============================================================================
 
-# Train all manuscripts one by one (Latin2FS Latin14396FS Latin16746FS Syr341FS)
-MANUSCRIPTS=(Syr341FS)
+# Train all manuscripts one by one (Latin2 Latin14396 Latin16746 Syr341)
+MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "========================================================================"
     echo "Training Hybrid2 Baseline Model: $MANUSCRIPT"
     echo "========================================================================"
-    echo "Dataset: U-DIADS-Bib-FS_patched"
+    echo "Dataset: U-DIADS-Bib-MS_patched"
     echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → EfficientNet-B4 Decoder"
     echo "Components Enabled:"
     echo "  ✓ Swin Encoder (4 stages)"
@@ -115,7 +96,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --use_baseline \
         --efficientnet_variant b4 \
         --dataset UDIADS_BIB \
-        --udiadsbib_root "../../U-DIADS-Bib-FS_patched" \
+        --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --batch_size 4 \
@@ -124,7 +105,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --patience 150 \
         --use_groupnorm \
         --scheduler_type ReduceLROnPlateau \
-        --output_dir "./Results/UDIADS_BIB_FS/${MANUSCRIPT}"
+        --output_dir "./Results/UDIADS_BIB_MS/${MANUSCRIPT}"
 
     echo ""
     echo "========================================================================"
@@ -136,41 +117,37 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --use_baseline \
         --efficientnet_variant b4 \
         --dataset UDIADS_BIB \
-        --udiadsbib_root "../../U-DIADS-Bib-FS_patched" \
+        --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --is_savenii \
         --use_tta \
         --use_crf \
         --use_groupnorm \
-        --output_dir "./Results/UDIADS_BIB_FS/${MANUSCRIPT}"
+        --output_dir "./Results/UDIADS_BIB_MS/${MANUSCRIPT}"
 done
 
 echo ""
 echo "========================================================================"
 echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL"
 echo "========================================================================"
-echo "Results saved in: ./Results/UDIADS_BIB_FS/"
+echo "Results saved in: ./Results/UDIADS_BIB_MS/"
 echo ""
-echo "Model Configuration:"
-echo "  • Architecture: Hybrid2 Baseline (Swin-Encoder + EfficientNet-Decoder)"
-echo "  • Encoder: Swin Transformer (4 stages, 96→768 dim)"
-echo "  • Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
-echo "  • Decoder: EfficientNet-B4 style CNN decoder"
-echo "  • Skip Connections: Simple token→CNN conversion"
-echo "  • Positional Embeddings: Enabled (default, matching SwinUnet pattern)"
-echo "  • Normalization: GroupNorm (baseline normalization)"
+
+# Aggregate results across all manuscripts
 echo ""
-echo "Training Configuration:"
-echo "  • Dataset: U-DIADS-Bib-FS_patched"
-echo "  • Manuscripts: Latin2FS, Latin14396FS, Latin16746FS, Syr341FS"
-echo "  • Batch Size: 4"
-echo "  • Max Epochs: 300"
-echo "  • Base Learning Rate: 0.0001"
-echo "  • Scheduler: ReduceLROnPlateau (factor=0.5, patience=15)"
-echo "  • Early Stopping: 150 epochs patience"
+echo "========================================================================"
+echo "AGGREGATING RESULTS ACROSS ALL MANUSCRIPTS"
+echo "========================================================================"
+
+python3 aggregate_results.py \
+    --results_dir "./Results/UDIADS_BIB_MS" \
+    --manuscripts Latin2 Latin14396 Latin16746 Syr341 \
+    --output "./Results/UDIADS_BIB_MS/aggregated_metrics.txt"
+
 echo ""
-echo "Testing Configuration:"
-echo "  • Test-Time Augmentation: Enabled"
-echo "  • Save Predictions: Enabled (NIfTI format)"
+echo "========================================================================"
+echo "AGGREGATION COMPLETE"
+echo "========================================================================"
+echo "Aggregated metrics saved to: ./Results/UDIADS_BIB_MS/aggregated_metrics.txt"
 echo ""

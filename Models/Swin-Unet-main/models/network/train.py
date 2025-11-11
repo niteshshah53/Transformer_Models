@@ -46,16 +46,50 @@ def get_model(args, config):
     """
     print("Loading CNN-Transformer model...")
     from vision_transformer_cnn import CNNTransformerUnet as ViT_seg
-    model = ViT_seg(
-        None, 
-        img_size=args.img_size, 
-        num_classes=args.num_classes,
-        use_deep_supervision=getattr(args, 'deep_supervision', False),
-        fusion_method=getattr(args, 'fusion_method', 'simple'),
-        use_bottleneck=getattr(args, 'bottleneck', False),
-        adapter_mode=getattr(args, 'adapter_mode', 'external'),
-        use_multiscale_agg=getattr(args, 'use_multiscale_agg', False)
-    )
+    
+    use_baseline = getattr(args, 'use_baseline', False)
+    
+    if use_baseline:
+        print("=" * 80)
+        print("🚀 Loading CNN-Transformer BASELINE")
+        print("=" * 80)
+        print("Baseline Configuration:")
+        print("  ✓ EfficientNet-B4 Encoder")
+        print("  ✓ Bottleneck: 2 Swin Transformer blocks")
+        print("  ✓ Swin Transformer Decoder")
+        print("  ✓ Simple concatenation skip connections")
+        print("  ✓ Adapter mode: streaming (default)")
+        print("  ✓ GroupNorm: {}".format(getattr(args, 'use_groupnorm', True)))
+        print("=" * 80)
+        
+        # Baseline defaults
+        adapter_mode = 'streaming'  # Default for baseline
+        use_bottleneck = True  # Always enabled for baseline
+        fusion_method = getattr(args, 'fusion_method', 'simple')
+        
+        model = ViT_seg(
+            None, 
+            img_size=args.img_size, 
+            num_classes=args.num_classes,
+            use_deep_supervision=getattr(args, 'deep_supervision', False),
+            fusion_method=fusion_method,
+            use_bottleneck=use_bottleneck,
+            adapter_mode=adapter_mode,
+            use_multiscale_agg=getattr(args, 'use_multiscale_agg', False),
+            use_groupnorm=getattr(args, 'use_groupnorm', True)  # Default True for baseline
+        )
+    else:
+        # Original non-baseline mode (backward compatibility)
+        model = ViT_seg(
+            None, 
+            img_size=args.img_size, 
+            num_classes=args.num_classes,
+            use_deep_supervision=getattr(args, 'deep_supervision', False),
+            fusion_method=getattr(args, 'fusion_method', 'simple'),
+            use_bottleneck=getattr(args, 'bottleneck', False),
+            adapter_mode=getattr(args, 'adapter_mode', 'external'),
+            use_multiscale_agg=getattr(args, 'use_multiscale_agg', False)
+        )
     
     # Move to GPU if available
     if torch.cuda.is_available():
@@ -163,6 +197,26 @@ def validate_arguments(args):
     # Check if output directory is writable
     os.makedirs(args.output_dir, exist_ok=True)
     
+    # Validate baseline flag usage
+    use_baseline = getattr(args, 'use_baseline', False)
+    
+    # Component flags that should only work with --use_baseline
+    component_flags = [
+        ('use_deep_supervision', getattr(args, 'deep_supervision', False)),
+        ('use_fourier_fusion', getattr(args, 'fusion_method', 'simple') == 'fourier'),
+        ('use_smart_fusion', getattr(args, 'fusion_method', 'simple') == 'smart'),
+        ('use_multiscale_agg', getattr(args, 'use_multiscale_agg', False)),
+        ('use_groupnorm', getattr(args, 'use_groupnorm', False)),
+    ]
+    
+    # Check if component flags are used without --use_baseline
+    if not use_baseline:
+        used_flags = [name for name, used in component_flags if used]
+        if used_flags:
+            print(f"ERROR: Component flags {used_flags} can only be used with --use_baseline flag")
+            print("Please add --use_baseline to enable these features")
+            sys.exit(1)
+    
     print("All arguments validated successfully!")
 
 
@@ -178,6 +232,10 @@ def parse_arguments():
     # Model configuration
     parser.add_argument('--img_size', type=int, default=224, help='Input image size')
     parser.add_argument('--num_classes', type=int, default=5, help='Number of classes')
+    
+    # Baseline flag (similar to hybrid2)
+    parser.add_argument('--use_baseline', action='store_true', default=False,
+                       help='Use baseline CNN-Transformer (EfficientNet-B4 encoder + bottleneck + Swin decoder)')
     
     # Dataset configuration
     parser.add_argument('--dataset', type=str, default='UDIADS_BIB', 
@@ -203,18 +261,18 @@ def parse_arguments():
     parser.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
     parser.add_argument('--seed', type=int, default=1234, help='Random seed')
     
-    # Model enhancement flags
+    # Baseline enhancement flags (only used with --use_baseline)
     parser.add_argument('--deep_supervision', action='store_true', default=False, 
-                       help='Enable deep supervision with 3 auxiliary outputs')
+                       help='Enable deep supervision with 3 auxiliary outputs (requires --use_baseline)')
     parser.add_argument('--fusion_method', type=str, default='simple',
                        choices=['simple', 'fourier', 'smart'],
-                       help='Feature fusion: simple (concat), fourier (FFT-based), smart (attention-based)')
-    parser.add_argument('--bottleneck', action='store_true', default=False,
-                       help='Enable bottleneck with 2 Swin blocks (Hybrid1-like)')
-    parser.add_argument('--adapter_mode', type=str, default='external', choices=['external', 'streaming'],
-                       help='Adapter placement: external adapters (current) or streaming (Hybrid1-like)')
+                       help='Feature fusion: simple (concat), fourier (FFT-based), smart (attention-based smart skip connections) (requires --use_baseline)')
     parser.add_argument('--use_multiscale_agg', action='store_true', default=False,
-                       help='Enable multi-scale aggregation in bottleneck (like hybrid1)')
+                       help='Enable multi-scale aggregation in bottleneck (requires --use_baseline)')
+    parser.add_argument('--use_groupnorm', action='store_true', default=True,
+                       help='Use GroupNorm instead of LayerNorm (default: True for baseline, requires --use_baseline)')
+    parser.add_argument('--no_groupnorm', dest='use_groupnorm', action='store_false',
+                       help='Disable GroupNorm (use LayerNorm instead)')
     
     # Freezing configuration
     parser.add_argument('--freeze_encoder', action='store_true', default=False,
