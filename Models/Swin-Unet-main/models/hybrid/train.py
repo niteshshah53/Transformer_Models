@@ -344,6 +344,9 @@ def main():
     # Create output directory
     os.makedirs(args.output_dir, exist_ok=True)
     
+    # Debug: Verify output_dir is correct (should not include dataset name)
+    print(f"DEBUG: args.output_dir = {args.output_dir}")
+    
     # Start training
     print("\n=== Starting Training ===")
     print("Dataset: {}".format(args.dataset))
@@ -354,6 +357,7 @@ def main():
     print()
     
     # Run training with SwinUnet approach
+    # Use args.output_dir directly - it should already be the correct path
     result = trainer_hybrid(args, model, args.output_dir, train_dataset, val_dataset)
     
     print("\n=== TRAINING COMPLETED SUCCESSFULLY ===")

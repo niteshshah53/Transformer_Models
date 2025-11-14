@@ -169,11 +169,14 @@ def compute_class_weights(train_dataset, num_classes, smoothing=0.05):
     class_freq = class_counts / total_pixels
     
     # Effective Number of Samples (ENS) weighting
-    # beta = 0.9999 for highly imbalanced datasets, 0.99 for moderate imbalance
-    beta = 0.9999 if np.min(class_freq[class_freq > 0]) < 0.001 else 0.99
+    # Force beta = 0.9999 for extreme imbalance in all cases
+    beta = 0.9999
     
     effective_num = 1.0 - np.power(beta, class_counts)
     weights = (1.0 - beta) / (effective_num + 1e-8)
+    
+    # Debug: Print raw ENS weights before smoothing
+    print("Raw ENS weights:", weights)
     
     # Apply smoothing to prevent extreme weights
     if smoothing > 0:
@@ -780,7 +783,7 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
     
     # Compute class weights for balanced training
     if hasattr(train_dataset, 'mask_paths'):
-        class_weights = compute_class_weights(train_dataset, args.num_classes, smoothing=0.1)
+        class_weights = compute_class_weights(train_dataset, args.num_classes, smoothing=0.0)
         # Print class weights (matching Network model)
         print(f"📈 Class weights computed with ENS method (smoothing=0.1)")
         print(f"   Final weights: {class_weights.cpu().numpy()}\n")

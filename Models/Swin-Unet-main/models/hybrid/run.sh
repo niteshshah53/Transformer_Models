@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=baseline2_ds
-#SBATCH --output=./Results/UDIADS_BIB_MS/baseline2_ds_%j.out
-#SBATCH --error=./Results/UDIADS_BIB_MS/baseline2_ds_%j.out
+#SBATCH --job-name=r1
+#SBATCH --output=./Result/a1/hybrid3_aff_%j.out
+#SBATCH --error=./Result/a1/hybrid3_aff_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -86,7 +86,7 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "========================================================================"
-    echo "Training Hybrid2 Baseline Model with Deep Supervision: $MANUSCRIPT"
+    echo "Training Hybrid2 Baseline Model with Smart Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     echo "Dataset: U-DIADS-Bib-MS_patched"
     echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → Simple CNN Decoder"
@@ -96,20 +96,21 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "  ✓ Swin Encoder (4 stages: 96→192→384→768 dim)"
     echo "  ✓ Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
     echo "  ✓ Simple CNN Decoder (channels: [256, 128, 64, 32])"
-    echo "  ✓ Deep Supervision"
+    echo "  ✓ Smart Skip Connections"
     echo "  ✓ Positional Embeddings (default: enabled)"
     echo "  ✓ GroupNorm (default normalization)"
     echo ""
     echo "Components Disabled (baseline):"
     echo "  ✗ CBAM Attention"
-    echo "  ✗ Smart Skip Connections"
     echo "  ✗ Cross-Attention Bottleneck"
-    echo "  ✗ Multi-Scale Aggregation"
     echo "  ✗ BatchNorm"
+    echo "  ✗ Deep Supervision"
+    echo "  ✗ Multi-Scale Aggregation"
     echo "========================================================================"
     
     python3 train.py \
         --use_baseline \
+        --use_smart_skip \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -117,17 +118,18 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --batch_size 4 \
         --max_epochs 300 \
         --base_lr 0.0001 \
-        --patience 100 \
-        --scheduler_type CosineAnnealingWarmRestarts \
-        --output_dir "./Results/UDIADS_BIB_MS/${MANUSCRIPT}"
+        --patience 150 \
+        --scheduler_type OneCycleLR \
+        --output_dir "./Result/a1/${MANUSCRIPT}"
 
     echo ""
     echo "========================================================================"
-    echo "Testing Hybrid2 Baseline Model with Deep Supervision: $MANUSCRIPT"
+    echo "Testing Hybrid2 Baseline Model with Smart Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     
     python3 test.py \
         --use_baseline \
+        --use_smart_skip \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -135,15 +137,15 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --is_savenii \
         --use_tta \
         --use_crf \
-        --output_dir "./Results/UDIADS_BIB_MS/${MANUSCRIPT}"
+        --output_dir "./Result/a1/${MANUSCRIPT}"
 done
 
 echo ""
 echo "========================================================================"
-echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH DEEP SUPERVISION"
+echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH SMART SKIP CONNECTIONS"
 echo "========================================================================"
-echo "Model: Hybrid2 Baseline (Swin Encoder + Simple Decoder with Deep Supervision)"
-echo "Results saved in: ./Results/UDIADS_BIB_MS/"
+echo "Model: Hybrid2 Baseline (Swin Encoder + Simple Decoder with Smart Skip Connections)"
+echo "Results saved in: ./Result/a1/"
 echo ""
 
 # Aggregate results across all manuscripts
@@ -153,13 +155,13 @@ echo "AGGREGATING RESULTS ACROSS ALL MANUSCRIPTS"
 echo "========================================================================"
 
 python3 aggregate_results.py \
-    --results_dir "./Results/UDIADS_BIB_MS" \
+    --results_dir "./Result/a1/" \
     --manuscripts Latin2 Latin14396 Latin16746 Syr341 \
-    --output "./Results/UDIADS_BIB_MS/aggregated_metrics.txt"
+    --output "./Result/a1/aggregated_metrics.txt"
 
 echo ""
 echo "========================================================================"
 echo "AGGREGATION COMPLETE"
 echo "========================================================================"
-echo "Aggregated metrics saved to: ./Results/UDIADS_BIB_MS/aggregated_metrics.txt"
+echo "Aggregated metrics saved to: ./Result/a1/aggregated_metrics.txt"
 echo ""
