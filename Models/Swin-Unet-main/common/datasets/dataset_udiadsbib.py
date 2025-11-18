@@ -141,7 +141,7 @@ def identity_transform(img, mask):
     return img, mask
 
 
-def class_aware_training_transform(image, mask_class, patch_size, use_aggressive_aug=False):
+def class_aware_training_transform(image, mask_class, patch_size, num_classes=6, use_aggressive_aug=False):
     """
     Class-aware training transform that applies stronger augmentation for rare classes.
     
@@ -149,7 +149,7 @@ def class_aware_training_transform(image, mask_class, patch_size, use_aggressive
     - Paratext (1): ~5-8% (rare)
     - Decoration (2): ~2-3% (rare)
     - Title (4): ~1-2% (very rare)
-    - Chapter Headings (5): ~<1% (extremely rare)
+    - Chapter Headings (5): ~<1% (extremely rare) - only for 6-class datasets
     
     Common classes:
     - Background (0): ~60-70%
@@ -162,16 +162,22 @@ def class_aware_training_transform(image, mask_class, patch_size, use_aggressive
         image: PIL Image
         mask_class: numpy array of class indices (H, W)
         patch_size: Target patch size
+        num_classes: Number of classes (5 for Syr341, 6 for other manuscripts)
         use_aggressive_aug: If True, always use aggressive augmentation (for rare class samples)
     
     Returns:
         (augmented_image, augmented_mask_class)
     """
     # Check if mask contains rare classes and determine rarity level
-    # Rare classes: Paratext (1), Decoration (2), Title (4), Chapter Headings (5)
-    # Very rare classes: Title (4), Chapter Headings (5) - <2% frequency
-    rare_classes = {1, 2, 4, 5}
-    very_rare_classes = {4, 5}  # Title, Chapter Heading (<2% frequency)
+    # Rare classes: Paratext (1), Decoration (2), Title (4), Chapter Headings (5) if num_classes==6
+    # Very rare classes: Title (4), Chapter Headings (5) if num_classes==6 - <2% frequency
+    if num_classes == 5:
+        # For Syr341 (5 classes): no Chapter Headings (class 5)
+        rare_classes = {1, 2, 4}  # Paratext, Decoration, Title
+        very_rare_classes = {4}  # Title only (<2% frequency)
+    else:  # num_classes == 6 (default)
+        rare_classes = {1, 2, 4, 5}  # Paratext, Decoration, Title, Chapter Headings
+        very_rare_classes = {4, 5}  # Title, Chapter Heading (<2% frequency)
     
     unique_classes = set(np.unique(mask_class))
     has_rare_class = use_aggressive_aug or bool(rare_classes.intersection(unique_classes))
@@ -367,7 +373,7 @@ class UDiadsBibDataset(Dataset):
                 if split == 'training':
                     # Use class-aware augmentation if enabled, otherwise standard
                     if use_class_aware_aug:
-                        self.transform = partial(class_aware_training_transform, patch_size=patch_size)
+                        self.transform = partial(class_aware_training_transform, patch_size=patch_size, num_classes=num_classes)
                     else:
                         # bind patch_size so the transform is a picklable top-level callable
                         self.transform = partial(training_transform, patch_size=patch_size)
@@ -379,7 +385,7 @@ class UDiadsBibDataset(Dataset):
                 if split == 'training':
                     # Use class-aware augmentation if enabled
                     if use_class_aware_aug:
-                        self.transform = partial(class_aware_training_transform, patch_size=patch_size)
+                        self.transform = partial(class_aware_training_transform, patch_size=patch_size, num_classes=num_classes)
                     else:
                         # bind patch_size so the transform is a picklable top-level callable
                         # Network model uses EfficientNet-B4 encoder, so use strong augmentation

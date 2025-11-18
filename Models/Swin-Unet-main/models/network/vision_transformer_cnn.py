@@ -25,7 +25,8 @@ class CNNTransformerUnet(nn.Module):
     
     def __init__(self, config, img_size=224, num_classes=6, zero_head=False, vis=False, 
                  use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, 
-                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False):
+                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False,
+                 encoder_type='efficientnet'):
         """
         Initialize CNN-Transformer U-Net model.
         
@@ -41,6 +42,7 @@ class CNNTransformerUnet(nn.Module):
             adapter_mode: Adapter mode - 'external' or 'streaming' (default: 'external')
             use_multiscale_agg: Whether to use multi-scale aggregation (default: False)
             use_groupnorm: Whether to use GroupNorm in adapters (default: False)
+            encoder_type: Encoder type - 'efficientnet' or 'resnet50' (default: 'efficientnet')
         """
         super(CNNTransformerUnet, self).__init__()
         
@@ -52,11 +54,13 @@ class CNNTransformerUnet(nn.Module):
         self.adapter_mode = adapter_mode
         self.use_multiscale_agg = use_multiscale_agg
         self.use_groupnorm = use_groupnorm
+        self.encoder_type = encoder_type
         
         # Create model configuration
         model_config = {
             'img_size': img_size,
             'num_classes': num_classes,
+            'encoder_type': encoder_type,  # 'efficientnet' or 'resnet50'
             'efficientnet_model': 'tf_efficientnet_b4_ns',  # EfficientNet-B4 (same as Hybrid1)
             'pretrained': True,
             'embed_dim': 96,
@@ -79,7 +83,11 @@ class CNNTransformerUnet(nn.Module):
         print(f"CNN-Transformer U-Net initialized:")
         print(f"  - Image size: {img_size}")
         print(f"  - Number of classes: {num_classes}")
-        print(f"  - EfficientNet variant: {model_config['efficientnet_model']}")
+        if encoder_type == 'resnet50':
+            print(f"  - Encoder: ResNet-50 (official)")
+        else:
+            print(f"  - Encoder: EfficientNet-B4")
+            print(f"  - EfficientNet variant: {model_config['efficientnet_model']}")
         print(f"  - Embed dimension: {model_config['embed_dim']}")
         if use_deep_supervision:
             print(f"  - ✅ Deep Supervision: ENABLED (3 auxiliary outputs)")

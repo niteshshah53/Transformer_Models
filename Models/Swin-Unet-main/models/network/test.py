@@ -78,6 +78,11 @@ Examples:
     parser.add_argument('--no_groupnorm', dest='use_groupnorm', action='store_false',
                        help='Disable GroupNorm (use LayerNorm instead)')
     
+    # Encoder type configuration
+    parser.add_argument('--encoder_type', type=str, default='efficientnet',
+                       choices=['efficientnet', 'resnet50'],
+                       help='Encoder type: efficientnet (EfficientNet-B4) or resnet50 (ResNet-50) (default: efficientnet)')
+    
     # Legacy flag (kept for backward compatibility, but not used)
     parser.add_argument('--use_baseline', action='store_true', default=False,
                        help='[DEPRECATED: All flags are now independent] Use baseline CNN-Transformer configuration')
@@ -145,13 +150,17 @@ def get_model(args, config):
     use_deep_supervision = getattr(args, 'deep_supervision', False)
     use_multiscale_agg = getattr(args, 'use_multiscale_agg', False)
     use_groupnorm = getattr(args, 'use_groupnorm', True)
+    encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Print configuration (matching train.py format)
     print("=" * 80)
     print("🚀 Loading CNN-Transformer Model for Testing")
     print("=" * 80)
     print("Model Configuration:")
-    print("  ✓ EfficientNet-B4 Encoder")
+    if encoder_type == 'resnet50':
+        print("  ✓ ResNet-50 Encoder (official)")
+    else:
+        print("  ✓ EfficientNet-B4 Encoder")
     print(f"  ✓ Bottleneck: {'Enabled' if use_bottleneck else 'Disabled'}")
     print("  ✓ Swin Transformer Decoder")
     print(f"  ✓ Fusion Method: {fusion_method}")
@@ -171,7 +180,8 @@ def get_model(args, config):
         use_bottleneck=use_bottleneck,
         adapter_mode=adapter_mode,
         use_multiscale_agg=use_multiscale_agg,
-        use_groupnorm=use_groupnorm
+        use_groupnorm=use_groupnorm,
+        encoder_type=encoder_type
     )
     
     if torch.cuda.is_available():

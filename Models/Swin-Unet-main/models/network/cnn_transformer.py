@@ -529,6 +529,41 @@ class EfficientNetEncoder(nn.Module):
         return features  # Return 4 feature maps
 
 
+class ResNet50Encoder(nn.Module):
+    """
+    ResNet-50 encoder with feature extraction at multiple scales using timm.
+    
+    ResNet-50 is a standard CNN encoder that provides good feature representations
+    for segmentation tasks. It uses residual connections and has been widely used
+    in computer vision tasks.
+    """
+    def __init__(self, model_name='resnet50', pretrained=True, freeze_bn=False):
+        super().__init__()
+        
+        # Load pretrained ResNet-50 using timm
+        self.backbone = timm.create_model(
+            model_name, 
+            pretrained=pretrained, 
+            features_only=True, 
+            out_indices=(1, 2, 3, 4)
+        )
+        
+        # Freeze batch normalization layers if specified
+        if freeze_bn:
+            for m in self.backbone.modules():
+                if isinstance(m, nn.BatchNorm2d):
+                    m.eval()
+                    m.track_running_stats = False
+        
+        # Get channel dimensions for different stages from timm
+        self.stage_channels = self.backbone.feature_info.channels()
+    
+    def forward(self, x):
+        # Extract features at different stages
+        features = self.backbone(x)
+        return features  # Return 4 feature maps
+
+
 class SmartSkipConnectionTransformer(nn.Module):
     def __init__(self, encoder_dim, decoder_dim, num_heads=8, dropout=0.1):
         super().__init__()
@@ -642,10 +677,10 @@ class SimpleSkipConnectionTransformer(nn.Module):
 
 class EfficientNetSwinUNet(nn.Module):
     """
-    Hybrid CNN-Transformer UNet with EfficientNet encoder and Swin Transformer decoder
+    Hybrid CNN-Transformer UNet with EfficientNet or ResNet-50 encoder and Swin Transformer decoder
     """
     def __init__(self, img_size=224, num_classes=6, efficientnet_model='tf_efficientnet_b4_ns',
-                 pretrained=True, embed_dim=96, depths_decoder=[2, 2, 2, 2], 
+                 encoder_type='efficientnet', pretrained=True, embed_dim=96, depths_decoder=[2, 2, 2, 2], 
                  num_heads=[3, 6, 12, 24], window_size=7, mlp_ratio=4.,
                  qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0.1, norm_layer=nn.LayerNorm, use_checkpoint=False,
@@ -662,9 +697,13 @@ class EfficientNetSwinUNet(nn.Module):
         self.adapter_mode = adapter_mode  # 'external' or 'streaming'
         self.use_multiscale_agg = use_multiscale_agg
         self.use_groupnorm = use_groupnorm
+        self.encoder_type = encoder_type  # 'efficientnet' or 'resnet50'
         
-        # EfficientNet Encoder
-        self.encoder = EfficientNetEncoder(model_name=efficientnet_model, pretrained=pretrained)
+        # Encoder selection: EfficientNet or ResNet-50
+        if encoder_type == 'resnet50':
+            self.encoder = ResNet50Encoder(model_name='resnet50', pretrained=pretrained)
+        else:
+            self.encoder = EfficientNetEncoder(model_name=efficientnet_model, pretrained=pretrained)
         
         # Target dimensions for decoder (matching your diagram exactly)
         # Stage resolutions: 56x56, 28x28, 14x14, 7x7

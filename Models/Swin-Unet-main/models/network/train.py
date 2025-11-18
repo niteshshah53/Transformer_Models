@@ -56,13 +56,17 @@ def get_model(args, config):
     use_deep_supervision = getattr(args, 'deep_supervision', False)
     use_multiscale_agg = getattr(args, 'use_multiscale_agg', False)
     use_groupnorm = getattr(args, 'use_groupnorm', True)
+    encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Print configuration
     print("=" * 80)
     print("🚀 Loading CNN-Transformer Model")
     print("=" * 80)
     print("Model Configuration:")
-    print("  ✓ EfficientNet-B4 Encoder")
+    if encoder_type == 'resnet50':
+        print("  ✓ ResNet-50 Encoder (official)")
+    else:
+        print("  ✓ EfficientNet-B4 Encoder")
     print(f"  ✓ Bottleneck: {'Enabled' if use_bottleneck else 'Disabled'}")
     print("  ✓ Swin Transformer Decoder")
     print(f"  ✓ Fusion Method: {fusion_method}")
@@ -82,7 +86,8 @@ def get_model(args, config):
         use_bottleneck=use_bottleneck,
         adapter_mode=adapter_mode,
         use_multiscale_agg=use_multiscale_agg,
-        use_groupnorm=use_groupnorm
+        use_groupnorm=use_groupnorm,
+        encoder_type=encoder_type
     )
     
     # Move to GPU if available
@@ -132,7 +137,10 @@ def setup_datasets(args):
         use_class_aware_aug = getattr(args, 'use_class_aware_aug', False)
         if use_class_aware_aug:
             print("✓ Class-aware augmentation enabled (stronger augmentation for rare classes)")
-            print("  Rare classes: Paratext, Decoration, Title, Chapter Headings")
+            if num_classes == 5:
+                print("  Rare classes: Paratext, Decoration, Title")
+            else:  # num_classes == 6
+                print("  Rare classes: Paratext, Decoration, Title, Chapter Headings")
         
         train_dataset = UDiadsBibDataset(
             root_dir=root_dir,
@@ -284,6 +292,11 @@ def parse_arguments():
                        help='Use GroupNorm instead of LayerNorm (default: True)')
     parser.add_argument('--no_groupnorm', dest='use_groupnorm', action='store_false',
                        help='Disable GroupNorm (use LayerNorm instead)')
+    
+    # Encoder type configuration
+    parser.add_argument('--encoder_type', type=str, default='efficientnet',
+                       choices=['efficientnet', 'resnet50'],
+                       help='Encoder type: efficientnet (EfficientNet-B4) or resnet50 (ResNet-50) (default: efficientnet)')
     
     # Freezing configuration
     parser.add_argument('--freeze_encoder', action='store_true', default=False,
