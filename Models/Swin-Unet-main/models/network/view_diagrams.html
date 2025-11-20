@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Architecture Diagrams - Corrected</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            font-size: 24px;
+        }
+
+        h2 {
+            color: #555;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 20px;
+        }
+
+        .diagram-container {
+            margin: 20px auto;
+            text-align: center;
+            /* default max width for general diagrams */
+            max-width: 700px;
+        }
+
+        /* make mermaid SVG fill the container exactly */
+        .mermaid {
+            display: block;
+            margin: 0 auto;
+        }
+
+        .mermaid svg {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Force the Attention Fusion and GCCF components to exactly 15cm x 15cm */
+        /* Use the specific IDs applied to those mermaid wrappers */
+        #attnFusion,
+        #gccf {
+            width: 15cm;
+            height: 15cm;
+            box-sizing: border-box;
+            border: 1px dashed #e0e0e0;
+            padding: 6px;
+            background: #ffffff;
+            margin: 0 auto;
+            overflow: auto;
+        }
+
+        /* Small responsive tweak for narrow screens */
+        @media (max-width: 480px) {
+
+            #attnFusion,
+            #gccf {
+                width: 95vw;
+                height: 95vw;
+            }
+        }
+    </style>
+
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'base' });
+    </script>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Architecture Diagrams</h1>
+
+        <h2>Network Architecture (Swin-Unet with Attention Feature Fusion & Deep Supervision)</h2>
+        <div class="diagram-container">
+            <div class="mermaid">
+                graph TD
+                %% Styles
+                classDef mbconv fill:#4caf50,stroke:#2e7d32,stroke-width:2px,color:white,rx:10,ry:10;
+                classDef se fill:#f48fb1,stroke:#c2185b,stroke-width:2px,color:black;
+                classDef swin fill:#2196f3,stroke:#1565c0,stroke-width:2px,color:white,rx:10,ry:10;
+                classDef expand fill:#fff176,stroke:#fbc02d,stroke-width:2px,color:black;
+                classDef input fill:#a5d6a7,stroke:#2e7d32,stroke-width:2px,color:black;
+                classDef output fill:#cfd8dc,stroke:#455a64,stroke-width:2px,color:black;
+                classDef aux fill:#ffb74d,stroke:#e65100,stroke-width:2px,color:black;
+                classDef auxBlock fill:#ff9800,stroke:#e65100,stroke-width:2px,color:white;
+                classDef label fill:none,stroke:none,color:black,font-size:12px;
+
+                %% Layout Structure
+                subgraph Layout [ ]
+                direction TB
+
+                %% Top Row: Input and Output
+                subgraph TopRow [ ]
+                direction LR
+                style TopRow fill:none,stroke:none
+                Input["Input<br>(B, 3, H, W)"]:::input
+                Output["Output<br>(B, 3, H, W)"]:::output
+                end
+
+                %% Middle Section: Encoder | Decoder | Aux
+                subgraph Columns [ ]
+                direction LR
+                style Columns fill:none,stroke:none
+
+                %% Encoder (Left)
+                subgraph Encoder [Encoder]
+                direction TB
+                style Encoder fill:#f9f9f9,stroke:#ddd
+
+                subgraph E1 [ ]
+                direction TB
+                style E1 fill:none,stroke:none
+                E1_MB["MBConv"]:::mbconv
+                E1_SE["SE Attention"]:::se
+                E1_MB --> E1_SE
+                end
+                E1_Label["H/4 × W/4"]:::label
+
+                subgraph E2 [ ]
+                direction TB
+                style E2 fill:none,stroke:none
+                E2_MB["MBConv"]:::mbconv
+                E2_SE["SE Attention"]:::se
+                E2_MB --> E2_SE
+                end
+                E2_Label["H/8 × W/8"]:::label
+
+                subgraph E3 [ ]
+                direction TB
+                style E3 fill:none,stroke:none
+                E3_MB["MBConv"]:::mbconv
+                E3_SE["SE Attention"]:::se
+                E3_MB --> E3_SE
+                end
+                E3_Label["H/16 × W/16"]:::label
+
+                subgraph E4 [ ]
+                direction TB
+                style E4 fill:none,stroke:none
+                E4_MB["MBConv"]:::mbconv
+                E4_SE["SE Attention"]:::se
+                E4_MB --> E4_SE
+                end
+                E4_Label["H/32 × W/32"]:::label
+
+                Tokenized["Tokenized"]:::label
+
+                E1_SE --> E2_MB
+                E2_SE --> E3_MB
+                E3_SE --> E4_MB
+                E4_SE --> Tokenized
+                end
+
+                %% Decoder (Right)
+                subgraph Decoder [Decoder]
+                direction BT
+                style Decoder fill:#f9f9f9,stroke:#ddd
+
+                subgraph D4 [ ]
+                direction TB
+                style D4 fill:none,stroke:none
+                D4_Swin["Swin Transformer<br>Block x2"]:::swin
+                D4_Exp["Patch Expanding"]:::expand
+                D4_Swin --> D4_Exp
+                end
+                D4_Label["H/32 × W/32"]:::label
+
+                subgraph D3 [ ]
+                direction TB
+                style D3 fill:none,stroke:none
+                D3_Swin["Swin Transformer<br>Block x2"]:::swin
+                D3_Exp["Patch Expanding"]:::expand
+                D3_Swin --> D3_Exp
+                end
+                D3_Label["H/16 × W/16"]:::label
+
+                subgraph D2 [ ]
+                direction TB
+                style D2 fill:none,stroke:none
+                D2_Swin["Swin Transformer<br>Block x2"]:::swin
+                D2_Exp["Patch Expanding"]:::expand
+                D2_Swin --> D2_Exp
+                end
+                D2_Label["H/8 × W/8"]:::label
+
+                subgraph D1 [ ]
+                direction TB
+                style D1 fill:none,stroke:none
+                D1_Swin["Swin Transformer<br>Block x2"]:::swin
+                D1_Exp["Patch Expanding"]:::expand
+                D1_Swin --> D1_Exp
+                end
+                D1_Label["H/4 × W/4"]:::label
+
+                D4_Exp --> D3_Swin
+                D3_Exp --> D2_Swin
+                D2_Exp --> D1_Swin
+                end
+
+                %% Auxiliary Outputs (Far Right)
+                subgraph AuxSide [Auxiliary Outputs]
+                direction TB
+                style AuxSide fill:none,stroke:none
+                Aux1["Aux Output 1"]:::aux
+                Aux2["Aux Output 2"]:::aux
+                Aux3["Aux Output 3"]:::aux
+                AuxLossBlock["Auxiliary Loss"]:::auxBlock
+
+                Aux1 --> AuxLossBlock
+                Aux2 --> AuxLossBlock
+                Aux3 --> AuxLossBlock
+                end
+                end
+
+                %% Bottleneck (Bottom)
+                subgraph Bottleneck [Bottleneck]
+                direction LR
+                style Bottleneck fill:none,stroke:none
+                B1["Swin Transformer<br>Block x2"]:::swin
+                B2["Swin Transformer<br>Block x2"]:::swin
+                B1 --> B2
+                end
+                end
+
+                %% Main Flow Connections
+                Input --> E1_MB
+                Tokenized -- "Red Arrow" --> B1
+                linkStyle 20 stroke:red,stroke-width:2px;
+                B2 --> D4_Swin
+                D1_Exp --> Output
+
+                %% Skip Connections (Dashed Red)
+                E1_SE -.-> D1_Swin
+                E2_SE -.-> D2_Swin
+                E3_SE -.-> D3_Swin
+                E4_SE -.-> D4_Swin
+                linkStyle 23,24,25,26 stroke:red,stroke-width:2px,stroke-dasharray: 5 5;
+
+                %% Aux Connections (Gold)
+                D2_Exp -.-> Aux1
+                D3_Exp -.-> Aux2
+                D4_Exp -.-> Aux3
+                linkStyle 27,28,29 stroke:gold,stroke-width:2px;
+            </div>
+        </div>
+
+        <h2>Smart Component (SmartSkipConnectionTransformer) — Attention Feature Fusion</h2>
+        <div class="diagram-container">
+            <!-- this mermaid block is constrained to 15cm x 15cm by the #attnFusion CSS -->
+            <div id="attnFusion" class="mermaid">
+                graph TD
+                %% Styles
+                classDef input fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+                classDef process fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px;
+                classDef fusion fill:#fff3e0,stroke:#ef6c00,stroke-width:2px;
+                classDef output fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px;
+
+                subgraph Inputs
+                Enc["Encoder Tokens<br />(B, L_enc, C)"]:::input
+                Dec["Decoder Tokens<br />(B, L_dec, C)"]:::input
+                end
+
+                subgraph Alignment [Alignment & Attention]
+                Align["Align<br />Linear + LN + GELU"]:::process
+                Enc --> Align
+
+                Attn["Multi-Head Self-Attention"]:::process
+                Align --> Attn
+                Align --> Attn
+                Align --> Attn
+
+                AddNorm1["Add + LayerNorm"]:::process
+                Attn --> AddNorm1
+                Align --> AddNorm1
+
+                Interp["Interpolate<br />(if sizes differ)"]:::process
+                AddNorm1 --> Interp
+                end
+
+                subgraph FusionBlock [Fusion]
+                Concat["Concatenate<br />(Dim * 2)"]:::fusion
+                Dec --> Concat
+                Interp --> Concat
+
+                Fuse["Fusion Layer<br />Linear + LN + GELU + Dropout + Linear + LN"]:::fusion
+                Concat --> Fuse
+                end
+
+                subgraph OutputBlock [Output]
+                ResAdd["Residual Add"]:::output
+                Dec --> ResAdd
+                Fuse --> ResAdd
+
+                Out["Fused Output<br />(B, L_dec, C)"]:::output
+                ResAdd --> Out
+                end
+            </div>
+        </div>
+
+        <h2>GCCF Component (GCFFSkipConnectionTransformer)</h2>
+        <div class="diagram-container">
+            <!-- this mermaid block is constrained to 15cm x 15cm by the #gccf CSS -->
+            <div id="gccf" class="mermaid">
+                graph TD
+                %% Styles
+                classDef input fill:#e3f2fd,stroke:#1565c0,stroke-width:2px;
+                classDef proj fill:#e1bee7,stroke:#4a148c,stroke-width:2px;
+                classDef context fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px;
+                classDef attention fill:#ffecb3,stroke:#ff6f00,stroke-width:2px;
+                classDef fusion fill:#ffccbc,stroke:#d84315,stroke-width:2px;
+                classDef output fill:#b2ebf2,stroke:#006064,stroke-width:2px;
+
+                subgraph Inputs
+                Enc["Encoder Tokens"]:::input
+                Dec["Decoder Tokens"]:::input
+                end
+
+                subgraph Projections [Projections]
+                We["W_e: 1x1 Conv"]:::proj
+                Wd["W_d: 1x1 Conv"]:::proj
+                Enc --> We
+                Dec --> Wd
+                end
+
+                subgraph Combination
+                Add["Add"]:::proj
+                ReLU1["ReLU"]:::proj
+                We --> Add
+                Wd --> Add
+                Add --> ReLU1
+                end
+
+                subgraph GlobalContext [Global Context Path]
+                GC["ContextBlock<br />Attention Pooling + MLP"]:::context
+                ReLU1 --> GC
+                end
+
+                subgraph ChannelAttn [Channel Attention Path]
+                CA["CAMLayer<br />Max/Avg Pool + MLP"]:::attention
+                ReLU1 --> CA
+                end
+
+                subgraph FeatureFusion [Fusion]
+                CombinePaths["Add"]:::fusion
+                GC --> CombinePaths
+                CA --> CombinePaths
+
+                Psi["Psi: 1x1 Conv + ReLU"]:::fusion
+                CombinePaths --> Psi
+                end
+
+                subgraph OutputBlock [Output]
+                ResAdd["Residual Add"]:::output
+                We --> ResAdd
+                Psi --> ResAdd
+
+                Out["Fused Output"]:::output
+                ResAdd --> Out
+                end
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

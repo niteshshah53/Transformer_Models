@@ -67,8 +67,8 @@ Examples:
                        choices=['external', 'streaming'],
                        help='Adapter placement mode: external (separate adapters) or streaming (integrated adapters) (default: streaming)')
     parser.add_argument('--fusion_method', type=str, default='simple',
-                       choices=['simple', 'fourier', 'smart'],
-                       help='Feature fusion method: simple (concat), fourier (FFT-based), smart (attention-based smart skip connections) (default: simple)')
+                       choices=['simple', 'fourier', 'smart', 'gcff'],
+                       help='Feature fusion method: simple (concat), fourier (FFT-based), smart (attention-based smart skip connections), gcff (Global Context Feature Fusion from MSAGHNet) (default: simple)')
     parser.add_argument('--deep_supervision', action='store_true', default=False,
                        help='Enable deep supervision with 3 auxiliary outputs (default: False)')
     parser.add_argument('--use_multiscale_agg', action='store_true', default=False,
@@ -77,6 +77,10 @@ Examples:
                        help='Use GroupNorm instead of LayerNorm (default: True)')
     parser.add_argument('--no_groupnorm', dest='use_groupnorm', action='store_false',
                        help='Disable GroupNorm (use LayerNorm instead)')
+    parser.add_argument('--use_se_msfe', action='store_true', default=False,
+                       help='Use SE-MSFE (Squeeze-and-Excitation Multi-Scale Feature Extraction) to replace MBConv conv operations in encoder (default: False)')
+    parser.add_argument('--use_msfa_mct_bottleneck', action='store_true', default=False,
+                       help='Use MSFA + MCT Hybrid Bottleneck (from MSAGHNet) instead of 2 Swin Transformer blocks (default: False)')
     
     # Encoder type configuration
     parser.add_argument('--encoder_type', type=str, default='efficientnet',
@@ -150,6 +154,8 @@ def get_model(args, config):
     use_deep_supervision = getattr(args, 'deep_supervision', False)
     use_multiscale_agg = getattr(args, 'use_multiscale_agg', False)
     use_groupnorm = getattr(args, 'use_groupnorm', True)
+    use_se_msfe = getattr(args, 'use_se_msfe', False)
+    use_msfa_mct_bottleneck = getattr(args, 'use_msfa_mct_bottleneck', False)
     encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Print configuration (matching train.py format)
@@ -161,7 +167,14 @@ def get_model(args, config):
         print("  ✓ ResNet-50 Encoder (official)")
     else:
         print("  ✓ EfficientNet-B4 Encoder")
+        if use_se_msfe:
+            print("    - SE-MSFE: Enabled (replaces MBConv conv operations)")
     print(f"  ✓ Bottleneck: {'Enabled' if use_bottleneck else 'Disabled'}")
+    if use_bottleneck:
+        if use_msfa_mct_bottleneck:
+            print("    - Type: MSFA + MCT Hybrid (from MSAGHNet)")
+        else:
+            print("    - Type: 2 Swin Transformer blocks")
     print("  ✓ Swin Transformer Decoder")
     print(f"  ✓ Fusion Method: {fusion_method}")
     print(f"  ✓ Adapter Mode: {adapter_mode}")
@@ -181,7 +194,9 @@ def get_model(args, config):
         adapter_mode=adapter_mode,
         use_multiscale_agg=use_multiscale_agg,
         use_groupnorm=use_groupnorm,
-        encoder_type=encoder_type
+        encoder_type=encoder_type,
+        use_se_msfe=use_se_msfe,
+        use_msfa_mct_bottleneck=use_msfa_mct_bottleneck
     )
     
     if torch.cuda.is_available():
@@ -282,6 +297,8 @@ def load_model_checkpoint(model, args):
         fusion_mismatch = not has_skip_fusions
     elif model.model.fusion_method == 'smart':
         fusion_mismatch = not has_smart_skips
+    elif model.model.fusion_method == 'gcff':
+        fusion_mismatch = not hasattr(model.model, 'gcff_skips') or model.model.gcff_skips is None
     else:
         fusion_mismatch = (has_skip_fusions or has_smart_skips)
     

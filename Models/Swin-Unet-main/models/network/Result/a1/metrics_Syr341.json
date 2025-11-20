@@ -1,0 +1,8 @@
+{
+  "manuscript": "Syr341",
+  "mean_precision": 0.7154636452860141,
+  "mean_recall": 0.6099295269951701,
+  "mean_f1": 0.6523034233003284,
+  "mean_iou": 0.5450531581738483,
+  "num_images": 30
+}

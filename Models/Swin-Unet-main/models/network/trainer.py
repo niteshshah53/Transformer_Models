@@ -392,24 +392,29 @@ def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss,
                           ce_weight=0.3, focal_weight=0.2, dice_weight=0.5):
     """
     Compute combined loss with support for deep supervision.
-    Matches hybrid2's pattern but keeps network model's weight values.
+    Now supports MSAGHNet-style multi-resolution deep supervision:
+    - Main output at full resolution
+    - Auxiliary outputs at native resolutions (H/16, H/8, H/4)
+    - Ground truth is downsampled to match each auxiliary output's resolution
     
     Args:
         predictions: Model output (logits or tuple with auxiliary outputs)
-        labels: Ground truth labels
+        labels: Ground truth labels [B, H, W] or [B, 1, H, W]
         ce_loss, focal_loss, dice_loss: Loss functions
         ce_weight, focal_weight, dice_weight: Loss combination weights (default: 0.3, 0.2, 0.5)
         
     Returns:
         tuple: (total_loss, loss_dict) where loss_dict contains individual losses
     """
+    import torch.nn.functional as F
+    
     loss_dict = {}
     
     # Handle deep supervision
     if isinstance(predictions, tuple):
         logits, aux_outputs = predictions
         
-        # Main branch losses
+        # Main branch losses (at full resolution)
         loss_ce = ce_loss(logits, labels)
         loss_focal = focal_loss(logits, labels)
         loss_dice = dice_loss(logits, labels, softmax=True)
@@ -420,20 +425,43 @@ def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss,
         loss_dict['focal'] = loss_focal.item()
         loss_dict['dice'] = loss_dice.item()
         
-        # Auxiliary losses with exponentially decaying weights (matching hybrid2 pattern)
-        # Further reduced weights for stability when using smart skip connections + CB Loss + aggressive augmentation
-        # Smart skip connections + deep supervision + CB Loss + Focal γ=4.0 can cause gradient explosion
-        # Reduced from 0.1 to 0.05 to prevent NaN/Inf gradients
+        # Auxiliary losses with multi-resolution support (MSAGHNet style)
+        # Auxiliary outputs are at native resolutions: [H/16, H/8, H/4]
+        # Scale factors: [16, 8, 4] (downsample GT by these factors)
+        scale_factors = [16, 8, 4]
         aux_weights = [0.05 * (0.8 ** i) for i in range(len(aux_outputs))]
         aux_loss = 0.0
         
+        # Prepare labels for multi-resolution loss computation
+        # Ensure labels are in [B, 1, H, W] format for interpolation
+        if labels.dim() == 3:
+            labels_4d = labels.unsqueeze(1)  # [B, 1, H, W]
+        else:
+            labels_4d = labels
+        
         for i, (weight, aux_output) in enumerate(zip(aux_weights, aux_outputs)):
-            aux_ce = ce_loss(aux_output, labels)
-            aux_focal = focal_loss(aux_output, labels)
-            aux_dice = dice_loss(aux_output, labels, softmax=True)
+            # Get target resolution from auxiliary output
+            _, _, aux_h, aux_w = aux_output.shape
+            
+            # Downsample ground truth to match auxiliary output resolution
+            labels_downsampled = F.interpolate(
+                labels_4d.float(), 
+                size=(aux_h, aux_w), 
+                mode='nearest'  # Use nearest neighbor for label downsampling
+            ).long()
+            
+            # Remove channel dimension if needed for loss functions
+            if labels_downsampled.shape[1] == 1:
+                labels_downsampled = labels_downsampled.squeeze(1)  # [B, H, W]
+            
+            # Compute losses at native resolution
+            aux_ce = ce_loss(aux_output, labels_downsampled)
+            aux_focal = focal_loss(aux_output, labels_downsampled)
+            aux_dice = dice_loss(aux_output, labels_downsampled, softmax=True)
             aux_combined = ce_weight * aux_ce + focal_weight * aux_focal + dice_weight * aux_dice
             aux_loss += weight * aux_combined
             loss_dict[f'aux_{i}'] = (weight * aux_combined).item()
+            loss_dict[f'aux_{i}_res'] = f'{aux_h}x{aux_w}'
         
         total_loss = main_loss + aux_loss
         loss_dict['total'] = total_loss.item()
@@ -489,23 +517,49 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader
     # Encoder (pretrained EfficientNet): 0.05x - more aggressive for pretrained weights
     # Bottleneck (randomly initialized Swin blocks): 1.0x - full LR for random init
     # Decoder (randomly initialized Swin blocks): 1.0x - full LR for random init
-    encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.05) if args is not None else 0.05
+    
+    # Check if SE-MSFE is enabled (requires lower encoder LR and warm-up)
+    # Other components (GCFF, MSFA+MCT) use default encoder LR (0.05x)
+    fusion_method = getattr(args, 'fusion_method', 'simple') if args is not None else 'simple'
+    use_se_msfe = getattr(args, 'use_se_msfe', False) if args is not None else False
+    use_msfa_mct_bottleneck = getattr(args, 'use_msfa_mct_bottleneck', False) if args is not None else False
+    
+    # Check for any advanced components (for gradient clipping)
+    use_advanced_components = (fusion_method == 'gcff') or use_se_msfe or use_msfa_mct_bottleneck
+    
+    # Lower encoder LR (0.01x) and warm-up ONLY for SE-MSFE
+    # All other components use default encoder LR (0.05x)
+    if use_se_msfe:
+        encoder_lr_factor = 0.01  # 0.01x for SE-MSFE to reduce gradient instability
+        if args is not None:
+            args.use_gradient_clipping = True  # Flag for gradient clipping
+            args.use_lr_warmup = True  # Flag for LR warm-up
+    else:
+        # Default encoder LR (0.05x) for all other components
+        encoder_lr_factor = getattr(args, 'encoder_lr_factor', 0.05) if args is not None else 0.05
+        # Enable gradient clipping for other advanced components (GCFF, MSFA+MCT) but no warm-up
+        if use_advanced_components and args is not None:
+            args.use_gradient_clipping = True  # Flag for gradient clipping
+            args.use_lr_warmup = False  # No warm-up for non-SE-MSFE components
     param_groups = [
         {
             'params': encoder_params,
             'lr': learning_rate * encoder_lr_factor,  # Configurable encoder LR factor (default: 0.05x)
+            'initial_lr': learning_rate * encoder_lr_factor,  # Store initial LR for warm-up
             'weight_decay': 1e-4,
             'name': 'encoder'
         },
         {
             'params': bottleneck_params,
             'lr': learning_rate,  # Full LR for randomly initialized (was 0.5x)
+            'initial_lr': learning_rate,  # Store initial LR for warm-up
             'weight_decay': 5e-4,
             'name': 'bottleneck'
         },
         {
             'params': decoder_params,
             'lr': learning_rate,  # Full LR for randomly initialized
+            'initial_lr': learning_rate,  # Store initial LR for warm-up
             'weight_decay': 1e-3,
             'name': 'decoder'
         }
@@ -565,11 +619,25 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader
     print("\n" + "="*80)
     print("OPTIMIZER CONFIGURATION")
     print("="*80)
+    if use_se_msfe:
+        print("⚠️  SE-MSFE component detected")
+        print("   → Encoder LR reduced to 0.01x (from 0.05x) for better stability")
+        print("   → Gradient clipping enabled (max_norm=1.0) to reduce skipped batches")
+        print("   → Learning rate warm-up enabled (first 10 epochs)")
+        print("")
+    elif use_advanced_components:
+        print("⚠️  Advanced components detected (GCFF or MSFA+MCT bottleneck)")
+        print("   → Encoder LR: 0.05x (default)")
+        print("   → Gradient clipping enabled (max_norm=1.0) to reduce skipped batches")
+        print("   → Learning rate warm-up: DISABLED (only for SE-MSFE)")
+        print("")
     for group in param_groups:
         num_params = sum(p.numel() for p in group['params'])
         print(f"{group['name'].capitalize():12}: LR={group['lr']:.6f}, "
               f"WD={group['weight_decay']:.6f}, Params={num_params:,}")
     print(f"Scheduler:   {scheduler_name}")
+    if use_se_msfe and scheduler_type == 'CosineAnnealingWarmRestarts':
+        print("   → Warm-up: Manual LR control for first 10 epochs (SE-MSFE only)")
     print("="*80 + "\n")
     
     return optimizer, scheduler
@@ -577,7 +645,7 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader
 
 def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, 
                        optimizer, scheduler, scheduler_type='OneCycleLR',
-                       use_amp=False, scaler=None):
+                       use_amp=False, scaler=None, args=None):
     """Run one training epoch with gradient clipping.
     Matches hybrid2's pattern: returns loss_dict.
 
@@ -656,27 +724,40 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
         # use component-specific clipping since transformers and CNNs have different gradient scales
         # Encoder (EfficientNet): smaller gradients, use higher max_norm
         # Decoder (Swin Transformer): larger gradients, use lower max_norm
+        
+        # Check if advanced components are enabled (gcff, SE-MSFE, or MSFA+MCT bottleneck)
+        # If so, use uniform gradient clipping with max_norm=1.0 for better stability
+        use_gradient_clipping = getattr(args, 'use_gradient_clipping', False) if args is not None else False
+        
         if use_amp and scaler is not None:
             # Unscale gradients before clipping (required for AMP)
             scaler.unscale_(optimizer)
         
-        encoder_params = []
-        decoder_params = []
-        for name, param in model.named_parameters():
-            if param.grad is not None:
-                lname = name.lower()
-                if 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname:
-                    encoder_params.append(param)
-                else:
-                    decoder_params.append(param)
-        
-        # Clip encoder and decoder separately with different norms
-        # Encoder: max_norm=5.0 (EfficientNet has smaller gradients)
-        # Decoder: max_norm=1.0 (Swin Transformer has larger gradients)
-        if encoder_params:
-            torch.nn.utils.clip_grad_norm_(encoder_params, max_norm=5.0)
-        if decoder_params:
-            torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=1.0)
+        if use_gradient_clipping:
+            # Uniform gradient clipping for advanced components (max_norm=1.0)
+            # This helps reduce skipped batches due to NaN/Inf gradients
+            all_params = [p for p in model.parameters() if p.grad is not None]
+            if all_params:
+                torch.nn.utils.clip_grad_norm_(all_params, max_norm=1.0)
+        else:
+            # Component-specific gradient clipping (default behavior)
+            encoder_params = []
+            decoder_params = []
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    lname = name.lower()
+                    if 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname:
+                        encoder_params.append(param)
+                    else:
+                        decoder_params.append(param)
+            
+            # Clip encoder and decoder separately with different norms
+            # Encoder: max_norm=5.0 (EfficientNet has smaller gradients)
+            # Decoder: max_norm=1.0 (Swin Transformer has larger gradients)
+            if encoder_params:
+                torch.nn.utils.clip_grad_norm_(encoder_params, max_norm=5.0)
+            if decoder_params:
+                torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=1.0)
         
         # Optimizer step with AMP support
         if use_amp and scaler is not None:
@@ -695,9 +776,11 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
                     print("⚠️  Scheduler reached max steps, stopping LR updates.")
                     scheduler_warning_printed = True
         
-        # Accumulate losses
+        # Accumulate losses (skip non-numeric values like resolution strings)
         for key, value in loss_dict.items():
-            epoch_losses[key] += value
+            if isinstance(value, (int, float)):
+                epoch_losses[key] += value
+            # Skip string values (e.g., aux_{i}_res) - they're for logging only
     
     # Print summary only if batches were skipped
     if skipped_loss_nan > 0 or skipped_grad_nan > 0:
@@ -762,9 +845,11 @@ def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss, max_batche
                         # Skip this batch if NaN/Inf detected
                         continue
             
-            # Accumulate losses (only if no NaN/Inf detected)
+            # Accumulate losses (only if no NaN/Inf detected, skip non-numeric values)
             for key, value in loss_dict.items():
-                epoch_losses[key] += value
+                if isinstance(value, (int, float)):
+                    epoch_losses[key] += value
+                # Skip string values (e.g., aux_{i}_res) - they're for logging only
             
             num_batches += 1
     
@@ -1142,7 +1227,7 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             train_losses = run_training_epoch(
                 model, train_loader, ce_loss, focal_loss, dice_loss,
                 optimizer, scheduler, scheduler_type=scheduler_type,
-                use_amp=use_amp, scaler=scaler
+                use_amp=use_amp, scaler=scaler, args=args
             )
             
             # Check for NaN/Inf in training losses (matching hybrid2 pattern)
@@ -1187,10 +1272,36 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                     writer.add_scalar(f'Val/{key}', value, epoch)
                 writer.add_scalar('LR', optimizer.param_groups[0]['lr'], epoch)
                 
+                # Learning rate warm-up for SE-MSFE component only
+                # Warm-up for first 10 epochs to stabilize training (only enabled when SE-MSFE is present)
+                use_lr_warmup = getattr(args, 'use_lr_warmup', False)
+                warmup_epochs = getattr(args, 'warmup_epochs', 10)
+                
+                if use_lr_warmup and epoch < warmup_epochs:
+                    # Linear warm-up: gradually increase LR from 0.1x to 1.0x over warmup_epochs
+                    warmup_progress = (epoch + 1) / warmup_epochs
+                    warmup_factor = 0.1 + 0.9 * warmup_progress  # Linear from 0.1 to 1.0
+                    
+                    # Apply warm-up factor to all parameter groups
+                    for param_group in optimizer.param_groups:
+                        # Use initial_lr if available, otherwise use current lr as base
+                        base_lr = param_group.get('initial_lr', param_group.get('lr', args.base_lr))
+                        if 'initial_lr' not in param_group:
+                            param_group['initial_lr'] = base_lr
+                        param_group['lr'] = base_lr * warmup_factor
+                    
+                    if (epoch + 1) % 5 == 0 or epoch == 0:  # Print every 5 epochs or first epoch
+                        print(f"  🔥 LR Warm-up: {warmup_progress*100:.1f}% complete (factor: {warmup_factor:.3f}x)")
+                
                 # Step scheduler per epoch (for schedulers that step per epoch, not per batch)
                 # OneCycleLR is stepped per batch in run_training_epoch
+                # Skip scheduler step during warm-up for CosineAnnealingWarmRestarts
                 if scheduler_type != 'OneCycleLR':
-                    if scheduler_type == 'ReduceLROnPlateau':
+                    if use_lr_warmup and epoch < warmup_epochs and scheduler_type == 'CosineAnnealingWarmRestarts':
+                        # Don't step scheduler during warm-up for CosineAnnealingWarmRestarts
+                        # We're manually controlling LR during warm-up
+                        pass
+                    elif scheduler_type == 'ReduceLROnPlateau':
                         # ReduceLROnPlateau steps based on validation loss
                         # Use a large value if val_loss is inf to avoid issues
                         scheduler_val_loss = val_loss if not math.isinf(val_loss) else 1e6
@@ -1208,10 +1319,36 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                     writer.add_scalar(f'Train/{key}', value, epoch)
                 writer.add_scalar('LR', optimizer.param_groups[0]['lr'], epoch)
                 
+                # Learning rate warm-up for SE-MSFE component only
+                # Warm-up for first 10 epochs to stabilize training (only enabled when SE-MSFE is present)
+                use_lr_warmup = getattr(args, 'use_lr_warmup', False)
+                warmup_epochs = getattr(args, 'warmup_epochs', 10)
+                
+                if use_lr_warmup and epoch < warmup_epochs:
+                    # Linear warm-up: gradually increase LR from 0.1x to 1.0x over warmup_epochs
+                    warmup_progress = (epoch + 1) / warmup_epochs
+                    warmup_factor = 0.1 + 0.9 * warmup_progress  # Linear from 0.1 to 1.0
+                    
+                    # Apply warm-up factor to all parameter groups
+                    for param_group in optimizer.param_groups:
+                        # Use initial_lr if available, otherwise use current lr as base
+                        base_lr = param_group.get('initial_lr', param_group.get('lr', args.base_lr))
+                        if 'initial_lr' not in param_group:
+                            param_group['initial_lr'] = base_lr
+                        param_group['lr'] = base_lr * warmup_factor
+                    
+                    if (epoch + 1) % 5 == 0 or epoch == 0:  # Print every 5 epochs or first epoch
+                        print(f"  🔥 LR Warm-up: {warmup_progress*100:.1f}% complete (factor: {warmup_factor:.3f}x)")
+                
                 # Step scheduler per epoch (for schedulers that step per epoch, not per batch)
                 # OneCycleLR is stepped per batch in run_training_epoch
+                # Skip scheduler step during warm-up for CosineAnnealingWarmRestarts
                 if scheduler_type != 'OneCycleLR':
-                    if scheduler_type == 'ReduceLROnPlateau':
+                    if use_lr_warmup and epoch < warmup_epochs and scheduler_type == 'CosineAnnealingWarmRestarts':
+                        # Don't step scheduler during warm-up for CosineAnnealingWarmRestarts
+                        # We're manually controlling LR during warm-up
+                        pass
+                    elif scheduler_type == 'ReduceLROnPlateau':
                         # ReduceLROnPlateau needs validation loss - skip stepping this epoch
                         print(f"  ⚠️  ReduceLROnPlateau scheduler skipped (requires validation loss)")
                     else:

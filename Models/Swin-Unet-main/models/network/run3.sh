@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=5th
-#SBATCH --output=./Result/a3/baseline_ds_%j.out
-#SBATCH --error=./Result/a3/baseline_ds_%j.out
+#SBATCH --job-name=3rd
+#SBATCH --output=./Result/a3/baseline_gcff_%j.out
+#SBATCH --error=./Result/a3/baseline_gcff_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -27,20 +27,26 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # ============================================================================
-# CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION CONFIGURATION
+# CNN-TRANSFORMER BASE MODEL + GCFF FUSION CONFIGURATION
 # ============================================================================
-# Base Model Configuration (minimal components, no extra enhancements):
+# Base Model Configuration with GCFF (Global Context Feature Fusion):
 #   ✓ EfficientNet-B4 Encoder
 #   ✓ Bottleneck: 2 Swin Transformer blocks (enabled)
 #   ✓ Swin Transformer Decoder
-#   ✓ Fusion Method: simple (concatenation)
+#   ✓ Fusion Method: gcff (Global Context Feature Fusion from MSAGHNet)
 #   ✓ Adapter mode: streaming (integrated adapters)
 #   ✓ GroupNorm: enabled
-#   ✓ Deep Supervision: enabled (auxiliary outputs for better gradient flow)
+#   ✗ Deep Supervision: disabled (baseline with GCFF only)
 #   ✓ Loss functions: CE (weighted) + Focal (γ=2.0) + Dice
 #   ✓ Differential LR: Encoder (0.05x), Bottleneck (1.0x), Decoder (1.0x)
 #
-# Components Disabled (base model):
+# GCFF Components:
+#   ✓ Global Context Block (attention-based pooling + MLP)
+#   ✓ Channel Attention Module (max/avg pool + MLP)
+#   ✓ Applied at 3 skip connection stages
+#
+# Components Disabled:
+#   ✗ Deep Supervision
 #   ✗ Multi-Scale Aggregation
 #   ✗ Fourier Feature Fusion
 #   ✗ Smart Skip Connections
@@ -49,21 +55,25 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION"
+echo "CNN-TRANSFORMER BASE MODEL + GCFF FUSION"
 echo "============================================================================"
-echo "Configuration: CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION"
+echo "Configuration: CNN-TRANSFORMER BASE MODEL + GCFF (Global Context Feature Fusion)"
 echo ""
 echo "Component Details:"
 echo "  ✓ EfficientNet-B4 Encoder"
 echo "  ✓ Bottleneck: 2 Swin Transformer blocks (enabled)"
 echo "  ✓ Swin Transformer Decoder"
-echo "  ✓ Fusion Method: simple (concatenation)"
+echo "  ✓ Fusion Method: gcff (Global Context Feature Fusion from MSAGHNet)"
 echo "  ✓ Adapter mode: streaming (integrated)"
 echo "  ✓ GroupNorm: enabled"
-echo "  ✓ Deep Supervision: enabled (auxiliary outputs for better gradient flow)"
-echo "  ✗ Multi-Scale Aggregation: disabled (base model)"
-echo "  ✗ Fourier Feature Fusion: disabled (using simple fusion)"
-echo "  ✗ Smart Skip Connections: disabled (using simple fusion)"
+echo "  ✓ GCFF Components:"
+echo "    - Global Context Block (attention pooling + MLP)"
+echo "    - Channel Attention Module (max/avg pool + MLP)"
+echo "    - Applied at 3 skip connection stages"
+echo "  ✗ Deep Supervision: disabled (baseline with GCFF only)"
+echo "  ✗ Multi-Scale Aggregation: disabled"
+echo "  ✗ Fourier Feature Fusion: disabled (using GCFF fusion)"
+echo "  ✗ Smart Skip Connections: disabled (using GCFF fusion)"
 echo "  ✓ Balanced Sampler: ENABLED (oversamples rare classes)"
 echo "  ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)"
 echo ""
@@ -83,10 +93,10 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TRAINING CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION: $MANUSCRIPT"
+    echo "║  TRAINING CNN-TRANSFORMER BASE MODEL + GCFF: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Configuration: CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION"
+    echo "Configuration: CNN-TRANSFORMER BASE MODEL + GCFF (Global Context Feature Fusion)"
     echo "Output Directory: ./Result/a3/${MANUSCRIPT}"
     echo ""
     
@@ -96,16 +106,15 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --scheduler_type CosineAnnealingWarmRestarts \
-        --batch_size 12 \
+        --batch_size 24 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
         --encoder_lr_factor 0.05 \
         --bottleneck \
         --adapter_mode streaming \
-        --fusion_method simple \
+        --fusion_method gcff \
         --use_groupnorm \
-        --deep_supervision \
         --focal_gamma 2.0 \
         --use_balanced_sampler \
         --use_class_aware_aug \
@@ -126,7 +135,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         echo ""
         
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  TESTING CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION: $MANUSCRIPT"
+        echo "║  TESTING CNN-TRANSFORMER BASE MODEL + GCFF: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
         echo "Test Configuration:"
@@ -147,9 +156,8 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
             --batch_size 1 \
             --bottleneck \
             --adapter_mode streaming \
-            --fusion_method simple \
+            --fusion_method gcff \
             --use_groupnorm \
-            --deep_supervision \
             --output_dir "./Result/a3/${MANUSCRIPT}"
 
         TEST_EXIT_CODE=$?
@@ -182,6 +190,6 @@ echo ""
 echo "============================================================================"
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: CNN-TRANSFORMER BASE MODEL + DEEP SUPERVISION"
+echo "Configuration Used: CNN-TRANSFORMER BASE MODEL + GCFF (Global Context Feature Fusion)"
 echo "Results Location: ./Result/a3/"
 echo "============================================================================"

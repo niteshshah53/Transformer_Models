@@ -26,7 +26,7 @@ class CNNTransformerUnet(nn.Module):
     def __init__(self, config, img_size=224, num_classes=6, zero_head=False, vis=False, 
                  use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, 
                  adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False,
-                 encoder_type='efficientnet'):
+                 encoder_type='efficientnet', use_se_msfe=False, use_msfa_mct_bottleneck=False):
         """
         Initialize CNN-Transformer U-Net model.
         
@@ -75,6 +75,8 @@ class CNNTransformerUnet(nn.Module):
             'adapter_mode': adapter_mode,
             'use_multiscale_agg': use_multiscale_agg,
             'use_groupnorm': use_groupnorm,  # Pass GroupNorm flag
+            'use_se_msfe': use_se_msfe,  # Pass SE-MSFE flag
+            'use_msfa_mct_bottleneck': use_msfa_mct_bottleneck,  # Pass MSFA+MCT bottleneck flag
         }
         
         # Create the CNN-Transformer model

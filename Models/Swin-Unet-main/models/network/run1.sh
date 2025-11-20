@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=1st      
-#SBATCH --output=./Result/a1/test_baseline_%j.out
-#SBATCH --error=./Result/a1/test_baseline_%j.out
+#SBATCH --job-name=vis_baseline_ds      
+#SBATCH --output=./gradcam_results/visualize_baseline_ds_%j.out
+#SBATCH --error=./gradcam_results/visualize_baseline_ds_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -26,116 +26,129 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 # This helps prevent OOM errors during TTA (Test-Time Augmentation) which processes 4 augmentations at once
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
+# Change to script directory (where this script is located)
+# This ensures we can find visualize_gradcam.py and other modules
+SCRIPT_DIR="/home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network"
+cd "$SCRIPT_DIR"
+echo "Changed to script directory: $SCRIPT_DIR"
+echo "Current directory: $(pwd)"
+echo ""
+
 # ============================================================================
-# BASE NETWORK MODEL CONFIGURATION (BEST RESULT: F1=0.7266)
+# GRADCAM VISUALIZATION: BASELINE + DEEP SUPERVISION
 # ============================================================================
-# Base Model Configuration (minimal components, no extra enhancements):
-#   ✓ EfficientNet-B4 Encoder
-#   ✓ Bottleneck: 2 Swin Transformer blocks (enabled)
-#   ✓ Swin Transformer Decoder
-#   ✓ Fusion Method: simple (concatenation)
-#   ✓ Adapter mode: streaming (integrated adapters)
-#   ✓ GroupNorm: enabled
-#   ✓ Loss functions: CE (weighted) + Focal (γ=2.0) + Dice
-#   ✓ Differential LR: Encoder (0.05x), Bottleneck (1.0x), Decoder (1.0x)
-#   ✗ Balanced Sampler: DISABLED (was causing performance degradation)
-#   ✗ Class-Aware Augmentation: DISABLED (was causing performance degradation)
+# Generate GradCAM visualizations for Baseline + Deep Supervision models
+# 
+# Models to Visualize:
+#   ✓ Baseline (Simple Skip): ./Result/a1/
+#   ✓ Baseline + Deep Supervision: ./Result/a4/
 #
-# Best Configuration (from baseline_1327314.out):
-#   - Batch Size: 32 (NOT 12)
-#   - NO balanced sampler
-#   - NO class-aware augmentation
-#   - Focal gamma: 2.0
-#   - Result: F1=0.7266, Val Loss=0.3701
+# Visualizations Generated:
+#   - Component comparison (Baseline vs Baseline+DS)
+#   - Encoder GradCAM heatmaps
+#   - Predictions comparison
+#   - Deep Supervision multi-resolution outputs
 #
-# Components Disabled (base model):
-#   ✗ Deep Supervision
-#   ✗ Fourier Feature Fusion
-#   ✗ Smart Skip Connections
-#   ✗ Multi-Scale Aggregation
+# Requirements:
+#   - pytorch-grad-cam: pip install grad-cam
+#   - Trained model checkpoints in Result directories
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER BASE NETWORK MODEL"
+echo "GRADCAM VISUALIZATION: BASELINE + DEEP SUPERVISION"
 echo "============================================================================"
-echo "Configuration: CNN-TRANSFORMER BASE MODEL (No Extra Components)"
+echo "Generating visualizations for:"
+echo "  ✓ Baseline Model (Simple Skip Connection)"
+echo "  ✓ Baseline + Deep Supervision (MSAGHNet-style multi-resolution)"
 echo ""
-echo "Component Details:"
-echo "  ✓ EfficientNet-B4 Encoder"
-echo "  ✓ Bottleneck: 2 Swin Transformer blocks (enabled)"
-echo "  ✓ Swin Transformer Decoder"
-echo "  ✓ Fusion Method: simple (concatenation)"
-echo "  ✓ Adapter mode: streaming (integrated)"
-echo "  ✓ GroupNorm: enabled"
-echo "  ✗ Balanced Sampler: DISABLED (causes performance degradation)"
-echo "  ✗ Class-Aware Augmentation: DISABLED (causes performance degradation)"
-echo "  ✓ Loss: CE (weighted) + Focal (γ=2.0) + Dice"
-echo "  ✗ Deep Supervision: disabled (base model)"
-echo "  ✗ Multi-Scale Aggregation: disabled (base model)"
-echo "  ✗ Fourier Feature Fusion: disabled (using simple fusion)"
-echo "  ✗ Smart Skip Connections: disabled (using simple fusion)"
+echo "Visualization Types:"
+echo "  ✓ Component comparison (side-by-side GradCAM)"
+echo "  ✓ Encoder attention heatmaps"
+echo "  ✓ Prediction comparisons"
+echo "  ✓ Multi-resolution outputs (for Deep Supervision)"
 echo ""
-echo "Training Parameters:"
-echo "  - Batch Size: 32 (best result configuration)"
-echo "  - Max Epochs: 300"
-echo "  - Learning Rate: 0.0001"
-echo "  - Scheduler: CosineAnnealingWarmRestarts"
-echo "  - Early Stopping: 150 epochs patience"
-echo ""
-echo "Best Result Configuration (F1=0.7266):"
-echo "  ✓ Batch size: 32 (NOT 12)"
-echo "  ✓ NO balanced sampler"
-echo "  ✓ NO class-aware augmentation"
-echo "  ✓ Focal gamma: 2.0"
+echo "Output Location: ./gradcam_results/"
 echo "============================================================================"
 echo ""
 
-# Test all manuscripts one by one
+# Check if grad-cam is installed
+python3 -c "import pytorch_grad_cam" 2>/dev/null
+if [ $? -ne 0 ]; then
+    echo "⚠️  Installing pytorch-grad-cam..."
+    pip install grad-cam --quiet
+    echo "✓ Installation complete"
+    echo ""
+fi
+
+# Generate visualizations for all manuscripts
 MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TESTING CNN-TRANSFORMER BASE MODEL: $MANUSCRIPT"
+    echo "║  GENERATING VISUALIZATIONS: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Configuration: CNN-TRANSFORMER BASE MODEL"
-    echo "Output Directory: ./Result/a1/${MANUSCRIPT}"
+    echo "Models to Visualize:"
+    echo "  - Baseline: ./Result/a1/${MANUSCRIPT}"
+    echo "  - Baseline + Deep Supervision: ./Result/a4/${MANUSCRIPT}"
     echo ""
-    echo "Test Configuration:"
-    echo "  ✓ Test-Time Augmentation (TTA): ENABLED"
-    echo "  ✗ CRF Post-processing: DISABLED"
-    echo "  - Batch Size: 1 (reduced for TTA memory efficiency)"
+    echo "Output Directory: ./gradcam_results/${MANUSCRIPT}"
     echo ""
     
-    # Use batch_size=1 for testing to avoid OOM with TTA (4 augmentations per patch = 4x memory)
-    # TTA processes 4 augmentations at once, so batch_size=1 means 4 patches in memory simultaneously
-    python3 test.py \
-        --dataset UDIADS_BIB \
-        --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
+    # Check if model directories exist
+    BASELINE_DIR="./Result/a1/${MANUSCRIPT}"
+    BASELINE_DS_DIR="./Result/a4/${MANUSCRIPT}"
+    
+    if [ ! -d "$BASELINE_DIR" ]; then
+        echo "⚠️  Warning: Baseline model directory not found: $BASELINE_DIR"
+        echo "   Skipping $MANUSCRIPT..."
+        continue
+    fi
+    
+    if [ ! -d "$BASELINE_DS_DIR" ]; then
+        echo "⚠️  Warning: Baseline+DS model directory not found: $BASELINE_DS_DIR"
+        echo "   Will only visualize Baseline model..."
+        BASELINE_DS_DIR=""
+    fi
+    
+    # Ensure we're in the script directory (already changed at top of script)
+    cd "$SCRIPT_DIR"
+    
+    # Check if visualize_gradcam.py exists
+    if [ ! -f "visualize_gradcam.py" ]; then
+        echo "❌ Error: visualize_gradcam.py not found in $SCRIPT_DIR"
+        echo "   Current directory: $(pwd)"
+        echo "   Files in directory: $(ls -la *.py 2>/dev/null | head -5)"
+        continue
+    fi
+    
+    # Run visualization script
+    python3 visualize_gradcam.py \
+        --dataset_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
-        --use_patched_data \
-        --is_savenii \
-        --use_tta \
-        --batch_size 1 \
-        --bottleneck \
-        --adapter_mode streaming \
-        --fusion_method simple \
-        --use_groupnorm \
-        --output_dir "./Result/a1/${MANUSCRIPT}"
+        --baseline_dir "${BASELINE_DIR}" \
+        --baseline_ds_dir "${BASELINE_DS_DIR}" \
+        --output_dir "./gradcam_results/${MANUSCRIPT}" \
+        --num_samples 10
     
-    TEST_EXIT_CODE=$?
+    VIS_EXIT_CODE=$?
     
-    if [ $TEST_EXIT_CODE -eq 0 ]; then
+    if [ $VIS_EXIT_CODE -eq 0 ]; then
         echo ""
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  ✓ TESTING COMPLETED: $MANUSCRIPT"
+        echo "║  ✓ VISUALIZATION COMPLETED: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
+        echo ""
+        echo "  Visualizations saved to: ./gradcam_results/${MANUSCRIPT}/"
+        echo "  - comparison_image_*.png (Component comparisons)"
+        echo "  - attention_heatmap_*.png (if applicable)"
+        echo "  - fourier_frequency_*.png (if applicable)"
         echo ""
     else
         echo ""
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  ✗ TESTING FAILED: $MANUSCRIPT (Exit Code: $TEST_EXIT_CODE)"
+        echo "║  ✗ VISUALIZATION FAILED: $MANUSCRIPT (Exit Code: $VIS_EXIT_CODE)"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
     fi
@@ -143,8 +156,21 @@ done
 
 echo ""
 echo "============================================================================"
-echo "ALL MANUSCRIPTS TESTED"
+echo "ALL VISUALIZATIONS GENERATED"
 echo "============================================================================"
-echo "Configuration Used: CNN-TRANSFORMER BASE MODEL (No Extra Components)"
-echo "Results Location: ./Result/a1/"
+echo "Models Visualized:"
+echo "  ✓ Baseline (Simple Skip Connection)"
+echo "  ✓ Baseline + Deep Supervision (MSAGHNet-style)"
+echo ""
+echo "Results Location: ./gradcam_results/"
+echo ""
+echo "Visualization Files:"
+echo "  - comparison_image_*.png: Side-by-side component comparisons"
+echo "  - attention_heatmap_*.png: Attention visualizations (if applicable)"
+echo "  - fourier_frequency_*.png: Frequency domain plots (if applicable)"
+echo ""
+echo "Next Steps:"
+echo "  1. Review visualizations in ./gradcam_results/"
+echo "  2. Select best images for presentation"
+echo "  3. Use in slides: GradCAM Analysis, Component Comparisons"
 echo "============================================================================"

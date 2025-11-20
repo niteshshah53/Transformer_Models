@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=1st      
-#SBATCH --output=./Result/a1/baseline_resnet50_syr341_%j.out
-#SBATCH --error=./Result/a1/baseline_resnet50_syr341_%j.out
+#SBATCH --job-name=baseline_ds_smart
+#SBATCH --output=./Result/a1/baseline_ds_smart_%j.out
+#SBATCH --error=./Result/a1/baseline_ds_smart_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -27,13 +27,14 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # ============================================================================
-# BASE NETWORK MODEL WITH RESNET-50 ENCODER
+# BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION CONFIGURATION
 # ============================================================================
-# Base Model Configuration with ResNet-50 Encoder:
-#   ✓ ResNet-50 Encoder (official)
+# Enhanced Model Configuration:
+#   ✓ EfficientNet-B4 Encoder
 #   ✓ Bottleneck: 2 Swin Transformer blocks (enabled)
 #   ✓ Swin Transformer Decoder
-#   ✓ Fusion Method: simple (concatenation)
+#   ✓ Fusion Method: smart (attention-based skip connections)
+#   ✓ Deep Supervision: ENABLED (multi-resolution auxiliary outputs)
 #   ✓ Adapter mode: streaming (integrated adapters)
 #   ✓ GroupNorm: enabled
 #   ✓ Loss functions: CB Loss (Class-Balanced) + Focal (γ=2.0) + Dice
@@ -41,85 +42,99 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 #   ✓ Balanced Sampler: ENABLED (oversamples rare classes)
 #   ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)
 #   ✓ Class-Balanced Loss: ENABLED (beta=0.9999, best for extreme imbalance >100:1)
-#   ✓ Numerical Stability: Reduced LR (0.00005), AMP disabled, gradient clipping (encoder: 5.0, decoder: 1.0)
+#
+# Deep Supervision Components:
+#   ✓ 3 auxiliary outputs at decoder stages
+#   ✓ Outputs at native resolutions (H/16, H/8, H/4)
+#   ✓ Multi-resolution loss computation (MSAGHNet-style)
+#   ✓ Ground truth downsampled to match resolutions
+#
+# Smart Feature Fusion Components:
+#   ✓ MultiheadAttention-based fusion for skip connections
+#   ✓ Attention mechanism selects relevant features
+#   ✓ Applied at 3 skip connection stages
 #
 # Components Disabled:
-#   ✗ Deep Supervision
-#   ✗ Fourier Feature Fusion
-#   ✗ Smart Skip Connections
+#   ✗ SE-MSFE
+#   ✗ MSFA+MCT Bottleneck
+#   ✗ GCFF Fusion
 #   ✗ Multi-Scale Aggregation
+#   ✗ Fourier Feature Fusion
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER BASE MODEL WITH RESNET-50 ENCODER"
+echo "BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
 echo "============================================================================"
-echo "Configuration: CNN-TRANSFORMER BASE MODEL (ResNet-50 Encoder)"
+echo "Configuration: BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
 echo ""
 echo "Component Details:"
-echo "  ✓ ResNet-50 Encoder (official)"
+echo "  ✓ EfficientNet-B4 Encoder"
 echo "  ✓ Bottleneck: 2 Swin Transformer blocks (enabled)"
 echo "  ✓ Swin Transformer Decoder"
-echo "  ✓ Fusion Method: simple (concatenation)"
+echo "  ✓ Fusion Method: smart (attention-based skip connections)"
+echo "    - MultiheadAttention-based fusion"
+echo "    - Attention mechanism selects relevant features"
+echo "    - Applied at 3 skip connection stages"
+echo "  ✓ Deep Supervision: ENABLED (multi-resolution auxiliary outputs)"
+echo "    - 3 auxiliary outputs at decoder stages"
+echo "    - Outputs at native resolutions (H/16, H/8, H/4)"
+echo "    - Multi-resolution loss computation (MSAGHNet-style)"
+echo "    - Ground truth downsampled to match resolutions"
 echo "  ✓ Adapter mode: streaming (integrated)"
 echo "  ✓ GroupNorm: enabled"
 echo "  ✓ Balanced Sampler: ENABLED (oversamples rare classes)"
 echo "  ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)"
 echo "  ✓ Loss: CB Loss (Class-Balanced, beta=0.9999) + Focal (γ=2.0) + Dice"
-echo "  ✗ Deep Supervision: disabled"
+echo "  ✗ SE-MSFE: disabled"
+echo "  ✗ MSFA+MCT Bottleneck: disabled"
+echo "  ✗ GCFF Fusion: disabled"
 echo "  ✗ Multi-Scale Aggregation: disabled"
-echo "  ✗ Fourier Feature Fusion: disabled (using simple fusion)"
-echo "  ✗ Smart Skip Connections: disabled (using simple fusion)"
+echo "  ✗ Fourier Feature Fusion: disabled"
 echo ""
 echo "Training Parameters:"
-echo "  - Batch Size: 12 (best result configuration)"
+echo "  - Batch Size: 16"
 echo "  - Max Epochs: 300"
-echo "  - Learning Rate: 0.00005 (reduced for numerical stability)"
+echo "  - Learning Rate: 0.0001"
 echo "  - Scheduler: CosineAnnealingWarmRestarts"
 echo "  - Early Stopping: 150 epochs patience"
-echo "  - AMP: DISABLED (for numerical stability)"
-echo "  - Gradient Clipping: Encoder (5.0), Decoder (1.0)"
-echo ""
-echo "Configuration:"
-echo "  ✓ Balanced sampler: ENABLED"
-echo "  ✓ Class-aware augmentation: ENABLED"
-echo "  ✓ Focal gamma: 2.0"
 echo "============================================================================"
 echo ""
 
-# Train all manuscripts one by one Latin2 Latin14396 Latin16746 Syr341
-MANUSCRIPTS=(Syr341) 
+# Train all manuscripts one by one
+MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TRAINING CNN-TRANSFORMER BASE MODEL (ResNet-50): $MANUSCRIPT"
+    echo "║  TRAINING BASELINE + DEEP SUPERVISION + SMART: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Configuration: CNN-TRANSFORMER BASE MODEL WITH RESNET-50 ENCODER"
+    echo "Configuration: BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
     echo "Output Directory: ./Result/a1/${MANUSCRIPT}"
     echo ""
     
     python3 train.py \
-        --encoder_type resnet50 \
-        --bottleneck \
-        --adapter_mode streaming \
-        --fusion_method simple \
-        --use_groupnorm \
-        --focal_gamma 2.0 \
-        --use_balanced_sampler \
-        --use_class_aware_aug \
-        --use_cb_loss \
-        --cb_beta 0.9999 \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --scheduler_type CosineAnnealingWarmRestarts \
-        --batch_size 12 \
+        --batch_size 16 \
         --max_epochs 300 \
-        --base_lr 0.00005 \
+        --base_lr 0.0001 \
         --patience 150 \
         --encoder_lr_factor 0.05 \
+        --use_cb_loss \
+        --cb_beta 0.9999 \
+        --bottleneck \
+        --adapter_mode streaming \
+        --fusion_method smart \
+        --deep_supervision \
+        --use_groupnorm \
+        --focal_gamma 2.0 \
+        --use_balanced_sampler \
+        --use_class_aware_aug \
+        --use_amp \
         --output_dir "./Result/a1/${MANUSCRIPT}"
     
     TRAIN_EXIT_CODE=$?
@@ -134,7 +149,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         echo ""
         
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  TESTING CNN-TRANSFORMER BASE MODEL (ResNet-50): $MANUSCRIPT"
+        echo "║  TESTING BASELINE + DEEP SUPERVISION + SMART: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
         echo "Test Configuration:"
@@ -153,10 +168,10 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
             --is_savenii \
             --use_tta \
             --batch_size 1 \
-            --encoder_type resnet50 \
             --bottleneck \
             --adapter_mode streaming \
-            --fusion_method simple \
+            --fusion_method smart \
+            --deep_supervision \
             --use_groupnorm \
             --output_dir "./Result/a1/${MANUSCRIPT}"
         
@@ -190,6 +205,6 @@ echo ""
 echo "============================================================================"
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: CNN-TRANSFORMER BASE MODEL WITH RESNET-50 ENCODER"
+echo "Configuration Used: BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
 echo "Results Location: ./Result/a1/"
 echo "============================================================================"

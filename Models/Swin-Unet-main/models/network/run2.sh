@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=3rd
-#SBATCH --output=./Result/a2/baseline_fourier_%j.out
-#SBATCH --error=./Result/a2/baseline_fourier_%j.out
+#SBATCH --job-name=baseline_gcff_ds
+#SBATCH --output=./Result/a2/baseline_gcff_ds_%j.out
+#SBATCH --error=./Result/a2/baseline_gcff_ds_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -27,13 +27,14 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # ============================================================================
-# CNN-TRANSFORMER BASE MODEL + FOURIER FEATURE FUSION CONFIGURATION
+# CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION CONFIGURATION
 # ============================================================================
-# Base Model Configuration with Fourier Feature Fusion:
+# Base Model Configuration with GCFF and Deep Supervision:
 #   ✓ EfficientNet-B4 Encoder
 #   ✓ Bottleneck: 2 Swin Transformer blocks (enabled)
 #   ✓ Swin Transformer Decoder
-#   ✓ Fusion Method: fourier (FFT-based feature fusion)
+#   ✓ Fusion Method: gcff (Global Context Feature Fusion from MSAGHNet)
+#   ✓ Deep Supervision: ENABLED (multi-resolution auxiliary outputs)
 #   ✓ Adapter mode: streaming (integrated adapters)
 #   ✓ GroupNorm: enabled
 #   ✓ Loss functions: CB Loss (Class-Balanced) + Focal (γ=2.0) + Dice
@@ -41,33 +42,51 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 #   ✓ Balanced Sampler: ENABLED (oversamples rare classes)
 #   ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)
 #   ✓ Class-Balanced Loss: ENABLED (beta=0.9999, best for extreme imbalance >100:1)
-#   ✓ Fourier Feature Fusion: ENABLED (FFT-based skip connections)
+#
+# GCFF Components:
+#   ✓ Global Context Block (attention-based pooling + MLP)
+#   ✓ Channel Attention Module (max/avg pool + MLP)
+#   ✓ Applied at 3 skip connection stages
+#
+# Deep Supervision Components:
+#   ✓ 3 auxiliary outputs at decoder stages (native resolutions)
+#   ✓ Ground truth downsampled to match auxiliary output resolutions
+#   ✓ Simple convolutional heads for auxiliary outputs
+#   ✓ Multi-resolution loss computation (MSAGHNet-style)
 #
 # Components Disabled:
-#   ✗ Deep Supervision
+#   ✗ SE-MSFE
 #   ✗ Multi-Scale Aggregation
 #   ✗ Smart Skip Connections
+#   ✗ Fourier Feature Fusion
 # ============================================================================
 
 echo "============================================================================"
-echo "CNN-TRANSFORMER BASE MODEL + FOURIER FEATURE FUSION"
+echo "CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION"
 echo "============================================================================"
-echo "Configuration: CNN-TRANSFORMER BASE MODEL + FOURIER FEATURE FUSION"
+echo "Configuration: CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION"
 echo ""
 echo "Component Details:"
 echo "  ✓ EfficientNet-B4 Encoder"
 echo "  ✓ Bottleneck: 2 Swin Transformer blocks (enabled)"
 echo "  ✓ Swin Transformer Decoder"
-echo "  ✓ Fusion Method: fourier (FFT-based feature fusion)"
+echo "  ✓ Fusion Method: gcff (Global Context Feature Fusion from MSAGHNet)"
+echo "    - Global Context Block (attention pooling + MLP)"
+echo "    - Channel Attention Module (max/avg pool + MLP)"
+echo "    - Applied at 3 skip connection stages"
+echo "  ✓ Deep Supervision: ENABLED (multi-resolution auxiliary outputs)"
+echo "    - 3 auxiliary outputs at decoder stages"
+echo "    - Ground truth downsampled to match resolutions"
+echo "    - Multi-resolution loss computation (MSAGHNet-style)"
 echo "  ✓ Adapter mode: streaming (integrated)"
 echo "  ✓ GroupNorm: enabled"
 echo "  ✓ Balanced Sampler: ENABLED (oversamples rare classes)"
 echo "  ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)"
 echo "  ✓ Loss: CB Loss (Class-Balanced, beta=0.9999) + Focal (γ=2.0) + Dice"
-echo "  ✓ Fourier Feature Fusion: ENABLED (FFT-based skip connections)"
-echo "  ✗ Deep Supervision: disabled"
+echo "  ✗ SE-MSFE: disabled"
 echo "  ✗ Multi-Scale Aggregation: disabled"
-echo "  ✗ Smart Skip Connections: disabled (using fourier fusion)"
+echo "  ✗ Smart Skip Connections: disabled (using GCFF)"
+echo "  ✗ Fourier Feature Fusion: disabled (using GCFF)"
 echo ""
 echo "Training Parameters:"
 echo "  - Batch Size: 12"
@@ -84,10 +103,10 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "╔════════════════════════════════════════════════════════════════════════╗"
-    echo "║  TRAINING CNN-TRANSFORMER BASE MODEL + FOURIER FUSION: $MANUSCRIPT"
+    echo "║  TRAINING CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION: $MANUSCRIPT"
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "Configuration: CNN-TRANSFORMER BASE MODEL + FOURIER FEATURE FUSION"
+    echo "Configuration: CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION"
     echo "Output Directory: ./Result/a2/${MANUSCRIPT}"
     echo ""
     
@@ -97,7 +116,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --scheduler_type CosineAnnealingWarmRestarts \
-        --batch_size 12 \
+        --batch_size 24 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
@@ -106,7 +125,8 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --cb_beta 0.9999 \
         --bottleneck \
         --adapter_mode streaming \
-        --fusion_method fourier \
+        --fusion_method gcff \
+        --deep_supervision \
         --use_groupnorm \
         --focal_gamma 2.0 \
         --use_balanced_sampler \
@@ -126,7 +146,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         echo ""
         
         echo "╔════════════════════════════════════════════════════════════════════════╗"
-        echo "║  TESTING CNN-TRANSFORMER BASE MODEL + FOURIER FUSION: $MANUSCRIPT"
+        echo "║  TESTING CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION: $MANUSCRIPT"
         echo "╚════════════════════════════════════════════════════════════════════════╝"
         echo ""
         echo "Test Configuration:"
@@ -147,7 +167,8 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
             --batch_size 1 \
             --bottleneck \
             --adapter_mode streaming \
-            --fusion_method fourier \
+            --fusion_method gcff \
+            --deep_supervision \
             --use_groupnorm \
             --output_dir "./Result/a2/${MANUSCRIPT}"
 
@@ -181,6 +202,6 @@ echo ""
 echo "============================================================================"
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
-echo "Configuration Used: CNN-TRANSFORMER BASE MODEL + FOURIER FEATURE FUSION"
+echo "Configuration Used: CNN-TRANSFORMER BASE MODEL + GCFF + DEEP SUPERVISION"
 echo "Results Location: ./Result/a2/"
 echo "============================================================================"

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
@@ -485,9 +486,431 @@ class FourierFeatureFusion(nn.Module):
         return output
 
 
+# ============================================================================
+# MSFA + MCT Hybrid Bottleneck Components
+# ============================================================================
+# Adapted from components.py to work with token-based bottleneck
+
+def pair(t):
+    """Helper function to ensure tuple format"""
+    return t if isinstance(t, tuple) else (t, t)
+
+
+class PreNorm(nn.Module):
+    """Pre-normalization for Transformer layers"""
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+
+class FeedForward(nn.Module):
+    """Feed-forward network for Transformer"""
+    def __init__(self, dim, hidden_dim, dropout=0.):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+
+class Attention(nn.Module):
+    """Multi-head self-attention for Transformer"""
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        project_out = not (heads == 1 and dim_head == dim)
+
+        self.heads = heads
+        self.scale = dim_head ** -0.5
+
+        self.attend = nn.Softmax(dim=-1)
+        self.dropout = nn.Dropout(dropout)
+
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+
+        self.to_out = nn.Sequential(
+            nn.Linear(inner_dim, dim),
+            nn.Dropout(dropout)
+        ) if project_out else nn.Identity()
+
+    def forward(self, x):
+        from einops import rearrange
+        qkv = self.to_qkv(x).chunk(3, dim=-1)
+        q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> b h n d', h=self.heads), qkv)
+
+        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
+
+        attn = self.attend(dots)
+        attn = self.dropout(attn)
+
+        out = torch.matmul(attn, v)
+        out = rearrange(out, 'b h n d -> b n (h d)')
+        return self.to_out(out)
+
+
+class Transformer(nn.Module):
+    """Transformer with PreNorm and residual connections"""
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
+            ]))
+
+    def forward(self, x):
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
+
+
+class MSFA(nn.Module):
+    """
+    Multi-Scale Feature Aggregation (MSFA) module.
+    Adapted from MSAGHNet (components.py) for bottleneck processing.
+    
+    Architecture:
+    - 5 branches: 4 atrous convolutions (dilations 1, 2, 4, 8) + 1 avg pool branch
+    - Attention mechanism for atrous branches
+    - Concat all branches + 1x1 conv fusion
+    """
+    def __init__(self, ch_in=768, out_channel=768):
+        super(MSFA, self).__init__()
+
+        depth = out_channel // 4
+        self.pool = nn.AvgPool2d(3, stride=1, padding=1)
+        self.conv = nn.Conv2d(ch_in, depth, 1, 1)
+
+        self.atrous_block1 = nn.Conv2d(ch_in, depth, 1, 1)
+        self.atrous_block6 = nn.Conv2d(ch_in, depth, 3, 1, padding=1, dilation=1)
+        self.atrous_block12 = nn.Conv2d(ch_in, depth, 3, 1, padding=2, dilation=2)
+        self.atrous_block18 = nn.Conv2d(ch_in, depth, 3, 1, padding=4, dilation=4)
+        self.atrous_block21 = nn.Conv2d(ch_in, depth, 3, 1, padding=8, dilation=8)
+        self.attention = nn.Conv2d(depth * 4, 4, 1, padding=0, groups=4, bias=False)
+        self.conv_1x1_output = nn.Conv2d(depth * 6, out_channel, 1, 1)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        size = x.shape[2:]
+
+        p1 = self.pool(x)
+        p1 = self.conv(p1)
+
+        d0 = self.atrous_block1(x)
+        d1 = self.atrous_block6(x)
+        d2 = self.atrous_block12(x)
+        d3 = self.atrous_block18(x)
+        d4 = self.atrous_block21(x)
+        
+        # Attention mechanism: apply sigmoid attention to atrous branches
+        att = torch.sigmoid(self.attention(torch.cat([d1, d2, d3, d4], 1)))
+        d1 = d1 + d1 * att[:, 0].unsqueeze(1)
+        d2 = d2 + d2 * att[:, 1].unsqueeze(1)
+        d3 = d3 + d3 * att[:, 2].unsqueeze(1)
+        d4 = d4 + d4 * att[:, 3].unsqueeze(1)
+
+        net = self.conv_1x1_output(torch.cat([d0, d1, d2, d3, d4, p1], dim=1))
+        out = self.relu(net)
+
+        return out
+
+
+class MCT(nn.Module):
+    """
+    Multi-scale Convolutional Transformer (MCT) module.
+    Adapted from MSAGHNet (components.py) for bottleneck processing.
+    
+    Architecture:
+    - Linear projection (patch embedding)
+    - Positional embedding + CLS token
+    - 12 stacked Transformer layers
+    - Reshape back to spatial (no upsampling - maintains input size)
+    
+    Note: For bottleneck use, we don't do upsampling (unlike original MCT which upsamples).
+    """
+    def __init__(self, *, image_size, patch_size, dim, depth, heads, mlp_dim, channels=768, dim_head=64, dropout=0.,
+                 emb_dropout=0.):
+        super().__init__()
+        from einops import rearrange, repeat
+        from einops.layers.torch import Rearrange
+        
+        image_height, image_width = pair(image_size)
+        patch_height, patch_width = pair(patch_size)
+
+        assert image_height % patch_height == 0 and image_width % patch_width == 0, 'Image dimensions must be divisible by the patch size.'
+
+        num_patches = (image_height // patch_height) * (image_width // patch_width)
+        patch_dim = channels * patch_height * patch_width
+
+        self.to_patch_embedding = nn.Sequential(
+            Rearrange('b c (h p1) (w p2) -> b (h w) (p1 p2 c)', p1=patch_height, p2=patch_width),
+            nn.Linear(patch_dim, dim),
+        )
+
+        self.pos_embedding = nn.Parameter(torch.randn(1, num_patches + 1, dim))
+        self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
+        self.dropout = nn.Dropout(emb_dropout)
+
+        self.transformer = Transformer(dim, depth, heads, dim_head, mlp_dim, dropout)
+
+        # Reshape back to spatial (no upsampling for bottleneck)
+        self.out = Rearrange("b (h w) c->b c h w", h=image_height // patch_height, w=image_width // patch_width)
+
+    def forward(self, img):
+        from einops import repeat
+        # Linear projection: convert spatial to tokens
+        x = self.to_patch_embedding(img)
+        b, n, _ = x.shape
+        # Add CLS token
+        cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
+        x = torch.cat((cls_tokens, x), dim=1)
+        x += self.pos_embedding[:, :(n + 1)]
+        x = self.dropout(x)
+        # Process through Transformer
+        x = self.transformer(x)
+
+        # Remove CLS token
+        output = x[:, 1:, :]
+        # Reshape back to spatial (maintains input spatial size)
+        output = self.out(output)
+
+        return output
+
+
+class MSFAMCTHybridBottleneck(nn.Module):
+    """
+    Hybrid MSFA + MCT Bottleneck for token-based processing.
+    Adapted from MSAGHNet paper (Fig. 3).
+    
+    Architecture:
+    1. Convert tokens to spatial format
+    2. Process in parallel:
+       - MSFA: Multi-scale atrous convolutions
+       - MCT: Multi-scale Convolutional Transformer
+    3. Concat both branches + ReLU
+    4. Convert back to tokens
+    
+    Input: [B, L, C] tokens where L = (H/32) * (W/32), C = 768
+    Output: [B, L, C] tokens
+    """
+    def __init__(self, img_size=224, dim=768, use_groupnorm=False):
+        super().__init__()
+        
+        # Spatial size at bottleneck (H/32, W/32)
+        spatial_size = img_size // 32
+        
+        # MSFA module (expects spatial input [B, C, H, W])
+        self.msfa = MSFA(ch_in=dim, out_channel=dim)
+        
+        # MCT module (expects spatial input [B, C, H, W])
+        # MCT uses depth=12, heads=16, mlp_dim=1024 (from MSAGHNet)
+        # For bottleneck, use patch_size=1 (each pixel is a patch) since spatial_size is small (e.g., 7x7)
+        # This ensures spatial_size is divisible by patch_size
+        patch_size = 1 if spatial_size < 8 else 8  # Use patch_size=1 for small spatial sizes
+        
+        self.mct = MCT(
+            image_size=spatial_size,
+            patch_size=patch_size,
+            dim=dim,
+            depth=12,
+            heads=16,
+            mlp_dim=1024,
+            channels=dim,
+            dim_head=64,
+            dropout=0.1,
+            emb_dropout=0.1
+        )
+        
+        # Fusion: concat + ReLU
+        self.fusion = nn.Sequential(
+            nn.Conv2d(dim * 2, dim, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.ReLU(inplace=True)
+        )
+    
+    def forward(self, tokens):
+        """
+        Forward pass: tokens -> spatial -> MSFA + MCT -> spatial -> tokens
+        
+        Args:
+            tokens: [B, L, C] where L = (H/32) * (W/32), C = 768
+            
+        Returns:
+            tokens: [B, L, C] processed tokens
+        """
+        B, L, C = tokens.shape
+        
+        # Convert tokens to spatial format
+        h = w = int(L ** 0.5)
+        spatial = tokens.view(B, h, w, C)
+        spatial = spatial.permute(0, 3, 1, 2)  # [B, C, H, W]
+        
+        # Process in parallel: MSFA and MCT
+        msfa_out = self.msfa(spatial)  # [B, C, H, W]
+        mct_out = self.mct(spatial)    # [B, C, H, W]
+        
+        # Concat both branches
+        concat = torch.cat([msfa_out, mct_out], dim=1)  # [B, 2*C, H, W]
+        
+        # Fusion: 1x1 conv + ReLU
+        fused = self.fusion(concat)  # [B, C, H, W]
+        
+        # Convert back to tokens
+        fused = fused.permute(0, 2, 3, 1)  # [B, H, W, C]
+        tokens_out = fused.reshape(B, L, C)  # [B, L, C]
+        
+        return tokens_out
+
+
+# ============================================================================
+# SE-MSFE (Squeeze-and-Excitation Multi-Scale Feature Extraction) Components
+# ============================================================================
+# Adapted from components.py to work with EfficientNet encoder
+
+class ChannelShuffle(nn.Module):
+    """Channel Shuffle for SE-MSFE - adapted from components.py"""
+    def __init__(self, groups=4):
+        super(ChannelShuffle, self).__init__()
+        self.groups = groups
+
+    def forward(self, x):
+        batch_size, num_channels, height, width = x.size()
+        num_channels_per_group = num_channels // self.groups
+        # Reshape input
+        x = x.view(batch_size, self.groups, num_channels_per_group, height, width)
+        # Transpose and reshape
+        x = torch.transpose(x, 1, 2).contiguous()
+        x = x.view(batch_size, -1, height, width)
+        return x
+
+
+class SEModule(nn.Module):
+    """Squeeze-and-Excitation Module for SE-MSFE - adapted from components.py"""
+    def __init__(self, channels, reduction=16):
+        super(SEModule, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.fc1 = nn.Conv2d(channels, channels // reduction, kernel_size=1, padding=0)
+        self.relu = nn.ReLU(inplace=True)
+        self.fc2 = nn.Conv2d(channels // reduction, channels, kernel_size=1, padding=0)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, input):
+        x = self.avg_pool(input)
+        x = self.fc1(x)
+        x = self.relu(x)
+        x = self.fc2(x)
+        x = self.sigmoid(x)
+        return input * x
+
+
+class SE_MSFE(nn.Module):
+    """
+    SE-MSFE (Squeeze-and-Excitation Multi-Scale Feature Extraction) Module.
+    Adapted from MSAGHNet paper (components.py) to replace standard conv operations in MBConv blocks.
+    
+    Architecture (from MSAGHNet paper Fig. 2):
+    1. W_e: 3x3 conv + BN + ReLU
+    2. Split to 5 branches:
+       - con1: 1x1 conv (residual branch)
+       - con3: 3x3 atrous conv (dilation=1) + 1x1
+       - con5: 3x3 atrous conv (dilation=3) + 1x1
+       - con7: 3x3 atrous conv (dilation=5) + 1x1
+       - con9: 3x3 atrous conv (dilation=7) + 1x1
+    3. Concat atrous branches (c3, c5, c7, c9) + channel shuffle
+    4. Add residual (con1)
+    5. SE block (global avg pool + FC-ReLU-FC-Sigmoid scale)
+    """
+    def __init__(self, ch_in, ch_out, use_groupnorm=False):
+        super(SE_MSFE, self).__init__()
+        
+        # W_e: Initial projection (3x3 conv + BN + ReLU)
+        norm_layer = get_norm_layer(ch_out, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out)
+        self.W_e = nn.Sequential(
+            nn.Conv2d(ch_in, ch_out, kernel_size=3, stride=1, padding=1),
+            norm_layer,
+            nn.ReLU(inplace=True)
+        )
+        
+        # Residual branch (1x1 conv)
+        norm_layer_res = get_norm_layer(ch_out, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out)
+        self.con1 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out, kernel_size=1, stride=1, padding=0),
+            norm_layer_res,
+            nn.ReLU(inplace=True)
+        )
+        
+        # Multi-scale atrous branches (4 branches with dilations 1, 3, 5, 7)
+        # Each branch: 3x3 atrous conv + 1x1 conv
+        norm_layer_3 = get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4)
+        self.con3 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out // 4, kernel_size=3, stride=1, padding=1, dilation=1),
+            norm_layer_3,
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out // 4, ch_out // 4, kernel_size=1, stride=1),
+            get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4),
+            nn.ReLU(inplace=True)
+        )
+        
+        norm_layer_5 = get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4)
+        self.con5 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out // 4, kernel_size=3, stride=1, padding=3, dilation=3),
+            norm_layer_5,
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out // 4, ch_out // 4, kernel_size=1, stride=1),
+            get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4),
+            nn.ReLU(inplace=True)
+        )
+        
+        norm_layer_7 = get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4)
+        self.con7 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out // 4, kernel_size=3, stride=1, padding=5, dilation=5),
+            norm_layer_7,
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out // 4, ch_out // 4, kernel_size=1, stride=1),
+            get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4),
+            nn.ReLU(inplace=True)
+        )
+        
+        norm_layer_9 = get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4)
+        self.con9 = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out // 4, kernel_size=3, stride=1, padding=7, dilation=7),
+            norm_layer_9,
+            nn.ReLU(inplace=True),
+            nn.Conv2d(ch_out // 4, ch_out // 4, kernel_size=1, stride=1),
+            get_norm_layer(ch_out // 4, 'group') if use_groupnorm else nn.BatchNorm2d(ch_out // 4),
+            nn.ReLU(inplace=True)
+        )
+        
+        self.relu = nn.ReLU(inplace=True)
+        self.shuffle = ChannelShuffle(4)
+        self.se = SEModule(ch_out)
+
+    def forward(self, x1):
+        x1 = self.W_e(x1)
+        c1 = self.con1(x1)  # Residual branch
+        c3 = self.con3(x1)  # Dilation 1
+        c5 = self.con5(x1)  # Dilation 3
+        c7 = self.con7(x1)  # Dilation 5
+        c9 = self.con9(x1)  # Dilation 7
+        # Concat atrous branches, shuffle, add residual, then SE
+        out = self.se(self.shuffle(torch.cat([c3, c5, c7, c9], dim=1)) + c1)
+        return out
+
+
 class EfficientNetEncoder(nn.Module):
     """
     EfficientNet encoder with feature extraction at multiple scales using timm.
+    Supports optional SE-MSFE replacement of MBConv block conv operations.
     
     NOTE: EfficientNet-B4 Architecture Comparison:
     - Network Model Encoder: Uses actual EfficientNet-B4 architecture from timm
@@ -502,10 +925,14 @@ class EfficientNetEncoder(nn.Module):
     They are NOT the same - Network uses real EfficientNet-B4 encoder, Hybrid2 uses simple CNN decoder
     with EfficientNet-B4 channel configuration.
     """
-    def __init__(self, model_name='tf_efficientnet_b4_ns', pretrained=True, freeze_bn=False):
+    def __init__(self, model_name='tf_efficientnet_b4_ns', pretrained=True, freeze_bn=False, 
+                 use_se_msfe=False, use_groupnorm=False):
         super().__init__()
         
-        # Load pretrained EfficientNet using timm (same as Hybrid1)
+        self.use_se_msfe = use_se_msfe
+        self.use_groupnorm = use_groupnorm
+        
+        # Load pretrained EfficientNet using timm
         self.backbone = timm.create_model(
             model_name, 
             pretrained=pretrained, 
@@ -513,15 +940,90 @@ class EfficientNetEncoder(nn.Module):
             out_indices=(1, 2, 3, 4)
         )
         
+        # Get channel dimensions for different stages from timm
+        self.stage_channels = self.backbone.feature_info.channels()
+        
+        # Replace MBConv blocks with SE-MSFE if requested
+        if use_se_msfe:
+            self._replace_mbconv_with_se_msfe()
+        
         # Freeze batch normalization layers if specified
         if freeze_bn:
             for m in self.backbone.modules():
                 if isinstance(m, nn.BatchNorm2d):
                     m.eval()
                     m.track_running_stats = False
+    
+    def _replace_mbconv_with_se_msfe(self):
+        """
+        Replace MBConv block conv operations with SE-MSFE modules.
+        This modifies the encoder in-place to use SE-MSFE instead of standard MBConv operations.
         
-        # Get channel dimensions for different stages from timm
-        self.stage_channels = self.backbone.feature_info.channels()
+        Strategy: Replace the conv_dw (depthwise conv) in each DepthwiseSeparableConv module
+        with SE-MSFE, which provides multi-scale feature extraction with atrous convolutions.
+        
+        Note: timm's EfficientNet uses DepthwiseSeparableConv which has conv_dw and conv_pw.
+        """
+        # Recursively find all DepthwiseSeparableConv modules (timm's MBConv equivalent)
+        def find_depthwise_separable_convs(module, conv_modules):
+            """Recursively find all DepthwiseSeparableConv modules"""
+            module_type = type(module).__name__
+            if 'DepthwiseSeparableConv' in module_type and hasattr(module, 'conv_dw'):
+                conv_modules.append(module)
+            for child in module.children():
+                find_depthwise_separable_convs(child, conv_modules)
+        
+        depthwise_convs = []
+        find_depthwise_separable_convs(self.backbone, depthwise_convs)
+        
+        if len(depthwise_convs) == 0:
+            print("⚠️  Warning: No DepthwiseSeparableConv modules found in EfficientNet. SE-MSFE not applied.")
+            return
+        
+        # Replace each DepthwiseSeparableConv's conv_dw with SE-MSFE
+        # Structure: conv_dw (depthwise) -> conv_pw (pointwise)
+        replaced_count = 0
+        for conv_module in depthwise_convs:
+            # Get channels from conv_dw
+            conv_dw = conv_module.conv_dw
+            if isinstance(conv_dw, nn.Conv2d):
+                in_channels = conv_dw.in_channels
+                out_channels = conv_dw.out_channels
+                original_stride = conv_dw.stride[0] if isinstance(conv_dw.stride, (tuple, list)) else conv_dw.stride
+            elif isinstance(conv_dw, nn.Sequential):
+                # Find the conv layer in Sequential
+                for layer in conv_dw:
+                    if isinstance(layer, nn.Conv2d):
+                        in_channels = layer.in_channels
+                        out_channels = layer.out_channels
+                        original_stride = layer.stride[0] if isinstance(layer.stride, (tuple, list)) else layer.stride
+                        break
+                else:
+                    continue
+            else:
+                continue
+            
+            # Create SE-MSFE module to replace conv_dw
+            # SE-MSFE maintains same input/output channels
+            se_msfe = SE_MSFE(ch_in=in_channels, ch_out=out_channels, 
+                             use_groupnorm=self.use_groupnorm)
+            
+            # Handle stride: SE-MSFE W_e needs to match original stride for downsampling
+            if original_stride > 1:
+                # Modify W_e's first conv to have the correct stride
+                se_msfe.W_e[0].stride = (original_stride, original_stride)
+                # Adjust padding for stride > 1 (maintain output size)
+                if original_stride == 2:
+                    se_msfe.W_e[0].padding = (1, 1)
+            
+            # Replace conv_dw with SE-MSFE
+            conv_module.conv_dw = se_msfe
+            replaced_count += 1
+        
+        if replaced_count > 0:
+            print(f"✓ Replaced {replaced_count} DepthwiseSeparableConv.conv_dw operations with SE-MSFE")
+        else:
+            print("⚠️  Warning: No DepthwiseSeparableConv modules were replaced. SE-MSFE may not be applied correctly.")
     
     def forward(self, x):
         # Extract features at different stages
@@ -675,6 +1177,229 @@ class SimpleSkipConnectionTransformer(nn.Module):
         return fused
 
 
+# ============================================================================
+# GCFF (Global Context Feature Fusion) Module Components
+# ============================================================================
+# These are adapted from components.py to work with the token-based decoder
+
+class ContextBlock(nn.Module):
+    """Global Context Block for GCFF - adapted from components.py"""
+    def __init__(self, inplanes, ratio, pooling_type='att',
+                 fusion_types=('channel_add',)):
+        super(ContextBlock, self).__init__()
+        valid_fusion_types = ['channel_add', 'channel_mul']
+
+        assert pooling_type in ['avg', 'att']
+        assert isinstance(fusion_types, (list, tuple))
+        assert all([f in valid_fusion_types for f in fusion_types])
+        assert len(fusion_types) > 0, 'at least one fusion should be used'
+
+        self.inplanes = inplanes
+        self.ratio = ratio
+        self.planes = int(inplanes * ratio)
+        self.pooling_type = pooling_type
+        self.fusion_types = fusion_types
+
+        if pooling_type == 'att':
+            self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)
+            self.softmax = nn.Softmax(dim=2)
+        else:
+            self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        if 'channel_add' in fusion_types:
+            self.channel_add_conv = nn.Sequential(
+                nn.Conv2d(self.inplanes, self.planes, kernel_size=1),
+                nn.LayerNorm([self.planes, 1, 1]),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(self.planes, self.inplanes, kernel_size=1))
+        else:
+            self.channel_add_conv = None
+        if 'channel_mul' in fusion_types:
+            self.channel_mul_conv = nn.Sequential(
+                nn.Conv2d(self.inplanes, self.planes, kernel_size=1),
+                nn.LayerNorm([self.planes, 1, 1]),
+                nn.ReLU(inplace=True),
+                nn.Conv2d(self.planes, self.inplanes, kernel_size=1))
+        else:
+            self.channel_mul_conv = None
+
+    def spatial_pool(self, x):
+        batch, channel, height, width = x.size()
+        if self.pooling_type == 'att':
+            input_x = x
+            # [N, C, H * W]
+            input_x = input_x.view(batch, channel, height * width)
+            # [N, 1, C, H * W]
+            input_x = input_x.unsqueeze(1)
+            # [N, 1, H, W]
+            context_mask = self.conv_mask(x)
+            # [N, 1, H * W]
+            context_mask = context_mask.view(batch, 1, height * width)
+            # [N, 1, H * W]
+            context_mask = self.softmax(context_mask)
+            # [N, 1, H * W, 1]
+            context_mask = context_mask.unsqueeze(3)
+            # [N, 1, C, 1]
+            context = torch.matmul(input_x, context_mask)
+            # [N, C, 1, 1]
+            context = context.view(batch, channel, 1, 1)
+        else:
+            # [N, C, 1, 1]
+            context = self.avg_pool(x)
+        return context
+
+    def forward(self, x):
+        # [N, C, 1, 1]
+        context = self.spatial_pool(x)
+        out = x
+        if self.channel_mul_conv is not None:
+            # [N, C, 1, 1]
+            channel_mul_term = torch.sigmoid(self.channel_mul_conv(context))
+            out = out * channel_mul_term
+        if self.channel_add_conv is not None:
+            # [N, C, 1, 1]
+            channel_add_term = self.channel_add_conv(context)
+            out = out + channel_add_term
+        return out
+
+
+class CAMLayer(nn.Module):
+    """Channel Attention Module for GCFF - adapted from components.py"""
+    def __init__(self, channel, reduction=8):
+        super(CAMLayer, self).__init__()
+
+        # channel attention 压缩H,W为1
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+
+        # shared MLP
+        self.mlp = nn.Sequential(
+            nn.Conv2d(channel, channel // reduction, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(channel // reduction, channel, 1, bias=False)
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x1 = x
+        max_out = self.mlp(self.max_pool(x))
+        avg_out = self.mlp(self.avg_pool(x))
+        channel_out = self.sigmoid(max_out + avg_out)
+        channel_x = channel_out * x
+
+        return channel_x
+
+
+class GCFFSkipConnectionTransformer(nn.Module):
+    """
+    GCFF (Global Context Feature Fusion) Skip Connection for transformer tokens.
+    Adapted from MSAGHNet's GCFF_block (components.py) to work with token-based decoder.
+    
+    Architecture (from MSAGHNet paper Fig. 4):
+    1. Project encoder (W_e: 1x1 conv) and decoder (W_d: Upsample + 1x1 conv) features
+    2. Add + ReLU → F
+    3. Global context path: ContextBlock (attention pooling + MLP)
+    4. Channel attention path: CAMLayer (max/avg pool + MLP)
+    5. Concat both paths → psi (1x1 conv + ReLU)
+    6. Add back to encoder: out = psi(...) + e1
+    
+    This module handles token-to-spatial conversion internally.
+    """
+    def __init__(self, encoder_dim, decoder_dim, ch_out, use_groupnorm=False):
+        super().__init__()
+        self.encoder_dim = encoder_dim
+        self.decoder_dim = decoder_dim
+        self.ch_out = ch_out
+        
+        # W_e: Project encoder tokens to output dimension (1x1 conv equivalent)
+        # Convert to spatial, apply conv, convert back
+        self.W_e = nn.Sequential(
+            nn.Conv2d(encoder_dim, ch_out, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.BatchNorm2d(ch_out) if not use_groupnorm else get_norm_layer(ch_out, 'group')
+        )
+        
+        # W_d: Project decoder tokens (1x1 conv)
+        # Note: We handle upsampling separately to match encoder resolution
+        self.W_d_conv = nn.Conv2d(decoder_dim, ch_out, kernel_size=1, stride=1, padding=0, bias=True)
+        self.W_d_norm = nn.BatchNorm2d(ch_out) if not use_groupnorm else get_norm_layer(ch_out, 'group')
+        
+        self.relu = nn.ReLU(inplace=True)
+        
+        # Global Context Block (attention-based pooling + MLP)
+        self.gc = ContextBlock(inplanes=ch_out, ratio=1. / 8., pooling_type='att')
+        
+        # Channel Attention Module
+        self.ca = CAMLayer(ch_out)
+        
+        # Psi: Final fusion (1x1 conv + ReLU)
+        self.psi = nn.Sequential(
+            nn.Conv2d(ch_out, ch_out, kernel_size=1, stride=1, padding=0, bias=True),
+            nn.ReLU()
+        )
+    
+    def forward(self, encoder_tokens, decoder_tokens):
+        """
+        GCFF forward pass: Fuses encoder feature Ei with upsampled decoder feature Di-1.
+        
+        Args:
+            encoder_tokens: (B, L_enc, encoder_dim) - Encoder tokens (Ei) at resolution H/2^i
+            decoder_tokens: (B, L_dec, decoder_dim) - Decoder tokens (Di-1) at resolution H/2^(i-1), already upsampled
+            
+        Returns:
+            fused: (B, L_enc, ch_out) - Fused tokens at encoder resolution (H/2^i)
+        """
+        B_enc, L_enc, enc_dim = encoder_tokens.shape
+        B_dec, L_dec, dec_dim = decoder_tokens.shape
+        
+        # Convert encoder tokens to spatial format
+        h_enc = w_enc = int(L_enc ** 0.5)
+        encoder_spatial = encoder_tokens.view(B_enc, h_enc, w_enc, enc_dim)
+        encoder_spatial = encoder_spatial.permute(0, 3, 1, 2)  # (B, C, H, W)
+        
+        # Convert decoder tokens to spatial format
+        h_dec = w_dec = int(L_dec ** 0.5)
+        decoder_spatial = decoder_tokens.view(B_dec, h_dec, w_dec, dec_dim)
+        decoder_spatial = decoder_spatial.permute(0, 3, 1, 2)  # (B, C, H, W)
+        
+        # Apply GCFF in spatial domain (following MSAGHNet GCFF_block from components.py)
+        # Step 1: Project encoder (W_e: 1x1 conv)
+        e1 = self.W_e(encoder_spatial)  # (B, ch_out, H_enc, W_enc)
+        
+        # Step 1b: Handle decoder - if decoder is at higher resolution, downsample first
+        # Then project (W_d: 1x1 conv) - matching original GCFF_block where W_d upsamples
+        # but in our case decoder is already upsampled, so we just need to match encoder size
+        if h_dec != h_enc or w_dec != w_enc:
+            # Decoder is at higher resolution, downsample to encoder resolution
+            decoder_spatial = F.interpolate(
+                decoder_spatial, size=(h_enc, w_enc), mode='bilinear', align_corners=False
+            )
+        
+        # Project decoder features
+        d1 = self.W_d_conv(decoder_spatial)  # (B, ch_out, H_enc, W_enc)
+        d1 = self.W_d_norm(d1)
+        
+        # Step 2: Add + ReLU → F
+        x1 = self.relu(e1 + d1)  # (B, ch_out, H, W)
+        
+        # Step 3: Global context path (ContextBlock: attention pooling + MLP)
+        gc_out = self.gc(x1)  # (B, ch_out, H, W)
+        
+        # Step 4: Channel attention path (CAMLayer: max/avg pool + MLP)
+        ca_out = self.ca(x1)  # (B, ch_out, H, W)
+        
+        # Step 5: Combine both paths → psi (following components.py line 337: gc(x1) + ca(x1))
+        combined = gc_out + ca_out  # (B, ch_out, H, W)
+        psi_out = self.psi(combined)  # (B, ch_out, H, W)
+        
+        # Step 6: Add back to encoder feature (residual connection)
+        out = psi_out + e1  # (B, ch_out, H, W)
+        
+        # Convert back to token format (at encoder resolution)
+        out = out.permute(0, 2, 3, 1)  # (B, H, W, C)
+        out = out.reshape(B_enc, L_enc, self.ch_out)  # (B, L_enc, ch_out)
+        
+        return out
+
+
 class EfficientNetSwinUNet(nn.Module):
     """
     Hybrid CNN-Transformer UNet with EfficientNet or ResNet-50 encoder and Swin Transformer decoder
@@ -685,7 +1410,8 @@ class EfficientNetSwinUNet(nn.Module):
                  qkv_bias=True, qk_scale=None, drop_rate=0., attn_drop_rate=0.,
                  drop_path_rate=0.1, norm_layer=nn.LayerNorm, use_checkpoint=False,
                  use_deep_supervision=False, fusion_method='simple', use_bottleneck=False, 
-                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False):
+                 adapter_mode='external', use_multiscale_agg=False, use_groupnorm=False,
+                 use_se_msfe=False, use_msfa_mct_bottleneck=False):
         super().__init__()
         
         self.num_classes = num_classes
@@ -698,12 +1424,19 @@ class EfficientNetSwinUNet(nn.Module):
         self.use_multiscale_agg = use_multiscale_agg
         self.use_groupnorm = use_groupnorm
         self.encoder_type = encoder_type  # 'efficientnet' or 'resnet50'
+        self.use_se_msfe = use_se_msfe
+        self.use_msfa_mct_bottleneck = use_msfa_mct_bottleneck
         
         # Encoder selection: EfficientNet or ResNet-50
         if encoder_type == 'resnet50':
             self.encoder = ResNet50Encoder(model_name='resnet50', pretrained=pretrained)
         else:
-            self.encoder = EfficientNetEncoder(model_name=efficientnet_model, pretrained=pretrained)
+            self.encoder = EfficientNetEncoder(
+                model_name=efficientnet_model, 
+                pretrained=pretrained,
+                use_se_msfe=use_se_msfe,
+                use_groupnorm=use_groupnorm
+            )
         
         # Target dimensions for decoder (matching your diagram exactly)
         # Stage resolutions: 56x56, 28x28, 14x14, 7x7
@@ -747,30 +1480,40 @@ class EfficientNetSwinUNet(nn.Module):
         
         self.norm = norm_layer(self.decoder_dims[-1])
         if self.use_bottleneck:
-            # Calculate stochastic drop_path using decoder depths for consistency
-            # The bottleneck is part of the decoder path, so use decoder depths
-            # dpr = linspace(0, drop_path_rate, sum(depths_decoder))
-            dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_decoder))]
-            # Bottleneck uses the last 2 blocks (since bottleneck depth=2)
-            bottleneck_drop_path = dpr[-2:]
-            
-            # 2 Swin blocks at 7x7 with dim=768, heads=24 (matching SwinUnet)
-            self.bottleneck_layer = BasicLayer(
-                dim=bottleneck_dim,
-                input_resolution=(img_size // 32, img_size // 32),
-                depth=2,
-                num_heads=bottleneck_num_heads,
-                window_size=window_size,
-                mlp_ratio=mlp_ratio,
-                qkv_bias=qkv_bias,
-                qk_scale=qk_scale,
-                drop=drop_rate,
-                attn_drop=attn_drop_rate,
-                drop_path=bottleneck_drop_path,  # Stochastic depth matching SwinUnet
-                norm_layer=norm_layer,
-                downsample=None,  # No downsampling in bottleneck
-                use_checkpoint=use_checkpoint
-            )
+            if self.use_msfa_mct_bottleneck:
+                # MSFA + MCT Hybrid Bottleneck (from MSAGHNet)
+                self.bottleneck_layer = MSFAMCTHybridBottleneck(
+                    img_size=img_size,
+                    dim=bottleneck_dim,
+                    use_groupnorm=use_groupnorm
+                )
+                print("🚀 Bottleneck: MSFA + MCT Hybrid (from MSAGHNet)")
+            else:
+                # Standard 2 Swin Transformer blocks
+                # Calculate stochastic drop_path using decoder depths for consistency
+                # The bottleneck is part of the decoder path, so use decoder depths
+                # dpr = linspace(0, drop_path_rate, sum(depths_decoder))
+                dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_decoder))]
+                # Bottleneck uses the last 2 blocks (since bottleneck depth=2)
+                bottleneck_drop_path = dpr[-2:]
+                
+                # 2 Swin blocks at 7x7 with dim=768, heads=24 (matching SwinUnet)
+                self.bottleneck_layer = BasicLayer(
+                    dim=bottleneck_dim,
+                    input_resolution=(img_size // 32, img_size // 32),
+                    depth=2,
+                    num_heads=bottleneck_num_heads,
+                    window_size=window_size,
+                    mlp_ratio=mlp_ratio,
+                    qkv_bias=qkv_bias,
+                    qk_scale=qk_scale,
+                    drop=drop_rate,
+                    attn_drop=attn_drop_rate,
+                    drop_path=bottleneck_drop_path,  # Stochastic depth matching SwinUnet
+                    norm_layer=norm_layer,
+                    downsample=None,  # No downsampling in bottleneck
+                    use_checkpoint=use_checkpoint
+                )
             
             # Multi-Scale Aggregation support
             if use_multiscale_agg:
@@ -823,11 +1566,24 @@ class EfficientNetSwinUNet(nn.Module):
             ])
             self.skip_fusions = None
             self.smart_skips = None
+            self.gcff_skips = None
+        elif fusion_method == 'gcff':
+            # GCFF (Global Context Feature Fusion) skip connections from MSAGHNet
+            # ch_out matches decoder_dim for each stage
+            self.gcff_skips = nn.ModuleList([
+                GCFFSkipConnectionTransformer(encoder_dim=384, decoder_dim=384, ch_out=384, use_groupnorm=use_groupnorm),
+                GCFFSkipConnectionTransformer(encoder_dim=192, decoder_dim=192, ch_out=192, use_groupnorm=use_groupnorm),
+                GCFFSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96,  ch_out=96,  use_groupnorm=use_groupnorm),
+            ])
+            self.skip_fusions = None
+            self.smart_skips = None
+            self.simple_skips = None
         else:
             # Default: no special fusion (fallback to original simple concat)
             self.skip_fusions = None
             self.smart_skips = None
             self.simple_skips = None
+            self.gcff_skips = None
         
         # Swin Transformer Decoder
         self.num_layers = 4
@@ -915,30 +1671,18 @@ class EfficientNetSwinUNet(nn.Module):
             )
         
         # Deep Supervision: Auxiliary heads for intermediate outputs
+        # Using MSAGHNet-style multi-resolution deep supervision (simple OutConv, no upsampling)
         if use_deep_supervision:
             # Stages 1, 2, 3 have dimensions: [384, 192, 96]
             aux_dims = [int(embed_dim * 2 ** (3-i)) for i in range(1, 4)]  # [384, 192, 96]
-            # Use convolutional heads to maintain spatial structure (U-Net++ style)
-            if use_groupnorm:
-                self.aux_heads = nn.ModuleList([
-                    nn.Sequential(
-                        nn.Conv2d(dim, dim, 3, padding=1, bias=False),
-                        get_norm_layer(dim, 'group'),
-                        nn.ReLU(inplace=True),
-                        nn.Conv2d(dim, num_classes, 1)
-                    ) for dim in aux_dims
-                ])
-            else:
-                self.aux_heads = nn.ModuleList([
-                    nn.Sequential(
-                        nn.Conv2d(dim, dim, 3, padding=1, bias=False),
-                        nn.BatchNorm2d(dim),
-                        nn.ReLU(inplace=True),
-                        nn.Conv2d(dim, num_classes, 1)
-                    ) for dim in aux_dims
-                ])
-            print("🚀 Deep Supervision enabled: 3 auxiliary outputs (convolutional heads)")
+            # Use simple OutConv heads (matching MSAGHNet style: single Conv2d, no BN/ReLU)
+            # This keeps outputs at native resolutions without upsampling
+            self.aux_heads = nn.ModuleList([
+                nn.Conv2d(dim, num_classes, 3, padding=1) for dim in aux_dims
+            ])
+            print("🚀 Deep Supervision enabled: 3 auxiliary outputs (MSAGHNet-style multi-resolution)")
             print(f"   Aux dims: {aux_dims}")
+            print("   Style: Simple OutConv (single Conv2d), outputs at native resolutions (H/16, H/8, H/4)")
         
         self.apply(self._init_weights)
     
@@ -1081,6 +1825,41 @@ class EfficientNetSwinUNet(nn.Module):
                 elif self.fusion_method == 'simple' and self.simple_skips is not None:
                     # Use simple skip connection matching hybrid2 pattern
                     x = self.simple_skips[inx - 1](skip_features, x)
+                elif self.fusion_method == 'gcff' and self.gcff_skips is not None:
+                    # Use GCFF (Global Context Feature Fusion) from MSAGHNet
+                    # GCFF fuses encoder (Ei) and decoder (Di-1) features
+                    # Output is at encoder resolution, need to upsample to decoder resolution
+                    gcff_out = self.gcff_skips[inx - 1](skip_features, x)
+                    
+                    # GCFF outputs at encoder resolution, but decoder needs its own resolution
+                    # Upsample GCFF output to match decoder resolution
+                    B, L_enc, ch_out = gcff_out.shape
+                    _, L_dec, dec_dim = x.shape
+                    
+                    if L_enc != L_dec:
+                        # Reshape to spatial and upsample
+                        h_enc = w_enc = int(L_enc ** 0.5)
+                        h_dec = w_dec = int(L_dec ** 0.5)
+                        gcff_spatial = gcff_out.view(B, h_enc, w_enc, ch_out).permute(0, 3, 1, 2)
+                        gcff_spatial = F.interpolate(
+                            gcff_spatial, size=(h_dec, w_dec), mode='bilinear', align_corners=False
+                        )
+                        gcff_out = gcff_spatial.permute(0, 2, 3, 1).reshape(B, L_dec, ch_out)
+                    
+                    # Project to decoder dimension if needed (ch_out should equal dec_dim, but handle mismatch)
+                    if ch_out != dec_dim:
+                        # Create a simple linear projection layer on-the-fly
+                        proj_weight = torch.eye(min(dec_dim, ch_out), device=gcff_out.device, dtype=gcff_out.dtype)
+                        if dec_dim > ch_out:
+                            # Pad with zeros
+                            padding = torch.zeros(dec_dim - ch_out, ch_out, device=gcff_out.device, dtype=gcff_out.dtype)
+                            proj_weight = torch.cat([proj_weight, padding], dim=0)
+                        elif ch_out > dec_dim:
+                            # Truncate
+                            proj_weight = proj_weight[:dec_dim, :]
+                        gcff_out = F.linear(gcff_out, weight=proj_weight)
+                    
+                    x = gcff_out
                 else:
                     # Fallback: Simple concatenation fusion (original)
                     x = torch.cat([x, skip_features], -1)
@@ -1119,39 +1898,34 @@ class EfficientNetSwinUNet(nn.Module):
     def process_aux_outputs(self, aux_features):
         """
         Process auxiliary features for deep supervision.
-        Uses convolutional heads to maintain spatial structure (U-Net++ style).
+        MSAGHNet-style: Simple OutConv heads, outputs at native resolutions (NO upsampling).
         
         Args:
             aux_features: List of 3 intermediate features [stage1, stage2, stage3]
-            Stage 1: H/16 resolution (after layer 0)
-            Stage 2: H/8 resolution (after layer 1)
-            Stage 3: H/4 resolution (after layer 2)
+            Stage 1: H/16 resolution (after layer 0) - tokens at H/16 x W/16
+            Stage 2: H/8 resolution (after layer 1) - tokens at H/8 x W/8
+            Stage 3: H/4 resolution (after layer 2) - tokens at H/4 x W/4
         
         Returns:
-            List of 3 auxiliary outputs [B, num_classes, H, W]
+            List of 3 auxiliary outputs at native resolutions:
+            - aux1: [B, num_classes, H/16, W/16]
+            - aux2: [B, num_classes, H/8, W/8]
+            - aux3: [B, num_classes, H/4, W/4]
         """
-        import torch.nn.functional as F
-        
         aux_outputs = []
-        
-        # Scale factors matching hybrid2: [16, 8, 4] for resolutions [H/16, H/8, H/4] -> H
-        scale_factors = [16, 8, 4]
         
         for i, aux_feat in enumerate(aux_features):
             # aux_feat: [B, L, C] - token format
             B, L, C = aux_feat.shape
             
-            # Reshape tokens to spatial format first to maintain spatial structure
+            # Reshape tokens to spatial format
             h = w = int(L ** 0.5)
             aux_feat_spatial = aux_feat.view(B, h, w, C)
             aux_feat_spatial = aux_feat_spatial.permute(0, 3, 1, 2)  # [B, C, h, w]
             
-            # Apply convolutional auxiliary head (maintains spatial structure)
+            # Apply simple OutConv head (MSAGHNet style: single Conv2d)
+            # Output remains at native resolution (NO upsampling)
             aux_out = self.aux_heads[i](aux_feat_spatial)  # [B, num_classes, h, w]
-            
-            # Upsample using scale_factor (matching hybrid2 pattern)
-            aux_out = F.interpolate(aux_out, scale_factor=scale_factors[i], 
-                                   mode='bilinear', align_corners=False)
             aux_outputs.append(aux_out)
         
         return aux_outputs
@@ -1186,6 +1960,7 @@ def create_model(config):
         img_size=config.get('img_size', 224),
         num_classes=config.get('num_classes', 6),
         efficientnet_model=config.get('efficientnet_model', 'tf_efficientnet_b4_ns'),
+        encoder_type=config.get('encoder_type', 'efficientnet'),
         pretrained=config.get('pretrained', True),
         embed_dim=config.get('embed_dim', 96),
         depths_decoder=config.get('depths_decoder', [2, 2, 2, 2]),
@@ -1199,6 +1974,8 @@ def create_model(config):
         adapter_mode=config.get('adapter_mode', 'external'),
         use_multiscale_agg=config.get('use_multiscale_agg', False),
         use_groupnorm=config.get('use_groupnorm', False),
+        use_se_msfe=config.get('use_se_msfe', False),
+        use_msfa_mct_bottleneck=config.get('use_msfa_mct_bottleneck', False),
     )
     return model
 
