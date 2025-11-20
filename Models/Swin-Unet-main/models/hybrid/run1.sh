@@ -1,7 +1,7 @@
 #!/bin/bash -l
-#SBATCH --job-name=r3
-#SBATCH --output=./Result/a3/hybrid3_aff_msa_ds_%j.out
-#SBATCH --error=./Result/a3/hybrid3_aff_msa_ds_%j.out
+#SBATCH --job-name=r1
+#SBATCH --output=./Result/a4/hybrid3_%j.out
+#SBATCH --error=./Result/a4/hybrid3_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -73,8 +73,11 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 # OPTIONAL FEATURES (DISABLED in baseline):
 #   ✓ Deep Supervision (--use_deep_supervision)
 #   ✗ CBAM Attention (--use_cbam)
+#   ✗ Smart Skip Connections (--use_smart_skip)
 #   ✗ Cross-Attention Bottleneck (--use_cross_attn)
+#   ✗ Multi-Scale Aggregation (--use_multiscale_agg)
 #   ✗ BatchNorm (--use_batchnorm)
+#   ✓ GroupNorm (default: enabled, uses GroupNorm)
 # ============================================================================
 
 # Train all manuscripts one by one (Latin2 Latin14396 Latin16746 Syr341)
@@ -83,7 +86,7 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "========================================================================"
-    echo "Training Hybrid2 Baseline Model with Smart Skip (AFF) + Multi-Scale Aggregation + Deep Supervision: $MANUSCRIPT"
+    echo "Training Hybrid2 Baseline Model with EfficientNet-B4 Decoder + Simple Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     echo "Dataset: U-DIADS-Bib-MS_patched"
     echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → EfficientNet-B4 Decoder"
@@ -92,30 +95,25 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "Components Enabled:"
     echo "  ✓ Swin Encoder (4 stages: 96→192→384→768 dim)"
     echo "  ✓ Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
-    echo "  ✓ EfficientNet-B4 Decoder (Real MBConv blocks, channels: [256, 128, 64, 32])"
-    echo "  ✓ Smart Skip Connections (Attention-based Features)"
-    echo "  ✓ Multi-Scale Aggregation"
-    echo "  ✓ Deep Supervision (Multi-resolution)"
+    echo "  ✓ EfficientNet-B4 Decoder (MBConv blocks, channels: [256, 128, 64, 32])"
+    echo "  ✓ Simple Skip Connections"
     echo "  ✓ Positional Embeddings (default: enabled)"
     echo "  ✓ GroupNorm (default normalization)"
     echo "  ✓ Balanced Sampler (oversampling rare classes)"
     echo "  ✓ Class-Aware Augmentation"
     echo ""
-    echo "Components Disabled:"
+    echo "Components Disabled (baseline):"
+    echo "  ✗ Smart Skip Connections"
     echo "  ✗ CBAM Attention"
     echo "  ✗ Cross-Attention Bottleneck"
     echo "  ✗ BatchNorm"
+    echo "  ✗ Deep Supervision"
+    echo "  ✗ Multi-Scale Aggregation"
     echo "========================================================================"
     
     python3 train.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
-        --use_smart_skip \
-        --use_multiscale_agg \
-        --use_deep_supervision \
-        --use_balanced_sampler \
-        --use_class_aware_aug \
-        --focal_gamma 2.0 \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -124,21 +122,22 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
-        --scheduler_type OneCycleLR \
+        --scheduler_type CosineAnnealingWarmRestarts \
+        --focal_gamma 2.0 \
+        --use_balanced_sampler \
+        --use_class_aware_aug \
+        --use_groupnorm \
         --amp_opt_level O1 \
-        --output_dir "./Result/a3/${MANUSCRIPT}"
+        --output_dir "./Result/a4/${MANUSCRIPT}"
 
     echo ""
     echo "========================================================================"
-    echo "Testing Hybrid2 Baseline Model with Smart Skip (AFF) + Multi-Scale Aggregation + Deep Supervision: $MANUSCRIPT"
+    echo "Testing Hybrid2 Baseline Model with EfficientNet-B4 Decoder + Simple Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     
     python3 test.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
-        --use_smart_skip \
-        --use_multiscale_agg \
-        --use_deep_supervision \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -146,15 +145,15 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --is_savenii \
         --use_tta \
         --amp-opt-level O1 \
-        --output_dir "./Result/a3/${MANUSCRIPT}"
+        --output_dir "./Result/a4/${MANUSCRIPT}"
 done
 
 echo ""
 echo "========================================================================"
-echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH SMART SKIP (AFF) + MULTI-SCALE AGGREGATION + DEEP SUPERVISION"
+echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH EFFICIENTNET-B4 DECODER + SIMPLE SKIP CONNECTIONS"
 echo "========================================================================"
-echo "Model: Hybrid2 Baseline (Swin Encoder + EfficientNet-B4 Decoder with Smart Skip (AFF) + Multi-Scale Aggregation + Deep Supervision)"
-echo "Results saved in: ./Result/a3/"
+echo "Model: Hybrid2 Baseline (Swin Encoder + EfficientNet-B4 Decoder with Simple Skip Connections)"
+echo "Results saved in: ./Result/a4/"
 echo ""
 
 # Aggregate results across all manuscripts
@@ -164,13 +163,13 @@ echo "AGGREGATING RESULTS ACROSS ALL MANUSCRIPTS"
 echo "========================================================================"
 
 python3 aggregate_results.py \
-    --results_dir "./Result/a3/" \
+    --results_dir "./Result/a4/" \
     --manuscripts Latin2 Latin14396 Latin16746 Syr341 \
-    --output "./Result/a3/aggregated_metrics.txt"
+    --output "./Result/a4/aggregated_metrics.txt"
 
 echo ""
 echo "========================================================================"
 echo "AGGREGATION COMPLETE"
 echo "========================================================================"
-echo "Aggregated metrics saved to: ./Result/a3/aggregated_metrics.txt"
+echo "Aggregated metrics saved to: ./Result/a4/aggregated_metrics.txt"
 echo ""

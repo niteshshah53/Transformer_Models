@@ -1,0 +1,666 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning}
+
+\geometry{margin=1in}
+
+\title{Hybrid2 Model Architecture: Complete Workflow Description}
+\author{Hybrid Swin Transformer + EfficientNet-B4 Architecture}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+The Hybrid2 model is a U-shaped encoder-decoder architecture designed for semantic segmentation tasks. It combines the strengths of Swin Transformers for feature extraction and EfficientNet-B4 style CNN blocks for decoding, with attention-based skip connections and deep supervision for improved performance.
+
+\subsection{Architecture Overview}
+
+The model follows a U-shaped structure:
+\begin{itemize}
+    \item \textbf{Left Column (Encoder)}: Swin Transformer encoder with 4 stages
+    \item \textbf{Bottom (Bottleneck)}: 2 Swin Transformer blocks for feature refinement
+    \item \textbf{Right Column (Decoder)}: EfficientNet-B4 style CNN decoder with 4 stages
+    \item \textbf{Skip Connections}: Attention-based (CBAM) connections from encoder to decoder
+    \item \textbf{Deep Supervision}: Auxiliary outputs at intermediate decoder stages
+\end{itemize}
+
+\section{Complete Workflow: Input to Output}
+
+\subsection{Input Processing}
+
+Given an input image $\mathbf{X} \in \mathbb{R}^{B \times 3 \times H \times W}$, where:
+\begin{itemize}
+    \item $B$ = batch size
+    \item $3$ = RGB channels
+    \item $H, W$ = image height and width (typically $H = W = 224$)
+\end{itemize}
+
+\subsection{Stage 1: Swin Transformer Encoder}
+
+The encoder extracts multi-scale features at 4 different resolutions using Swin Transformer blocks.
+
+\subsubsection{Patch Embedding}
+
+The input image is first partitioned into non-overlapping patches:
+
+\begin{equation}
+\mathbf{X}_0 = \text{PatchEmbed}(\mathbf{X}) \in \mathbb{R}^{B \times L_0 \times C_0}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item Patch size: $4 \times 4$
+    \item $L_0 = \frac{H}{4} \times \frac{W}{4} = 56 \times 56 = 3136$ (for $H=W=224$)
+    \item $C_0 = 96$ (embedding dimension)
+\end{itemize}
+
+The patch embedding operation:
+\begin{equation}
+\mathbf{X}_0 = \text{LayerNorm}(\text{Conv2d}_{3 \rightarrow 96}(\mathbf{X}))
+\end{equation}
+
+\subsubsection{Encoder Stage 1}
+
+\begin{equation}
+\mathbf{F}_1 = \text{EncoderStage}_1(\mathbf{X}_0) \in \mathbb{R}^{B \times L_0 \times C_0}
+\end{equation}
+
+\textbf{Components:}
+\begin{itemize}
+    \item 2 Swin Transformer blocks (BasicLayer with depth=2)
+    \item Window size: $7 \times 7$
+    \item Number of heads: 3
+    \item Shift size: Alternating (0, window\_size//2)
+\end{itemize}
+
+\textbf{Swin Transformer Block Operations:}
+\begin{align}
+\mathbf{X}' &= \text{LayerNorm}(\mathbf{X}) \\
+\mathbf{X}_{W-MSA} &= \text{WindowAttention}(\mathbf{X}', \text{window\_size}=7) \\
+\mathbf{X} &= \mathbf{X} + \text{DropPath}(\mathbf{X}_{W-MSA}) \\
+\mathbf{X}_{MLP} &= \text{MLP}(\text{LayerNorm}(\mathbf{X})) \\
+\mathbf{X} &= \mathbf{X} + \text{DropPath}(\mathbf{X}_{MLP})
+\end{align}
+
+\textbf{Window Attention:}
+\begin{equation}
+\text{Attention}(\mathbf{Q}, \mathbf{K}, \mathbf{V}) = \text{Softmax}\left(\frac{\mathbf{Q}\mathbf{K}^T}{\sqrt{d_k}} + \mathbf{B}\right)\mathbf{V}
+\end{equation}
+
+where $\mathbf{B}$ is the relative position bias.
+
+\textbf{Output Feature Map:}
+\begin{equation}
+\mathbf{f}_1 = \text{Reshape}(\mathbf{F}_1) \in \mathbb{R}^{B \times 96 \times \frac{H}{4} \times \frac{W}{4}}
+\end{equation}
+
+\subsubsection{Encoder Stage 2}
+
+\begin{equation}
+\mathbf{F}_2 = \text{PatchMerging}(\mathbf{F}_1) \in \mathbb{R}^{B \times L_1 \times C_1}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $L_1 = \frac{L_0}{4} = \frac{H}{8} \times \frac{W}{8} = 28 \times 28 = 784$
+    \item $C_1 = 192 = 2 \times C_0$
+\end{itemize}
+
+\textbf{Patch Merging:}
+\begin{equation}
+\mathbf{F}_2 = \text{Linear}_{4C_0 \rightarrow 2C_0}(\text{Concat}([\mathbf{F}_1^{0::2,0::2}, \mathbf{F}_1^{1::2,0::2}, \mathbf{F}_1^{0::2,1::2}, \mathbf{F}_1^{1::2,1::2}]))
+\end{equation}
+
+Then processed through 2 Swin blocks:
+\begin{equation}
+\mathbf{F}_2 = \text{EncoderStage}_2(\mathbf{F}_2)
+\end{equation}
+
+\textbf{Output Feature Map:}
+\begin{equation}
+\mathbf{f}_2 = \text{Reshape}(\mathbf{F}_2) \in \mathbb{R}^{B \times 192 \times \frac{H}{8} \times \frac{W}{8}}
+\end{equation}
+
+\subsubsection{Encoder Stage 3}
+
+\begin{equation}
+\mathbf{F}_3 = \text{PatchMerging}(\mathbf{F}_2) \in \mathbb{R}^{B \times L_2 \times C_2}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $L_2 = \frac{L_1}{4} = \frac{H}{16} \times \frac{W}{16} = 14 \times 14 = 196$
+    \item $C_2 = 384 = 2 \times C_1$
+\end{itemize}
+
+Processed through 2 Swin blocks:
+\begin{equation}
+\mathbf{F}_3 = \text{EncoderStage}_3(\mathbf{F}_3)
+\end{equation}
+
+\textbf{Output Feature Map:}
+\begin{equation}
+\mathbf{f}_3 = \text{Reshape}(\mathbf{F}_3) \in \mathbb{R}^{B \times 384 \times \frac{H}{16} \times \frac{W}{16}}
+\end{equation}
+
+\subsubsection{Encoder Stage 4}
+
+\begin{equation}
+\mathbf{F}_4 = \text{PatchMerging}(\mathbf{F}_3) \in \mathbb{R}^{B \times L_3 \times C_3}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $L_3 = \frac{L_2}{4} = \frac{H}{32} \times \frac{W}{32} = 7 \times 7 = 49$
+    \item $C_3 = 768 = 2 \times C_2$
+\end{itemize}
+
+Processed through 2 Swin blocks:
+\begin{equation}
+\mathbf{F}_4 = \text{EncoderStage}_4(\mathbf{F}_4)
+\end{equation}
+
+\textbf{Output Feature Map:}
+\begin{equation}
+\mathbf{f}_4 = \text{Reshape}(\mathbf{F}_4) \in \mathbb{R}^{B \times 768 \times \frac{H}{32} \times \frac{W}{32}}
+\end{equation}
+
+\textbf{Encoder Tokens (for bottleneck):}
+\begin{equation}
+\mathbf{T}_4 = \mathbf{F}_4 \in \mathbb{R}^{B \times 49 \times 768}
+\end{equation}
+
+\subsection{Stage 2: Feature Projection}
+
+All encoder features are projected to decoder channel dimensions:
+
+\begin{align}
+\mathbf{p}_1 &= \text{Conv2d}_{96 \rightarrow 256}(\mathbf{f}_1) \in \mathbb{R}^{B \times 256 \times \frac{H}{4} \times \frac{W}{4}} \\
+\mathbf{p}_2 &= \text{Conv2d}_{192 \rightarrow 128}(\mathbf{f}_2) \in \mathbb{R}^{B \times 128 \times \frac{H}{8} \times \frac{W}{8}} \\
+\mathbf{p}_3 &= \text{Conv2d}_{384 \rightarrow 64}(\mathbf{f}_3) \in \mathbb{R}^{B \times 64 \times \frac{H}{16} \times \frac{W}{16}} \\
+\mathbf{p}_4 &= \text{Conv2d}_{768 \rightarrow 32}(\mathbf{f}_4) \in \mathbb{R}^{B \times 32 \times \frac{H}{32} \times \frac{W}{32}}
+\end{align}
+
+Each projection includes:
+\begin{equation}
+\mathbf{p}_i = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}(\mathbf{f}_i)))
+\end{equation}
+
+\subsection{Stage 3: Multi-Scale Aggregation (Optional)}
+
+If enabled, features from all encoder stages are aggregated at the bottleneck:
+
+\begin{equation}
+\text{MSA}(\{\mathbf{f}_1, \mathbf{f}_2, \mathbf{f}_3, \mathbf{f}_4\}) = \text{Fusion}(\text{Concat}([\text{Proj}_1(\mathbf{f}_1), \text{Proj}_2(\mathbf{f}_2), \text{Proj}_3(\mathbf{f}_3), \text{Proj}_4(\mathbf{f}_4)]))
+\end{equation}
+
+\textbf{Step-by-step:}
+\begin{enumerate}
+    \item \textbf{Projection:} Each feature is projected to target dimension (32):
+    \begin{equation}
+    \mathbf{f}_i^{proj} = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{C_i \rightarrow 32}(\mathbf{f}_i)))
+    \end{equation}
+    
+    \item \textbf{Spatial Resizing:} All features are resized to bottleneck resolution:
+    \begin{equation}
+    \mathbf{f}_i^{resized} = \text{Interpolate}(\mathbf{f}_i^{proj}, \text{size}=(\frac{H}{32}, \frac{W}{32}))
+    \end{equation}
+    
+    \item \textbf{Concatenation:}
+    \begin{equation}
+    \mathbf{f}_{concat} = \text{Concat}([\mathbf{f}_1^{resized}, \mathbf{f}_2^{resized}, \mathbf{f}_3^{resized}, \mathbf{f}_4^{resized}]) \in \mathbb{R}^{B \times 128 \times \frac{H}{32} \times \frac{W}{32}}
+    \end{equation}
+    
+    \item \textbf{Fusion:}
+    \begin{equation}
+    \mathbf{f}_{msa} = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{128 \rightarrow 32}(\mathbf{f}_{concat})))
+    \end{equation}
+    
+    \item \textbf{Residual Addition:}
+    \begin{equation}
+    \mathbf{x}_{bottleneck} = \mathbf{p}_4 + \mathbf{f}_{msa}
+    \end{equation}
+\end{enumerate}
+
+If MSA is disabled:
+\begin{equation}
+\mathbf{x}_{bottleneck} = \mathbf{p}_4
+\end{equation}
+
+\subsection{Stage 4: Bottleneck (2 Swin Transformer Blocks)}
+
+The bottleneck refines features using 2 Swin Transformer blocks operating on tokens.
+
+\subsubsection{Token Conversion}
+
+The bottleneck input is converted to token format:
+\begin{equation}
+\mathbf{T}_{in} = \mathbf{T}_4 \in \mathbb{R}^{B \times 49 \times 768}
+\end{equation}
+
+\subsubsection{Swin Block 1 (W-MSA)}
+
+\begin{align}
+\mathbf{T}' &= \text{LayerNorm}(\mathbf{T}_{in}) \\
+\mathbf{T}_{W-MSA} &= \text{WindowAttention}(\mathbf{T}', \text{window\_size}=7, \text{shift}=0) \\
+\mathbf{T}_1 &= \mathbf{T}_{in} + \text{DropPath}(\mathbf{T}_{W-MSA}) \\
+\mathbf{T}_1' &= \text{LayerNorm}(\mathbf{T}_1) \\
+\mathbf{T}_{MLP} &= \text{MLP}(\mathbf{T}_1') \\
+\mathbf{T}_1 &= \mathbf{T}_1 + \text{DropPath}(\mathbf{T}_{MLP})
+\end{align}
+
+where:
+\begin{itemize}
+    \item Window size: $7 \times 7$
+    \item Number of heads: 24
+    \item MLP ratio: 4.0
+    \item Drop path rate: 0.1
+\end{itemize}
+
+\subsubsection{Swin Block 2 (SW-MSA)}
+
+\begin{align}
+\mathbf{T}_2' &= \text{LayerNorm}(\mathbf{T}_1) \\
+\mathbf{T}_{SW-MSA} &= \text{ShiftedWindowAttention}(\mathbf{T}_2', \text{window\_size}=7, \text{shift}=3) \\
+\mathbf{T}_2 &= \mathbf{T}_1 + \text{DropPath}(\mathbf{T}_{SW-MSA}) \\
+\mathbf{T}_2' &= \text{LayerNorm}(\mathbf{T}_2) \\
+\mathbf{T}_{MLP} &= \text{MLP}(\mathbf{T}_2') \\
+\mathbf{T}_{out} &= \mathbf{T}_2 + \text{DropPath}(\mathbf{T}_{MLP})
+\end{align}
+
+\subsubsection{Feature Map Conversion}
+
+Tokens are converted back to feature maps:
+\begin{equation}
+\mathbf{f}_{bottleneck} = \text{Reshape}(\mathbf{T}_{out}) \in \mathbb{R}^{B \times 768 \times 7 \times 7}
+\end{equation}
+
+\subsubsection{Feature Projection to Decoder Dimension}
+
+\begin{equation}
+\mathbf{x}_{decoder} = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{768 \rightarrow 32}(\mathbf{f}_{bottleneck}))) \in \mathbb{R}^{B \times 32 \times 7 \times 7}
+\end{equation}
+
+\subsection{Stage 5: Decoder (EfficientNet-B4 Style)}
+
+The decoder upsamples features through 4 stages using EfficientNet-B4 style CNN blocks.
+
+\subsubsection{Decoder Stage 1: H/32 → H/16}
+
+\textbf{Input:} $\mathbf{x}_{decoder} \in \mathbb{R}^{B \times 32 \times 7 \times 7}$
+
+\textbf{Decoder Block:}
+\begin{align}
+\mathbf{x}_1' &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{32 \rightarrow 256}(\mathbf{x}_{decoder}))) \\
+\mathbf{x}_1 &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{256 \rightarrow 256}(\mathbf{x}_1')))
+\end{align}
+
+\textbf{Upsampling:}
+\begin{equation}
+\mathbf{x}_1^{up} = \text{Upsample}_{2\times}(\mathbf{x}_1) \in \mathbb{R}^{B \times 256 \times 14 \times 14}
+\end{equation}
+
+\textbf{Skip Connection with Attention Gate:}
+\begin{equation}
+\mathbf{x}_1^{skip} = \text{AttentionSkip}(\mathbf{p}_3, \mathbf{x}_1^{up})
+\end{equation}
+
+\textbf{Attention Skip Connection Details:}
+\begin{enumerate}
+    \item \textbf{Channel Alignment:}
+    \begin{equation}
+    \mathbf{p}_3^{aligned} = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{64 \rightarrow 256}(\mathbf{p}_3)))
+    \end{equation}
+    
+    \item \textbf{CBAM Attention:}
+    \begin{align}
+    \mathbf{p}_3^{CA} &= \text{ChannelAttention}(\mathbf{p}_3^{aligned}) \\
+    \mathbf{p}_3^{SA} &= \text{SpatialAttention}(\mathbf{p}_3^{CA}) \\
+    \mathbf{p}_3^{attn} &= \mathbf{p}_3^{aligned} \odot \mathbf{p}_3^{SA}
+    \end{align}
+    
+    \textbf{Channel Attention:}
+    \begin{align}
+    \mathbf{a}_{avg} &= \text{AdaptiveAvgPool2d}(\mathbf{p}_3^{aligned}) \\
+    \mathbf{a}_{max} &= \text{AdaptiveMaxPool2d}(\mathbf{p}_3^{aligned}) \\
+    \mathbf{w}_c &= \sigma(\text{MLP}(\mathbf{a}_{avg}) + \text{MLP}(\mathbf{a}_{max})) \\
+    \mathbf{p}_3^{CA} &= \mathbf{p}_3^{aligned} \odot \mathbf{w}_c
+    \end{align}
+    
+    \textbf{Spatial Attention:}
+    \begin{align}
+    \mathbf{s}_{concat} &= \text{Concat}([\text{Mean}(\mathbf{p}_3^{CA}, \text{dim}=1), \text{Max}(\mathbf{p}_3^{CA}, \text{dim}=1)]) \\
+    \mathbf{w}_s &= \sigma(\text{Conv2d}_{2 \rightarrow 1}(\mathbf{s}_{concat})) \\
+    \mathbf{p}_3^{SA} &= \mathbf{p}_3^{CA} \odot \mathbf{w}_s
+    \end{align}
+    
+    \item \textbf{Fusion:}
+    \begin{equation}
+    \mathbf{x}_1^{fused} = \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{512 \rightarrow 256}(\text{Concat}([\mathbf{x}_1^{up}, \mathbf{p}_3^{attn}]))))
+    \end{equation}
+\end{enumerate}
+
+\textbf{Deep Supervision Output 1 (if enabled):}
+\begin{equation}
+\mathbf{y}_{aux1} = \text{Conv2d}_{256 \rightarrow \text{num\_classes}}(\mathbf{x}_1^{fused}) \in \mathbb{R}^{B \times \text{num\_classes} \times 14 \times 14}
+\end{equation}
+
+Upsampled to full resolution:
+\begin{equation}
+\mathbf{y}_{aux1}^{full} = \text{Interpolate}(\mathbf{y}_{aux1}, \text{scale\_factor}=16) \in \mathbb{R}^{B \times \text{num\_classes} \times H \times W}
+\end{equation}
+
+\subsubsection{Decoder Stage 2: H/16 → H/8}
+
+\textbf{Input:} $\mathbf{x}_1^{fused} \in \mathbb{R}^{B \times 256 \times 14 \times 14}$
+
+\textbf{Decoder Block:}
+\begin{align}
+\mathbf{x}_2' &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{256 \rightarrow 128}(\mathbf{x}_1^{fused}))) \\
+\mathbf{x}_2 &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{128 \rightarrow 128}(\mathbf{x}_2')))
+\end{align}
+
+\textbf{Upsampling:}
+\begin{equation}
+\mathbf{x}_2^{up} = \text{Upsample}_{2\times}(\mathbf{x}_2) \in \mathbb{R}^{B \times 128 \times 28 \times 28}
+\end{equation}
+
+\textbf{Skip Connection:}
+\begin{equation}
+\mathbf{x}_2^{fused} = \text{AttentionSkip}(\mathbf{p}_2, \mathbf{x}_2^{up})
+\end{equation}
+
+\textbf{Deep Supervision Output 2:}
+\begin{equation}
+\mathbf{y}_{aux2} = \text{Interpolate}(\text{Conv2d}_{128 \rightarrow \text{num\_classes}}(\mathbf{x}_2^{fused}), \text{scale\_factor}=8)
+\end{equation}
+
+\subsubsection{Decoder Stage 3: H/8 → H/4}
+
+\textbf{Input:} $\mathbf{x}_2^{fused} \in \mathbb{R}^{B \times 128 \times 28 \times 28}$
+
+\textbf{Decoder Block:}
+\begin{align}
+\mathbf{x}_3' &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{128 \rightarrow 64}(\mathbf{x}_2^{fused}))) \\
+\mathbf{x}_3 &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{64 \rightarrow 64}(\mathbf{x}_3')))
+\end{align}
+
+\textbf{Upsampling:}
+\begin{equation}
+\mathbf{x}_3^{up} = \text{Upsample}_{2\times}(\mathbf{x}_3) \in \mathbb{R}^{B \times 64 \times 56 \times 56}
+\end{equation}
+
+\textbf{Skip Connection:}
+\begin{equation}
+\mathbf{x}_3^{fused} = \text{AttentionSkip}(\mathbf{p}_1, \mathbf{x}_3^{up})
+\end{equation}
+
+\textbf{Deep Supervision Output 3:}
+\begin{equation}
+\mathbf{y}_{aux3} = \text{Interpolate}(\text{Conv2d}_{64 \rightarrow \text{num\_classes}}(\mathbf{x}_3^{fused}), \text{scale\_factor}=4)
+\end{equation}
+
+\subsubsection{Decoder Stage 4: H/4 → H}
+
+\textbf{Input:} $\mathbf{x}_3^{fused} \in \mathbb{R}^{B \times 64 \times 56 \times 56}$
+
+\textbf{Final Upsampling:}
+\begin{align}
+\mathbf{x}_4 &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{64 \rightarrow 64}(\mathbf{x}_3^{fused}))) \\
+\mathbf{x}_4^{up} &= \text{Upsample}_{4\times}(\mathbf{x}_4) \in \mathbb{R}^{B \times 64 \times H \times W}
+\end{align}
+
+\subsection{Stage 6: Segmentation Head}
+
+\textbf{Final Classification:}
+\begin{align}
+\mathbf{x}_{seg} &= \text{ReLU}(\text{GroupNorm}(\text{Conv2d}_{64 \rightarrow 64}(\mathbf{x}_4^{up}))) \\
+\mathbf{x}_{seg} &= \text{Dropout2d}(\mathbf{x}_{seg}, p=0.1) \\
+\mathbf{y}_{main} &= \text{Conv2d}_{64 \rightarrow \text{num\_classes}}(\mathbf{x}_{seg}) \in \mathbb{R}^{B \times \text{num\_classes} \times H \times W}
+\end{align}
+
+\subsection{Stage 7: Output and Loss Computation}
+
+\subsubsection{Main Output}
+
+The main segmentation output:
+\begin{equation}
+\mathbf{Y}_{main} = \mathbf{y}_{main} \in \mathbb{R}^{B \times \text{num\_classes} \times H \times W}
+\end{equation}
+
+\subsubsection{Deep Supervision Loss (if enabled)}
+
+If deep supervision is enabled, the total loss is:
+\begin{equation}
+\mathcal{L}_{total} = \mathcal{L}_{main} + \lambda_1 \mathcal{L}_{aux1} + \lambda_2 \mathcal{L}_{aux2} + \lambda_3 \mathcal{L}_{aux3}
+\end{equation}
+
+where:
+\begin{align}
+\mathcal{L}_{main} &= \text{CrossEntropyLoss}(\mathbf{Y}_{main}, \mathbf{Y}_{gt}) \\
+\mathcal{L}_{aux1} &= \text{CrossEntropyLoss}(\mathbf{y}_{aux1}^{full}, \mathbf{Y}_{gt}) \\
+\mathcal{L}_{aux2} &= \text{CrossEntropyLoss}(\mathbf{y}_{aux2}, \mathbf{Y}_{gt}) \\
+\mathcal{L}_{aux3} &= \text{CrossEntropyLoss}(\mathbf{y}_{aux3}, \mathbf{Y}_{gt})
+\end{align}
+
+Typically, $\lambda_1 = \lambda_2 = \lambda_3 = 0.4$ (or learnable).
+
+\subsubsection{Output (without deep supervision)}
+
+\begin{equation}
+\mathbf{Y} = \mathbf{Y}_{main}
+\end{equation}
+
+\section{Complete Data Flow Summary}
+
+\subsection{Tensor Shape Evolution}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Stage} & \textbf{Operation} & \textbf{Output Shape} \\
+\hline
+Input & Image & $(B, 3, H, W)$ \\
+\hline
+Patch Embedding & Conv2d(3→96, stride=4) & $(B, 96, H/4, W/4)$ \\
+\hline
+Encoder Stage 1 & 2 Swin Blocks & $(B, 96, H/4, W/4)$ \\
+Encoder Stage 2 & PatchMerging + 2 Swin Blocks & $(B, 192, H/8, W/8)$ \\
+Encoder Stage 3 & PatchMerging + 2 Swin Blocks & $(B, 384, H/16, W/16)$ \\
+Encoder Stage 4 & PatchMerging + 2 Swin Blocks & $(B, 768, H/32, W/32)$ \\
+\hline
+Feature Projection & Conv2d projections & $\mathbf{p}_1: (B, 256, H/4, W/4)$ \\
+ & & $\mathbf{p}_2: (B, 128, H/8, W/8)$ \\
+ & & $\mathbf{p}_3: (B, 64, H/16, W/16)$ \\
+ & & $\mathbf{p}_4: (B, 32, H/32, W/32)$ \\
+\hline
+MSA (optional) & Multi-scale aggregation & $(B, 32, H/32, W/32)$ \\
+\hline
+Bottleneck & Token conversion & $(B, 49, 768)$ \\
+ & 2 Swin Blocks & $(B, 49, 768)$ \\
+ & Feature projection & $(B, 32, 7, 7)$ \\
+\hline
+Decoder Stage 1 & Conv + Upsample 2× & $(B, 256, 14, 14)$ \\
+ & Skip connection & $(B, 256, 14, 14)$ \\
+ & Deep Sup 1 (optional) & $(B, \text{num\_classes}, H, W)$ \\
+\hline
+Decoder Stage 2 & Conv + Upsample 2× & $(B, 128, 28, 28)$ \\
+ & Skip connection & $(B, 128, 28, 28)$ \\
+ & Deep Sup 2 (optional) & $(B, \text{num\_classes}, H, W)$ \\
+\hline
+Decoder Stage 3 & Conv + Upsample 2× & $(B, 64, 56, 56)$ \\
+ & Skip connection & $(B, 64, 56, 56)$ \\
+ & Deep Sup 3 (optional) & $(B, \text{num\_classes}, H, W)$ \\
+\hline
+Decoder Stage 4 & Conv + Upsample 4× & $(B, 64, H, W)$ \\
+\hline
+Segmentation Head & Conv(64→num\_classes) & $(B, \text{num\_classes}, H, W)$ \\
+\hline
+\end{tabular}
+\caption{Complete tensor shape evolution through the Hybrid2 architecture}
+\end{table}
+
+\subsection{Key Components Summary}
+
+\subsubsection{Encoder Components}
+\begin{itemize}
+    \item \textbf{Patch Embedding}: Converts image to patch tokens
+    \item \textbf{4 Encoder Stages}: Each with 2 Swin Transformer blocks
+    \item \textbf{Patch Merging}: Reduces spatial resolution, doubles channels
+    \item \textbf{Window Attention}: Local self-attention within windows
+    \item \textbf{Shifted Window Attention}: Enables cross-window connections
+\end{itemize}
+
+\subsubsection{Bottleneck Components}
+\begin{itemize}
+    \item \textbf{2 Swin Blocks}: Feature refinement at lowest resolution
+    \item \textbf{Token Processing}: Operates on sequence format
+    \item \textbf{Feature Projection}: Maps to decoder input dimension
+\end{itemize}
+
+\subsubsection{Decoder Components}
+\begin{itemize}
+    \item \textbf{4 Decoder Stages}: EfficientNet-B4 style CNN blocks
+    \item \textbf{Upsampling}: Bilinear interpolation (2× or 4×)
+    \item \textbf{Attention Skip Connections}: CBAM-based feature fusion
+    \item \textbf{Deep Supervision}: Auxiliary outputs for training
+\end{itemize}
+
+\subsubsection{Attention Mechanisms}
+\begin{itemize}
+    \item \textbf{Window Attention (W-MSA)}: Local attention within windows
+    \item \textbf{Shifted Window Attention (SW-MSA)}: Cross-window attention
+    \item \textbf{Channel Attention (CA)}: Adaptive channel weighting
+    \item \textbf{Spatial Attention (SA)}: Adaptive spatial weighting
+    \item \textbf{CBAM}: Combined channel and spatial attention
+\end{itemize}
+
+\section{Mathematical Formulations}
+
+\subsection{Swin Transformer Block}
+
+For a Swin Transformer block with input $\mathbf{X} \in \mathbb{R}^{B \times L \times C}$:
+
+\begin{align}
+\mathbf{X}' &= \text{LN}(\mathbf{X}) \\
+\mathbf{X}_{attn} &= \text{W-MSA}(\mathbf{X}') \quad \text{or} \quad \text{SW-MSA}(\mathbf{X}') \\
+\mathbf{X} &= \mathbf{X} + \text{DropPath}(\mathbf{X}_{attn}) \\
+\mathbf{X}'' &= \text{LN}(\mathbf{X}) \\
+\mathbf{X}_{mlp} &= \text{MLP}(\mathbf{X}'') = \text{GELU}(\mathbf{X}'' \mathbf{W}_1) \mathbf{W}_2 \\
+\mathbf{X} &= \mathbf{X} + \text{DropPath}(\mathbf{X}_{mlp})
+\end{align}
+
+where:
+\begin{itemize}
+    \item $\text{LN}$ = Layer Normalization
+    \item $\text{W-MSA}$ = Window-based Multi-head Self-Attention
+    \item $\text{SW-MSA}$ = Shifted Window-based Multi-head Self-Attention
+    \item $\text{MLP}$ = Multi-Layer Perceptron (expansion ratio = 4)
+    \item $\text{DropPath}$ = Stochastic depth
+\end{itemize}
+
+\subsection{Window Attention}
+
+For window size $M \times M$ and $h$ attention heads:
+
+\begin{align}
+\mathbf{Q}, \mathbf{K}, \mathbf{V} &= \mathbf{X} \mathbf{W}_{qkv} \in \mathbb{R}^{B \times M^2 \times C} \\
+\mathbf{Q}_h, \mathbf{K}_h, \mathbf{V}_h &= \text{Split}(\mathbf{Q}, \mathbf{K}, \mathbf{V}, h) \\
+\text{Attn}_h &= \text{Softmax}\left(\frac{\mathbf{Q}_h \mathbf{K}_h^T}{\sqrt{C/h}} + \mathbf{B}_h\right) \\
+\mathbf{X}_h &= \text{Attn}_h \mathbf{V}_h \\
+\mathbf{X}_{attn} &= \text{Concat}([\mathbf{X}_1, \ldots, \mathbf{X}_h]) \mathbf{W}_o
+\end{align}
+
+where $\mathbf{B}_h$ is the relative position bias.
+
+\subsection{CBAM Attention}
+
+For input feature $\mathbf{F} \in \mathbb{R}^{B \times C \times H \times W}$:
+
+\textbf{Channel Attention:}
+\begin{align}
+\mathbf{a}_{avg} &= \text{AdaptiveAvgPool2d}(\mathbf{F}) \in \mathbb{R}^{B \times C \times 1 \times 1} \\
+\mathbf{a}_{max} &= \text{AdaptiveMaxPool2d}(\mathbf{F}) \in \mathbb{R}^{B \times C \times 1 \times 1} \\
+\mathbf{w}_c &= \sigma(\text{MLP}(\mathbf{a}_{avg}) + \text{MLP}(\mathbf{a}_{max})) \in \mathbb{R}^{B \times C \times 1 \times 1} \\
+\mathbf{F}_{CA} &= \mathbf{F} \odot \mathbf{w}_c
+\end{align}
+
+\textbf{Spatial Attention:}
+\begin{align}
+\mathbf{s}_{avg} &= \text{Mean}(\mathbf{F}_{CA}, \text{dim}=1) \in \mathbb{R}^{B \times 1 \times H \times W} \\
+\mathbf{s}_{max} &= \text{Max}(\mathbf{F}_{CA}, \text{dim}=1) \in \mathbb{R}^{B \times 1 \times H \times W} \\
+\mathbf{s}_{concat} &= \text{Concat}([\mathbf{s}_{avg}, \mathbf{s}_{max}], \text{dim}=1) \\
+\mathbf{w}_s &= \sigma(\text{Conv2d}_{2 \rightarrow 1}(\mathbf{s}_{concat})) \in \mathbb{R}^{B \times 1 \times H \times W} \\
+\mathbf{F}_{SA} &= \mathbf{F}_{CA} \odot \mathbf{w}_s
+\end{align}
+
+\subsection{Multi-Scale Aggregation}
+
+\begin{align}
+\mathbf{f}_i^{proj} &= \text{ReLU}(\text{GN}(\text{Conv2d}_{C_i \rightarrow C_{out}}(\mathbf{f}_i))) \\
+\mathbf{f}_i^{resized} &= \text{Interpolate}(\mathbf{f}_i^{proj}, \text{size}=(H_{target}, W_{target})) \\
+\mathbf{f}_{concat} &= \text{Concat}([\mathbf{f}_1^{resized}, \mathbf{f}_2^{resized}, \mathbf{f}_3^{resized}, \mathbf{f}_4^{resized}]) \\
+\mathbf{f}_{msa} &= \text{ReLU}(\text{GN}(\text{Conv2d}_{4C_{out} \rightarrow C_{out}}(\mathbf{f}_{concat})))
+\end{align}
+
+\section{Implementation Details}
+
+\subsection{Key Hyperparameters}
+
+\begin{itemize}
+    \item \textbf{Image Size}: $H = W = 224$ (default)
+    \item \textbf{Embedding Dimension}: $C_0 = 96$
+    \item \textbf{Encoder Channels}: $[96, 192, 384, 768]$
+    \item \textbf{Decoder Channels (EfficientNet-B4)}: $[256, 128, 64, 32]$
+    \item \textbf{Window Size}: $7 \times 7$
+    \item \textbf{Number of Heads}: $[3, 6, 12, 24]$ (encoder), $24$ (bottleneck)
+    \item \textbf{MLP Ratio}: $4.0$
+    \item \textbf{Drop Path Rate}: $0.1$
+    \item \textbf{Deep Supervision Weights}: $\lambda_1 = \lambda_2 = \lambda_3 = 0.4$ (typical)
+\end{itemize}
+
+\subsection{Code References}
+
+\begin{itemize}
+    \item \textbf{Encoder}: \texttt{models/hybrid/hybrid2/components.py} - \texttt{SwinEncoder} (lines 299-394)
+    \item \textbf{Bottleneck}: \texttt{SimpleDecoder.\_\_init\_\_} (lines 1216-1258)
+    \item \textbf{Decoder}: \texttt{SimpleDecoder} (lines 1132-1499)
+    \item \textbf{Skip Connections}: \texttt{ImprovedSmartSkipConnection} (lines 462-497)
+    \item \textbf{CBAM}: \texttt{ImprovedCBAM} (lines 448-459)
+    \item \textbf{MSA}: \texttt{MultiScaleAggregation} (lines 519-554)
+    \item \textbf{Forward Pass}: \texttt{SimpleDecoder.forward} (lines 1391-1479)
+\end{itemize}
+
+\section{Conclusion}
+
+The Hybrid2 architecture combines the global modeling capabilities of Swin Transformers in the encoder and bottleneck with the efficient local feature processing of EfficientNet-B4 style blocks in the decoder. The attention-based skip connections enable effective feature fusion, while deep supervision provides additional training signals for improved segmentation performance.
+
+The complete workflow processes input images through:
+\begin{enumerate}
+    \item Multi-scale feature extraction (encoder)
+    \item Optional multi-scale aggregation
+    \item Feature refinement (bottleneck)
+    \item Progressive upsampling with attention-based skip connections (decoder)
+    \item Final segmentation prediction
+\end{enumerate}
+
+This architecture achieves a balance between computational efficiency and representation power, making it suitable for semantic segmentation tasks on historical documents and other fine-grained segmentation applications.
+
+\end{document}

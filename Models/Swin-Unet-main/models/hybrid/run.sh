@@ -86,19 +86,21 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "========================================================================"
-    echo "Training Hybrid2 Baseline Model with Smart Skip Connections: $MANUSCRIPT"
+    echo "Training Hybrid2 Baseline Model with EfficientNet-B4 Decoder + Smart Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     echo "Dataset: U-DIADS-Bib-MS_patched"
-    echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → Simple CNN Decoder"
-    echo "Decoder: Simple Decoder (EfficientNet-b4 channel configuration)"
+    echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → EfficientNet-B4 Decoder"
+    echo "Decoder: EfficientNet-B4 Decoder (Real MBConv blocks)"
     echo ""
     echo "Components Enabled:"
     echo "  ✓ Swin Encoder (4 stages: 96→192→384→768 dim)"
     echo "  ✓ Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
-    echo "  ✓ Simple CNN Decoder (channels: [256, 128, 64, 32])"
+    echo "  ✓ EfficientNet-B4 Decoder (MBConv blocks, channels: [256, 128, 64, 32])"
     echo "  ✓ Smart Skip Connections"
     echo "  ✓ Positional Embeddings (default: enabled)"
     echo "  ✓ GroupNorm (default normalization)"
+    echo "  ✓ Balanced Sampler (oversampling rare classes)"
+    echo "  ✓ Class-Aware Augmentation"
     echo ""
     echo "Components Disabled (baseline):"
     echo "  ✗ CBAM Attention"
@@ -110,25 +112,32 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     
     python3 train.py \
         --use_baseline \
+        --decoder EfficientNet-B4 \
         --use_smart_skip \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 4 \
+        --batch_size 16\
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
-        --scheduler_type OneCycleLR \
+        --scheduler_type CosineAnnealingWarmRestarts \
+        --focal_gamma 2.0 \
+        --use_balanced_sampler \
+        --use_class_aware_aug \
+        --use_groupnorm \
+        --amp_opt_level O1 \
         --output_dir "./Result/a1/${MANUSCRIPT}"
 
     echo ""
     echo "========================================================================"
-    echo "Testing Hybrid2 Baseline Model with Smart Skip Connections: $MANUSCRIPT"
+    echo "Testing Hybrid2 Baseline Model with EfficientNet-B4 Decoder + Smart Skip Connections: $MANUSCRIPT"
     echo "========================================================================"
     
     python3 test.py \
         --use_baseline \
+        --decoder EfficientNet-B4 \
         --use_smart_skip \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
@@ -136,15 +145,15 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --use_patched_data \
         --is_savenii \
         --use_tta \
-        --use_crf \
+        --amp-opt-level O1 \
         --output_dir "./Result/a1/${MANUSCRIPT}"
 done
 
 echo ""
 echo "========================================================================"
-echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH SMART SKIP CONNECTIONS"
+echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH EFFICIENTNET-B4 DECODER + SMART SKIP CONNECTIONS"
 echo "========================================================================"
-echo "Model: Hybrid2 Baseline (Swin Encoder + Simple Decoder with Smart Skip Connections)"
+echo "Model: Hybrid2 Baseline (Swin Encoder + EfficientNet-B4 Decoder with Smart Skip Connections)"
 echo "Results saved in: ./Result/a1/"
 echo ""
 

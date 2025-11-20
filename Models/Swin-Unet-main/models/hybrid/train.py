@@ -119,6 +119,14 @@ def setup_datasets(args):
         args.num_classes = num_classes
         
         # Create datasets
+        use_class_aware_aug = getattr(args, 'use_class_aware_aug', False)
+        if use_class_aware_aug:
+            print("✓ Class-aware augmentation enabled (stronger augmentation for rare classes)")
+            if num_classes == 5:
+                print("  Rare classes: Paratext, Decoration, Title")
+            else:  # num_classes == 6
+                print("  Rare classes: Paratext, Decoration, Title, Chapter Headings")
+        
         train_dataset = UDiadsBibDataset(
             root_dir=args.udiadsbib_root,
             split='training',
@@ -126,7 +134,8 @@ def setup_datasets(args):
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
             model_type='hybrid2',  # Hardcoded since we only support hybrid2
-            num_classes=num_classes
+            num_classes=num_classes,
+            use_class_aware_aug=use_class_aware_aug
         )
         
         val_dataset = UDiadsBibDataset(
@@ -136,7 +145,8 @@ def setup_datasets(args):
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
             model_type='hybrid2',  # Hardcoded since we only support hybrid2
-            num_classes=num_classes
+            num_classes=num_classes,
+            use_class_aware_aug=False  # Never use augmentation for validation
         )
         
     elif args.dataset == 'DIVAHISDB' and DIVAHISDB_AVAILABLE:
@@ -272,6 +282,14 @@ def parse_arguments():
     parser.add_argument('--img_size', type=int, default=224, help='Input image size')
     parser.add_argument('--num_classes', type=int, default=5, help='Number of classes')
     
+    # Training enhancements (matching Network model)
+    parser.add_argument('--use_balanced_sampler', action='store_true', default=False,
+                       help='Use balanced sampler to oversample images containing rare classes')
+    parser.add_argument('--use_class_aware_aug', action='store_true', default=False,
+                       help='Use class-aware augmentation (stronger augmentation for rare classes)')
+    parser.add_argument('--focal_gamma', type=float, default=2.0,
+                       help='Focal loss gamma parameter (default: 2.0, Network model uses 3.0)')
+    
     # Dataset configuration
     parser.add_argument('--dataset', type=str, default='UDIADS_BIB', 
                        choices=['UDIADS_BIB', 'DIVAHISDB'], help='Dataset to use')
@@ -336,6 +354,19 @@ def main():
     
     # Set up datasets
     train_dataset, val_dataset = setup_datasets(args)
+    
+    # Create balanced sampler if requested
+    if getattr(args, 'use_balanced_sampler', False):
+        from trainer import create_balanced_sampler
+        balanced_sampler = create_balanced_sampler(train_dataset, args.num_classes)
+        args.balanced_sampler = balanced_sampler
+        if balanced_sampler is not None:
+            print("✓ Balanced sampler enabled (oversampling rare classes)")
+        else:
+            print("⚠️  Balanced sampler requested but could not be created (using default shuffling)")
+            args.balanced_sampler = None
+    else:
+        args.balanced_sampler = None
     
     # Create model (no config needed for Hybrid)
     model = get_model(args, config=None)

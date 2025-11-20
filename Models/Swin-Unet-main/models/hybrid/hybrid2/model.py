@@ -9,7 +9,8 @@ import torch.nn as nn
 from .components import (
     SwinEncoder,
     SimpleDecoder,
-    ResNet50Decoder
+    ResNet50Decoder,
+    EfficientNetB4Decoder
 )
 
 
@@ -102,11 +103,10 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
             img_size=img_size
         )
     elif decoder.lower() == 'efficientnet-b4' or decoder.lower() == 'efficientnet_b4':
-        # Use SimpleDecoder with EfficientNet-B4 variant
-        decoder_module = SimpleDecoder(
+        # Use REAL EfficientNet-B4 decoder with MBConv blocks
+        decoder_module = EfficientNetB4Decoder(
             encoder_channels=encoder_channels,
             num_classes=num_classes,
-            efficientnet_variant='b4',
             use_deep_supervision=use_deep_supervision,
             use_cbam=use_cbam,
             use_smart_skip=use_smart_skip,

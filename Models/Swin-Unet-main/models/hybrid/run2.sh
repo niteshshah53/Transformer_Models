@@ -83,26 +83,27 @@ MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341)
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo ""
     echo "========================================================================"
-    echo "Training Hybrid2 Baseline Model with Smart Skip Connections and Multi-Scale Aggregation: $MANUSCRIPT"
+    echo "Training Hybrid2 Baseline Model with Smart Skip (AFF) + Multi-Scale Aggregation: $MANUSCRIPT"
     echo "========================================================================"
     echo "Dataset: U-DIADS-Bib-MS_patched"
-    echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → Simple CNN Decoder"
-    echo "Decoder: Simple Decoder (EfficientNet-b4 channel configuration)"
+    echo "Architecture: Swin Transformer Encoder → 2 Swin Blocks Bottleneck → EfficientNet-B4 Decoder"
+    echo "Decoder: EfficientNet-B4 Decoder (Real MBConv blocks)"
     echo ""
     echo "Components Enabled:"
     echo "  ✓ Swin Encoder (4 stages: 96→192→384→768 dim)"
     echo "  ✓ Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
-    echo "  ✓ Simple CNN Decoder (channels: [256, 128, 64, 32])"
-    echo "  ✓ Smart Skip Connections"
+    echo "  ✓ EfficientNet-B4 Decoder (Real MBConv blocks, channels: [256, 128, 64, 32])"
+    echo "  ✓ Smart Skip Connections (Attention-based Features)"
     echo "  ✓ Multi-Scale Aggregation"
     echo "  ✓ Positional Embeddings (default: enabled)"
     echo "  ✓ GroupNorm (default normalization)"
+    echo "  ✓ Balanced Sampler (oversampling rare classes)"
+    echo "  ✓ Class-Aware Augmentation"
     echo ""
-    echo "Components Disabled (baseline):"
+    echo "Components Disabled:"
     echo "  ✗ CBAM Attention"
-    echo "  ✗ Smart Skip Connections"
     echo "  ✗ Cross-Attention Bottleneck"
-    echo "  ✗ Multi-Scale Aggregation"
+    echo "  ✗ Deep Supervision"
     echo "  ✗ BatchNorm"
     echo "========================================================================"
     
@@ -111,20 +112,24 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --decoder EfficientNet-B4 \
         --use_smart_skip \
         --use_multiscale_agg \
+        --use_balanced_sampler \
+        --use_class_aware_aug \
+        --focal_gamma 2.0 \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 4 \
+        --batch_size 16 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
         --scheduler_type OneCycleLR \
+        --amp_opt_level O1 \
         --output_dir "./Result/a2/${MANUSCRIPT}"
 
     echo ""
     echo "========================================================================"
-    echo "Testing Hybrid2 Baseline Model with Smart Skip Connections and Multi-Scale Aggregation: $MANUSCRIPT"
+    echo "Testing Hybrid2 Baseline Model with Smart Skip (AFF) + Multi-Scale Aggregation: $MANUSCRIPT"
     echo "========================================================================"
     
     python3 test.py \
@@ -138,15 +143,15 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --use_patched_data \
         --is_savenii \
         --use_tta \
-        --use_crf \
+        --amp-opt-level O1 \
         --output_dir "./Result/a2/${MANUSCRIPT}"
 done
 
 echo ""
 echo "========================================================================"
-echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH SMART SKIP CONNECTIONS AND MULTI-SCALE AGGREGATION"
+echo "ALL MANUSCRIPTS COMPLETED - HYBRID2 BASELINE MODEL WITH SMART SKIP (AFF) + MULTI-SCALE AGGREGATION"
 echo "========================================================================"
-echo "Model: Hybrid2 Baseline (Swin Encoder + Simple Decoder with Smart Skip Connections and Multi-Scale Aggregation)"
+echo "Model: Hybrid2 Baseline (Swin Encoder + EfficientNet-B4 Decoder with Smart Skip (AFF) + Multi-Scale Aggregation)"
 echo "Results saved in: ./Result/a2/"
 echo ""
 

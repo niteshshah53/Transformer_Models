@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
+import timm
 
 
 # ============================================================================
@@ -486,6 +487,12 @@ class ImprovedSmartSkipConnection(nn.Module):
     
     def forward(self, encoder_feat, decoder_feat):
         skip_feat = self.align(encoder_feat)
+        
+        # Upsample encoder features to match decoder spatial size
+        if skip_feat.shape[2:] != decoder_feat.shape[2:]:
+            skip_feat = F.interpolate(skip_feat, size=decoder_feat.shape[2:], 
+                                    mode='bilinear', align_corners=False)
+        
         skip_feat = self.attention(skip_feat)
         
         if self.fusion_type == 'add':
@@ -716,6 +723,12 @@ class SimpleSkipConnection(nn.Module):
     
     def forward(self, encoder_feat, decoder_feat):
         encoder_proj = self.proj(encoder_feat)
+        
+        # Upsample encoder features to match decoder spatial size
+        if encoder_proj.shape[2:] != decoder_feat.shape[2:]:
+            encoder_proj = F.interpolate(encoder_proj, size=decoder_feat.shape[2:], 
+                                       mode='bilinear', align_corners=False)
+        
         fused = torch.cat([decoder_feat, encoder_proj], dim=1)
         fused = self.fuse(fused)
         return fused
@@ -869,6 +882,15 @@ class BaselineHybrid2Decoder(nn.Module):
                 nn.ReLU(inplace=True)
             )
             
+            # Projection layers for MSA/p4 to encoder dimension (for token processing)
+            # Used when MSA is enabled or when encoder_tokens not available
+            self.msa_to_encoder_proj = nn.Sequential(
+                nn.Conv2d(decoder_dim, encoder_dim, 1, bias=False),
+                self._get_norm_layer(encoder_dim),
+                nn.ReLU(inplace=True)
+            )
+            self.p4_to_encoder_proj = self.msa_to_encoder_proj  # Same projection for p4
+            
             self.bottleneck_layer = BasicLayer(
                 dim=bottleneck_dim,  # 768
                 input_resolution=bottleneck_resolution,
@@ -919,13 +941,13 @@ class BaselineHybrid2Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 fusion_type='concat'
             )
         else:
             self.skip1 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 use_groupnorm=use_groupnorm
             )
@@ -937,13 +959,13 @@ class BaselineHybrid2Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 fusion_type='concat'
             )
         else:
             self.skip2 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 use_groupnorm=use_groupnorm
             )
@@ -955,14 +977,28 @@ class BaselineHybrid2Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
                 fusion_type='concat'
             )
         else:
             self.skip3 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Skip connection for decoder4: e1 (p1) → decoder4
+        if use_smart_skip:
+            self.skip4 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip4 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
                 use_groupnorm=use_groupnorm
             )
         
@@ -982,12 +1018,13 @@ class BaselineHybrid2Decoder(nn.Module):
             nn.Conv2d(64, num_classes, 1)
         )
         
-        # Auxiliary heads for deep supervision
+        # Auxiliary heads for deep supervision (MSAGHNet-style: simple OutConv, 3x3 conv)
+        # Outputs at native resolutions (NO upsampling) - matching Network model multi-resolution approach
         if use_deep_supervision:
             self.aux_heads = nn.ModuleList([
-                nn.Conv2d(decoder_channels[2], num_classes, 1),
-                nn.Conv2d(decoder_channels[1], num_classes, 1),
-                nn.Conv2d(decoder_channels[0], num_classes, 1),
+                nn.Conv2d(decoder_channels[0], num_classes, 3, padding=1),  # Stage 1: H/16, 256 channels
+                nn.Conv2d(decoder_channels[1], num_classes, 3, padding=1),  # Stage 2: H/8, 128 channels
+                nn.Conv2d(decoder_channels[2], num_classes, 3, padding=1),  # Stage 3: H/4, 64 channels
             ])
         else:
             self.aux_heads = None
@@ -1023,42 +1060,65 @@ class BaselineHybrid2Decoder(nn.Module):
         p4 = self.encoder_projections[3](f4)
         
         if self.use_multiscale_agg:
+            # If MSA enabled: bottleneck receives input ONLY from MSA output (not MSA + p4)
             bottleneck_feat = self.multiscale_agg([f1, f2, f3, f4])
             if bottleneck_feat.shape[2:] != p4.shape[2:]:
                 bottleneck_feat = F.interpolate(bottleneck_feat, size=p4.shape[2:], 
                                               mode='bilinear', align_corners=False)
-            x = bottleneck_feat + p4
+            x = bottleneck_feat  # MSA output ONLY (no addition with p4)
         else:
+            # If MSA disabled: bottleneck receives input ONLY from e4 (p4)
             x = p4
         
-        # Bottleneck: 2 Swin blocks (baseline)
-        # Use Stage 4 tokens directly with encoder dimension (768)
+        # Bottleneck: 2 Swin blocks
+        # If MSA enabled: bottleneck receives input ONLY from MSA output (convert to tokens)
+        # If MSA disabled: bottleneck receives input from e4 (use encoder_tokens if available, else p4)
         if self.use_bottleneck_swin:
-            if encoder_tokens is not None:
-                # Use Stage 4 tokens directly: (B, 49, 768)
-                stage4_tokens = encoder_tokens  # (B, 49, 768)
+            if self.use_multiscale_agg:
+                # MSA enabled: use MSA output (x) - convert feature maps to tokens
+                # x is MSA output at decoder_dim (32), need to project to encoder_dim (768) for token processing
+                B, C, H, W = x.shape
+                encoder_dim = self.encoder_channels[3]  # 768
                 
-                # No token projection - use encoder dimension directly
-                # Process through 2 Swin Transformer blocks at 768 dimension
+                # Project MSA output to encoder dimension for bottleneck token processing
+                if C != encoder_dim:
+                    x = self.msa_to_encoder_proj(x)  # (B, 768, 7, 7)
+                
+                # Convert feature maps to tokens
+                x_tokens = x.flatten(2).permute(0, 2, 1)  # (B, 49, 768)
+                x_tokens = self.bottleneck_layer(x_tokens)  # (B, 49, 768)
+                x = x_tokens.transpose(1, 2).view(B, encoder_dim, H, W)  # (B, 768, 7, 7)
+                
+                # Project from encoder dimension (768) to decoder dimension (32)
+                x = self.feature_projection(x)  # (B, 32, 7, 7)
+            elif encoder_tokens is not None:
+                # MSA disabled AND encoder_tokens available: use encoder_tokens directly
+                stage4_tokens = encoder_tokens  # (B, 49, 768)
                 x_tokens = self.bottleneck_layer(stage4_tokens)  # (B, 49, 768)
                 
-                # Convert tokens back to feature maps (same technique as encoder)
-                # B, L, C = x_tokens.shape -> (B, 49, 768)
+                # Convert tokens back to feature maps
                 B, L, C = x_tokens.shape
                 H = W = int(L ** 0.5)  # H = W = 7
                 x = x_tokens.transpose(1, 2).view(B, C, H, W)  # (B, 768, 7, 7)
                 
-                # Project feature maps from encoder dimension (768) to decoder dimension (32)
+                # Project from encoder dimension (768) to decoder dimension (32)
                 x = self.feature_projection(x)  # (B, 32, 7, 7)
             else:
-                # Fallback: convert feature map to tokens (old method)
-                B, C, H, W = x.shape
-                x_tokens = x.flatten(2).permute(0, 2, 1)
-                x_tokens = self.bottleneck_layer(x_tokens)
-                x = x_tokens.permute(0, 2, 1).reshape(B, C, H, W)
-                # Project if needed
-                if self.feature_projection is not None and C != self.decoder_channels[3]:
-                    x = self.feature_projection(x)
+                # MSA disabled AND no encoder_tokens: use p4, convert to tokens
+                B, C, H, W = x.shape  # x is p4 at decoder_dim (32)
+                encoder_dim = self.encoder_channels[3]  # 768
+                
+                # Project p4 to encoder dimension for token processing
+                if C != encoder_dim:
+                    x = self.p4_to_encoder_proj(x)  # (B, 768, 7, 7)
+                
+                # Convert feature maps to tokens
+                x_tokens = x.flatten(2).permute(0, 2, 1)  # (B, 49, 768)
+                x_tokens = self.bottleneck_layer(x_tokens)  # (B, 49, 768)
+                x = x_tokens.transpose(1, 2).view(B, encoder_dim, H, W)  # (B, 768, 7, 7)
+                
+                # Project from encoder dimension (768) to decoder dimension (32)
+                x = self.feature_projection(x)  # (B, 32, 7, 7)
         
         if self.bottleneck_cbam is not None:
             x = self.bottleneck_cbam(x)
@@ -1073,30 +1133,31 @@ class BaselineHybrid2Decoder(nn.Module):
         
         # Stage 1: H/32 -> H/16
         x = self.decoder1(x)
-        x = self.skip1(p3, x)
+        x = self.skip1(p4, x)  # e4 (p4) → decoder1
         if self.use_deep_supervision:
-            aux_out1 = self.aux_heads[0](x)
-            aux_out1 = F.interpolate(aux_out1, scale_factor=16, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/16) - NO upsampling (multi-resolution deep supervision)
+            aux_out1 = self.aux_heads[0](x)  # [B, num_classes, H/16, W/16]
             aux_outputs.append(aux_out1)
         
         # Stage 2: H/16 -> H/8
         x = self.decoder2(x)
-        x = self.skip2(p2, x)
+        x = self.skip2(p3, x)  # e3 (p3) → decoder2
         if self.use_deep_supervision:
-            aux_out2 = self.aux_heads[1](x)
-            aux_out2 = F.interpolate(aux_out2, scale_factor=8, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/8) - NO upsampling (multi-resolution deep supervision)
+            aux_out2 = self.aux_heads[1](x)  # [B, num_classes, H/8, W/8]
             aux_outputs.append(aux_out2)
         
         # Stage 3: H/8 -> H/4
         x = self.decoder3(x)
-        x = self.skip3(p1, x)
+        x = self.skip3(p2, x)  # e2 (p2) → decoder3
         if self.use_deep_supervision:
-            aux_out3 = self.aux_heads[2](x)
-            aux_out3 = F.interpolate(aux_out3, scale_factor=4, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/4) - NO upsampling (multi-resolution deep supervision)
+            aux_out3 = self.aux_heads[2](x)  # [B, num_classes, H/4, W/4]
             aux_outputs.append(aux_out3)
         
         # Stage 4: H/4 -> H
         x = self.decoder4(x)
+        x = self.skip4(p1, x)  # e1 (p1) → decoder4
         main_output = self.seg_head(x)
         
         if self.use_deep_supervision:
@@ -1243,6 +1304,15 @@ class SimpleDecoder(nn.Module):
                 nn.ReLU(inplace=True)
             )
             
+            # Projection layers for MSA/p4 to encoder dimension (for token processing)
+            # Used when MSA is enabled or when encoder_tokens not available
+            self.msa_to_encoder_proj = nn.Sequential(
+                nn.Conv2d(decoder_dim, encoder_dim, 1, bias=False),
+                self._get_norm_layer(encoder_dim),
+                nn.ReLU(inplace=True)
+            )
+            self.p4_to_encoder_proj = self.msa_to_encoder_proj  # Same projection for p4
+            
             self.bottleneck_layer = BasicLayer(
                 dim=bottleneck_dim,  # 768
                 input_resolution=bottleneck_resolution,
@@ -1293,13 +1363,13 @@ class SimpleDecoder(nn.Module):
         
         if use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 fusion_type='concat'
             )
         else:
             self.skip1 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 use_groupnorm=use_groupnorm
             )
@@ -1311,13 +1381,13 @@ class SimpleDecoder(nn.Module):
         
         if use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 fusion_type='concat'
             )
         else:
             self.skip2 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 use_groupnorm=use_groupnorm
             )
@@ -1329,14 +1399,28 @@ class SimpleDecoder(nn.Module):
         
         if use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
                 fusion_type='concat'
             )
         else:
             self.skip3 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Skip connection for decoder4: e1 (p1) → decoder4
+        if use_smart_skip:
+            self.skip4 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip4 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
                 use_groupnorm=use_groupnorm
             )
         
@@ -1356,12 +1440,13 @@ class SimpleDecoder(nn.Module):
             nn.Conv2d(64, num_classes, 1)
         )
         
-        # Auxiliary heads for deep supervision
+        # Auxiliary heads for deep supervision (MSAGHNet-style: simple OutConv, 3x3 conv)
+        # Outputs at native resolutions (NO upsampling) - matching Network model multi-resolution approach
         if use_deep_supervision:
             self.aux_heads = nn.ModuleList([
-                nn.Conv2d(decoder_channels[2], num_classes, 1),
-                nn.Conv2d(decoder_channels[1], num_classes, 1),
-                nn.Conv2d(decoder_channels[0], num_classes, 1),
+                nn.Conv2d(decoder_channels[0], num_classes, 3, padding=1),  # Stage 1: H/16, 256 channels
+                nn.Conv2d(decoder_channels[1], num_classes, 3, padding=1),  # Stage 2: H/8, 128 channels
+                nn.Conv2d(decoder_channels[2], num_classes, 3, padding=1),  # Stage 3: H/4, 64 channels
             ])
         else:
             self.aux_heads = None
@@ -1397,42 +1482,65 @@ class SimpleDecoder(nn.Module):
         p4 = self.encoder_projections[3](f4)
         
         if self.use_multiscale_agg:
+            # If MSA enabled: bottleneck receives input ONLY from MSA output (not MSA + p4)
             bottleneck_feat = self.multiscale_agg([f1, f2, f3, f4])
             if bottleneck_feat.shape[2:] != p4.shape[2:]:
                 bottleneck_feat = F.interpolate(bottleneck_feat, size=p4.shape[2:], 
                                               mode='bilinear', align_corners=False)
-            x = bottleneck_feat + p4
+            x = bottleneck_feat  # MSA output ONLY (no addition with p4)
         else:
+            # If MSA disabled: bottleneck receives input ONLY from e4 (p4)
             x = p4
         
-        # Bottleneck: 2 Swin blocks (baseline)
-        # Use Stage 4 tokens directly with encoder dimension (768)
+        # Bottleneck: 2 Swin blocks
+        # If MSA enabled: bottleneck receives input ONLY from MSA output (convert to tokens)
+        # If MSA disabled: bottleneck receives input from e4 (use encoder_tokens if available, else p4)
         if self.use_bottleneck_swin:
-            if encoder_tokens is not None:
-                # Use Stage 4 tokens directly: (B, 49, 768)
-                stage4_tokens = encoder_tokens  # (B, 49, 768)
+            if self.use_multiscale_agg:
+                # MSA enabled: use MSA output (x) - convert feature maps to tokens
+                # x is MSA output at decoder_dim (32), need to project to encoder_dim (768) for token processing
+                B, C, H, W = x.shape
+                encoder_dim = self.encoder_channels[3]  # 768
                 
-                # No token projection - use encoder dimension directly
-                # Process through 2 Swin Transformer blocks at 768 dimension
+                # Project MSA output to encoder dimension for bottleneck token processing
+                if C != encoder_dim:
+                    x = self.msa_to_encoder_proj(x)  # (B, 768, 7, 7)
+                
+                # Convert feature maps to tokens
+                x_tokens = x.flatten(2).permute(0, 2, 1)  # (B, 49, 768)
+                x_tokens = self.bottleneck_layer(x_tokens)  # (B, 49, 768)
+                x = x_tokens.transpose(1, 2).view(B, encoder_dim, H, W)  # (B, 768, 7, 7)
+                
+                # Project from encoder dimension (768) to decoder dimension (32)
+                x = self.feature_projection(x)  # (B, 32, 7, 7)
+            elif encoder_tokens is not None:
+                # MSA disabled AND encoder_tokens available: use encoder_tokens directly
+                stage4_tokens = encoder_tokens  # (B, 49, 768)
                 x_tokens = self.bottleneck_layer(stage4_tokens)  # (B, 49, 768)
                 
-                # Convert tokens back to feature maps (same technique as encoder)
-                # B, L, C = x_tokens.shape -> (B, 49, 768)
+                # Convert tokens back to feature maps
                 B, L, C = x_tokens.shape
                 H = W = int(L ** 0.5)  # H = W = 7
                 x = x_tokens.transpose(1, 2).view(B, C, H, W)  # (B, 768, 7, 7)
                 
-                # Project feature maps from encoder dimension (768) to decoder dimension (32)
+                # Project from encoder dimension (768) to decoder dimension (32)
                 x = self.feature_projection(x)  # (B, 32, 7, 7)
             else:
-                # Fallback: convert feature map to tokens (old method)
-                B, C, H, W = x.shape
-                x_tokens = x.flatten(2).permute(0, 2, 1)
-                x_tokens = self.bottleneck_layer(x_tokens)
-                x = x_tokens.permute(0, 2, 1).reshape(B, C, H, W)
-                # Project if needed
-                if self.feature_projection is not None and C != self.decoder_channels[3]:
-                    x = self.feature_projection(x)
+                # MSA disabled AND no encoder_tokens: use p4, convert to tokens
+                B, C, H, W = x.shape  # x is p4 at decoder_dim (32)
+                encoder_dim = self.encoder_channels[3]  # 768
+                
+                # Project p4 to encoder dimension for token processing
+                if C != encoder_dim:
+                    x = self.p4_to_encoder_proj(x)  # (B, 768, 7, 7)
+                
+                # Convert feature maps to tokens
+                x_tokens = x.flatten(2).permute(0, 2, 1)  # (B, 49, 768)
+                x_tokens = self.bottleneck_layer(x_tokens)  # (B, 49, 768)
+                x = x_tokens.transpose(1, 2).view(B, encoder_dim, H, W)  # (B, 768, 7, 7)
+                
+                # Project from encoder dimension (768) to decoder dimension (32)
+                x = self.feature_projection(x)  # (B, 32, 7, 7)
         
         if self.bottleneck_cbam is not None:
             x = self.bottleneck_cbam(x)
@@ -1447,30 +1555,31 @@ class SimpleDecoder(nn.Module):
         
         # Stage 1: H/32 -> H/16
         x = self.decoder1(x)
-        x = self.skip1(p3, x)
+        x = self.skip1(p4, x)  # e4 (p4) → decoder1
         if self.use_deep_supervision:
-            aux_out1 = self.aux_heads[0](x)
-            aux_out1 = F.interpolate(aux_out1, scale_factor=16, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/16) - NO upsampling (multi-resolution deep supervision)
+            aux_out1 = self.aux_heads[0](x)  # [B, num_classes, H/16, W/16]
             aux_outputs.append(aux_out1)
         
         # Stage 2: H/16 -> H/8
         x = self.decoder2(x)
-        x = self.skip2(p2, x)
+        x = self.skip2(p3, x)  # e3 (p3) → decoder2
         if self.use_deep_supervision:
-            aux_out2 = self.aux_heads[1](x)
-            aux_out2 = F.interpolate(aux_out2, scale_factor=8, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/8) - NO upsampling (multi-resolution deep supervision)
+            aux_out2 = self.aux_heads[1](x)  # [B, num_classes, H/8, W/8]
             aux_outputs.append(aux_out2)
         
         # Stage 3: H/8 -> H/4
         x = self.decoder3(x)
-        x = self.skip3(p1, x)
+        x = self.skip3(p2, x)  # e2 (p2) → decoder3
         if self.use_deep_supervision:
-            aux_out3 = self.aux_heads[2](x)
-            aux_out3 = F.interpolate(aux_out3, scale_factor=4, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/4) - NO upsampling (multi-resolution deep supervision)
+            aux_out3 = self.aux_heads[2](x)  # [B, num_classes, H/4, W/4]
             aux_outputs.append(aux_out3)
         
         # Stage 4: H/4 -> H
         x = self.decoder4(x)
+        x = self.skip4(p1, x)  # e1 (p1) → decoder4
         main_output = self.seg_head(x)
         
         if self.use_deep_supervision:
@@ -1646,6 +1755,15 @@ class ResNet50Decoder(nn.Module):
                 nn.ReLU(inplace=True)
             )
             
+            # Projection layers for MSA/p4 to encoder dimension (for token processing)
+            # Used when MSA is enabled or when encoder_tokens not available
+            self.msa_to_encoder_proj = nn.Sequential(
+                nn.Conv2d(decoder_dim, encoder_dim, 1, bias=False),
+                self._get_norm_layer(encoder_dim),
+                nn.ReLU(inplace=True)
+            )
+            self.p4_to_encoder_proj = self.msa_to_encoder_proj  # Same projection for p4
+            
             self.bottleneck_layer = BasicLayer(
                 dim=bottleneck_dim,
                 input_resolution=bottleneck_resolution,
@@ -1696,13 +1814,13 @@ class ResNet50Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 fusion_type='concat'
             )
         else:
             self.skip1 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[2],
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
                 use_groupnorm=use_groupnorm
             )
@@ -1714,13 +1832,13 @@ class ResNet50Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 fusion_type='concat'
             )
         else:
             self.skip2 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[1],
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
                 use_groupnorm=use_groupnorm
             )
@@ -1732,14 +1850,28 @@ class ResNet50Decoder(nn.Module):
         
         if use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
                 fusion_type='concat'
             )
         else:
             self.skip3 = SimpleSkipConnection(
-                encoder_channels=decoder_channels[0],
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Skip connection for decoder4: e1 (p1) → decoder4
+        if use_smart_skip:
+            self.skip4 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip4 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
                 use_groupnorm=use_groupnorm
             )
         
@@ -1759,12 +1891,13 @@ class ResNet50Decoder(nn.Module):
             nn.Conv2d(64, num_classes, 1)
         )
         
-        # Auxiliary heads for deep supervision
+        # Auxiliary heads for deep supervision (MSAGHNet-style: simple OutConv, 3x3 conv)
+        # Outputs at native resolutions (NO upsampling) - matching Network model multi-resolution approach
         if use_deep_supervision:
             self.aux_heads = nn.ModuleList([
-                nn.Conv2d(decoder_channels[2], num_classes, 1),
-                nn.Conv2d(decoder_channels[1], num_classes, 1),
-                nn.Conv2d(decoder_channels[0], num_classes, 1),
+                nn.Conv2d(decoder_channels[0], num_classes, 3, padding=1),  # Stage 1: H/16, 256 channels
+                nn.Conv2d(decoder_channels[1], num_classes, 3, padding=1),  # Stage 2: H/8, 128 channels
+                nn.Conv2d(decoder_channels[2], num_classes, 3, padding=1),  # Stage 3: H/4, 64 channels
             ])
         else:
             self.aux_heads = None
@@ -1823,30 +1956,31 @@ class ResNet50Decoder(nn.Module):
         
         # Stage 1: H/32 -> H/16
         x = self.decoder1(x)
-        x = self.skip1(p3, x)
+        x = self.skip1(p4, x)  # e4 (p4) → decoder1
         if self.use_deep_supervision:
-            aux_out1 = self.aux_heads[0](x)
-            aux_out1 = F.interpolate(aux_out1, scale_factor=16, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/16) - NO upsampling (multi-resolution deep supervision)
+            aux_out1 = self.aux_heads[0](x)  # [B, num_classes, H/16, W/16]
             aux_outputs.append(aux_out1)
         
         # Stage 2: H/16 -> H/8
         x = self.decoder2(x)
-        x = self.skip2(p2, x)
+        x = self.skip2(p3, x)  # e3 (p3) → decoder2
         if self.use_deep_supervision:
-            aux_out2 = self.aux_heads[1](x)
-            aux_out2 = F.interpolate(aux_out2, scale_factor=8, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/8) - NO upsampling (multi-resolution deep supervision)
+            aux_out2 = self.aux_heads[1](x)  # [B, num_classes, H/8, W/8]
             aux_outputs.append(aux_out2)
         
         # Stage 3: H/8 -> H/4
         x = self.decoder3(x)
-        x = self.skip3(p1, x)
+        x = self.skip3(p2, x)  # e2 (p2) → decoder3
         if self.use_deep_supervision:
-            aux_out3 = self.aux_heads[2](x)
-            aux_out3 = F.interpolate(aux_out3, scale_factor=4, mode='bilinear', align_corners=False)
+            # Output at native resolution (H/4) - NO upsampling (multi-resolution deep supervision)
+            aux_out3 = self.aux_heads[2](x)  # [B, num_classes, H/4, W/4]
             aux_outputs.append(aux_out3)
         
         # Stage 4: H/4 -> H
         x = self.decoder4(x)
+        x = self.skip4(p1, x)  # e1 (p1) → decoder4
         main_output = self.seg_head(x)
         
         if self.use_deep_supervision:
@@ -1858,6 +1992,449 @@ class ResNet50Decoder(nn.Module):
         """Get model information."""
         return {
             'decoder_type': 'ResNet50Decoder',
+            'encoder_channels': self.encoder_channels,
+            'decoder_channels': self.decoder_channels,
+            'num_classes': self.num_classes,
+            'use_deep_supervision': self.use_deep_supervision,
+            'use_cbam': self.use_cbam,
+            'use_smart_skip': self.use_smart_skip,
+            'use_cross_attn': self.use_cross_attn,
+            'use_multiscale_agg': self.use_multiscale_agg,
+            'use_groupnorm': self.use_groupnorm,
+            'use_pos_embed': self.use_pos_embed,
+            'use_bottleneck_swin': self.use_bottleneck_swin,
+            'total_params': sum(p.numel() for p in self.parameters()),
+            'trainable_params': sum(p.numel() for p in self.parameters() if p.requires_grad)
+        }
+
+
+# ============================================================================
+# EFFICIENTNET-B4 DECODER (Real MBConv Blocks from timm)
+# ============================================================================
+
+class MBConvBlock(nn.Module):
+    """
+    Mobile Inverted Bottleneck Convolution (MBConv) block.
+    Used in EfficientNet architectures.
+    Structure: Expand -> Depthwise -> SE -> Project
+    """
+    def __init__(self, in_channels, out_channels, expansion_ratio=6, 
+                 kernel_size=3, stride=1, se_ratio=0.25, use_groupnorm=False):
+        super().__init__()
+        self.stride = stride
+        self.expanded_channels = int(in_channels * expansion_ratio)
+        
+        # Expansion phase (1x1 conv)
+        if expansion_ratio != 1:
+            self.expand_conv = nn.Conv2d(in_channels, self.expanded_channels, 1, bias=False)
+            if use_groupnorm:
+                self.expand_bn = get_norm_layer(self.expanded_channels, 'group')
+            else:
+                self.expand_bn = nn.BatchNorm2d(self.expanded_channels)
+            self.expand_act = nn.SiLU()  # Swish activation
+        else:
+            self.expand_conv = None
+        
+        # Depthwise convolution (3x3 or 5x5)
+        padding = (kernel_size - 1) // 2
+        self.depthwise_conv = nn.Conv2d(
+            self.expanded_channels, self.expanded_channels, 
+            kernel_size, stride=stride, padding=padding, 
+            groups=self.expanded_channels, bias=False
+        )
+        if use_groupnorm:
+            self.depthwise_bn = get_norm_layer(self.expanded_channels, 'group')
+        else:
+            self.depthwise_bn = nn.BatchNorm2d(self.expanded_channels)
+        self.depthwise_act = nn.SiLU()
+        
+        # Squeeze-and-Excitation (SE) module
+        se_channels = max(1, int(in_channels * se_ratio))
+        self.se = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Conv2d(self.expanded_channels, se_channels, 1),
+            nn.SiLU(),
+            nn.Conv2d(se_channels, self.expanded_channels, 1),
+            nn.Sigmoid()
+        )
+        
+        # Projection phase (1x1 conv)
+        self.project_conv = nn.Conv2d(self.expanded_channels, out_channels, 1, bias=False)
+        if use_groupnorm:
+            self.project_bn = get_norm_layer(out_channels, 'group')
+        else:
+            self.project_bn = nn.BatchNorm2d(out_channels)
+        
+        # Skip connection
+        self.use_residual = (stride == 1 and in_channels == out_channels)
+    
+    def forward(self, x):
+        identity = x
+        
+        # Expansion
+        if self.expand_conv is not None:
+            x = self.expand_conv(x)
+            x = self.expand_bn(x)
+            x = self.expand_act(x)
+        
+        # Depthwise
+        x = self.depthwise_conv(x)
+        x = self.depthwise_bn(x)
+        x = self.depthwise_act(x)
+        
+        # SE
+        x = x * self.se(x)
+        
+        # Projection
+        x = self.project_conv(x)
+        x = self.project_bn(x)
+        
+        # Skip connection
+        if self.use_residual:
+            x = x + identity
+        
+        return x
+
+
+class EfficientNetB4Decoder(nn.Module):
+    """
+    Real EfficientNet-B4 Decoder using MBConv blocks from timm architecture.
+    Uses actual MBConv blocks (not simple Conv blocks) for decoder stages.
+    """
+    
+    def __init__(self, encoder_channels, num_classes=6,
+                 use_deep_supervision=False, use_cbam=False,
+                 use_smart_skip=False, use_cross_attn=False,
+                 use_multiscale_agg=False, use_groupnorm=True,
+                 use_pos_embed=True, use_bottleneck_swin=True,
+                 img_size=224):
+        super().__init__()
+        
+        self.num_classes = num_classes
+        self.encoder_channels = encoder_channels
+        self.use_deep_supervision = use_deep_supervision
+        self.use_cbam = use_cbam
+        self.use_smart_skip = use_smart_skip
+        self.use_cross_attn = use_cross_attn
+        self.use_multiscale_agg = use_multiscale_agg
+        self.use_groupnorm = use_groupnorm
+        self.use_pos_embed = use_pos_embed
+        self.use_bottleneck_swin = use_bottleneck_swin
+        self.img_size = img_size
+        
+        # EfficientNet-B4 decoder channels (matching encoder output scales)
+        decoder_channels = [256, 128, 64, 32]
+        self.decoder_channels = decoder_channels
+        
+        print("=" * 80)
+        print("🚀 EFFICIENTNET-B4 DECODER (Real MBConv Blocks)")
+        print("=" * 80)
+        print(f"  • Decoder Channels: {decoder_channels}")
+        print(f"  • Using MBConv blocks (NOT simple Conv)")
+        print(f"  • Bottleneck Swin Blocks: {use_bottleneck_swin}")
+        print(f"\n📊 Optional Features:")
+        print(f"  • Deep Supervision: {use_deep_supervision}")
+        print(f"  • CBAM Attention: {use_cbam}")
+        print(f"  • Smart Skip Connections: {use_smart_skip}")
+        print(f"  • Cross-Attention: {use_cross_attn}")
+        print(f"  • Multi-Scale Aggregation: {use_multiscale_agg}")
+        print(f"  • GroupNorm: {use_groupnorm} (else BatchNorm)")
+        print(f"  • Positional Embeddings: {use_pos_embed}")
+        print("=" * 80)
+        
+        # Feature projections
+        self.encoder_projections = nn.ModuleList([
+            nn.Sequential(
+                nn.Conv2d(enc_ch, dec_ch, 1, bias=False),
+                self._get_norm_layer(dec_ch),
+                nn.ReLU(inplace=True)
+            )
+            for enc_ch, dec_ch in zip(encoder_channels, decoder_channels)
+        ])
+        
+        # Multi-scale aggregation (optional)
+        if use_multiscale_agg:
+            self.multiscale_agg = MultiScaleAggregation(
+                encoder_channels_list=encoder_channels,
+                out_channels=decoder_channels[3],
+                target_size=None
+            )
+        else:
+            self.multiscale_agg = None
+        
+        # Bottleneck: 2 Swin blocks (same as SimpleDecoder)
+        if use_bottleneck_swin:
+            bottleneck_resolution = (img_size // 32, img_size // 32)
+            encoder_dim = encoder_channels[3]  # 768
+            bottleneck_dim = encoder_dim  # 768
+            
+            if bottleneck_dim == 768:
+                bottleneck_num_heads = 24
+            elif bottleneck_dim % 24 == 0:
+                bottleneck_num_heads = 24
+            elif bottleneck_dim % 16 == 0:
+                bottleneck_num_heads = 16
+            elif bottleneck_dim % 8 == 0:
+                bottleneck_num_heads = 8
+            else:
+                bottleneck_num_heads = 8
+            
+            self.token_projection = None
+            
+            decoder_dim = decoder_channels[3]  # 32
+            self.feature_projection = nn.Sequential(
+                nn.Conv2d(encoder_dim, decoder_dim, 1, bias=False),
+                self._get_norm_layer(decoder_dim),
+                nn.ReLU(inplace=True)
+            )
+            
+            # Projection layers for MSA/p4 to encoder dimension (for token processing)
+            # Used when MSA is enabled or when encoder_tokens not available
+            self.msa_to_encoder_proj = nn.Sequential(
+                nn.Conv2d(decoder_dim, encoder_dim, 1, bias=False),
+                self._get_norm_layer(encoder_dim),
+                nn.ReLU(inplace=True)
+            )
+            self.p4_to_encoder_proj = self.msa_to_encoder_proj  # Same projection for p4
+            
+            self.bottleneck_layer = BasicLayer(
+                dim=bottleneck_dim,
+                input_resolution=bottleneck_resolution,
+                depth=2,
+                num_heads=bottleneck_num_heads,
+                window_size=7,
+                mlp_ratio=4.0,
+                qkv_bias=True,
+                drop_path=0.1,
+                norm_layer=nn.LayerNorm,
+                downsample=None,
+                use_checkpoint=False
+            )
+        else:
+            self.bottleneck_layer = None
+            self.token_projection = None
+            self.feature_projection = None
+        
+        # Optional: Cross-Attention Bottleneck
+        if use_cross_attn:
+            self.cross_attn = CrossAttentionBottleneck(
+                decoder_dim=decoder_channels[3],
+                encoder_dim=encoder_channels[3],
+                num_heads=8
+            )
+        else:
+            self.cross_attn = None
+        
+        # Optional: CBAM for bottleneck
+        if use_cbam:
+            self.bottleneck_cbam = ImprovedCBAM(decoder_channels[3])
+        else:
+            self.bottleneck_cbam = None
+        
+        # Optional: Positional Embeddings
+        if use_pos_embed:
+            self.pos_embed = PositionalEmbedding2D(
+                decoder_channels[3], img_size // 32, img_size // 32
+            )
+        else:
+            self.pos_embed = None
+        
+        # Decoder stages with MBConv blocks
+        # Stage 1: 32 -> 256 (with upsampling)
+        self.decoder1 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+            MBConvBlock(32, 256, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm),
+            MBConvBlock(256, 256, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm)
+        )
+        
+        if use_smart_skip:
+            self.skip1 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
+                decoder_channels=decoder_channels[0],  # decoder1 outputs 256 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip1 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
+                decoder_channels=decoder_channels[0],  # decoder1 outputs 256 channels
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Stage 2: 256 -> 128 (with upsampling)
+        self.decoder2 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+            MBConvBlock(256, 128, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm),
+            MBConvBlock(128, 128, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm)
+        )
+        
+        if use_smart_skip:
+            self.skip2 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
+                decoder_channels=decoder_channels[1],  # decoder2 outputs 128 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip2 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
+                decoder_channels=decoder_channels[1],  # decoder2 outputs 128 channels
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Stage 3: 128 -> 64 (with upsampling)
+        self.decoder3 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),
+            MBConvBlock(128, 64, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm),
+            MBConvBlock(64, 64, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm)
+        )
+        
+        if use_smart_skip:
+            self.skip3 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
+                decoder_channels=decoder_channels[2],  # decoder3 outputs 64 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip3 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
+                decoder_channels=decoder_channels[2],  # decoder3 outputs 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Skip connection for decoder4: e1 (p1) → decoder4
+        if use_smart_skip:
+            self.skip4 = ImprovedSmartSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                fusion_type='concat'
+            )
+        else:
+            self.skip4 = SimpleSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        
+        # Stage 4: 64 -> 64 (with progressive upsampling: 2x → MBConv → 2x)
+        # This matches U-Net design principles: progressive 2x upsampling is better than single 4x
+        # Consistent with other decoder stages which all use 2x upsampling
+        self.decoder4 = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False),  # First 2x upsampling
+            MBConvBlock(64, 64, expansion_ratio=6, kernel_size=3, stride=1, use_groupnorm=use_groupnorm),
+            nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)   # Second 2x upsampling
+        )
+        
+        # Segmentation head
+        self.seg_head = nn.Sequential(
+            nn.Conv2d(64, 64, 3, padding=1, bias=False),
+            self._get_norm_layer(64),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(0.1),
+            nn.Conv2d(64, num_classes, 1)
+        )
+        
+        # Auxiliary heads for deep supervision (MSAGHNet-style: simple OutConv, 3x3 conv)
+        # Outputs at native resolutions (NO upsampling) - matching Network model multi-resolution approach
+        if use_deep_supervision:
+            self.aux_heads = nn.ModuleList([
+                nn.Conv2d(decoder_channels[0], num_classes, 3, padding=1),  # Stage 1: H/16, 256 channels
+                nn.Conv2d(decoder_channels[1], num_classes, 3, padding=1),  # Stage 2: H/8, 128 channels
+                nn.Conv2d(decoder_channels[2], num_classes, 3, padding=1),  # Stage 3: H/4, 64 channels
+            ])
+        else:
+            self.aux_heads = None
+    
+    def _get_norm_layer(self, channels):
+        """Get normalization layer based on flag."""
+        if self.use_groupnorm:
+            return get_norm_layer(channels, 'group')
+        else:
+            return nn.BatchNorm2d(channels)
+    
+    def forward(self, encoder_features, encoder_tokens=None):
+        f1, f2, f3, f4 = encoder_features
+        
+        p1 = self.encoder_projections[0](f1)
+        p2 = self.encoder_projections[1](f2)
+        p3 = self.encoder_projections[2](f3)
+        p4 = self.encoder_projections[3](f4)
+        
+        if self.use_multiscale_agg:
+            # If MSA enabled: bottleneck receives input ONLY from MSA output (not MSA + p4)
+            bottleneck_feat = self.multiscale_agg([f1, f2, f3, f4])
+            if bottleneck_feat.shape[2:] != p4.shape[2:]:
+                bottleneck_feat = F.interpolate(bottleneck_feat, size=p4.shape[2:], 
+                                              mode='bilinear', align_corners=False)
+            x = bottleneck_feat  # MSA output ONLY (no addition with p4)
+        else:
+            # If MSA disabled: bottleneck receives input ONLY from e4 (p4)
+            x = p4
+        
+        # Bottleneck: 2 Swin blocks
+        if self.use_bottleneck_swin:
+            if encoder_tokens is not None:
+                stage4_tokens = encoder_tokens
+                x_tokens = self.bottleneck_layer(stage4_tokens)
+                B, L, C = x_tokens.shape
+                H = W = int(L ** 0.5)
+                x = x_tokens.transpose(1, 2).view(B, C, H, W)
+                x = self.feature_projection(x)
+            else:
+                B, C, H, W = x.shape
+                x_tokens = x.flatten(2).permute(0, 2, 1)
+                x_tokens = self.bottleneck_layer(x_tokens)
+                x = x_tokens.permute(0, 2, 1).reshape(B, C, H, W)
+                if self.feature_projection is not None and C != self.decoder_channels[3]:
+                    x = self.feature_projection(x)
+        
+        if self.bottleneck_cbam is not None:
+            x = self.bottleneck_cbam(x)
+        
+        if self.pos_embed is not None:
+            x = self.pos_embed(x)
+        
+        if self.use_cross_attn and encoder_tokens is not None:
+            x = self.cross_attn(x, encoder_tokens)
+        
+        aux_outputs = [] if self.use_deep_supervision else None
+        
+        # Stage 1: H/32 -> H/16 (Upsample then MBConv)
+        x = self.decoder1(x)
+        x = self.skip1(p4, x)  # e4 (p4) → decoder1
+        if self.use_deep_supervision:
+            # Output at native resolution (H/16) - NO upsampling (multi-resolution deep supervision)
+            aux_out1 = self.aux_heads[0](x)  # [B, num_classes, H/16, W/16]
+            aux_outputs.append(aux_out1)
+        
+        # Stage 2: H/16 -> H/8 (Upsample then MBConv)
+        x = self.decoder2(x)
+        x = self.skip2(p3, x)  # e3 (p3) → decoder2
+        if self.use_deep_supervision:
+            # Output at native resolution (H/8) - NO upsampling (multi-resolution deep supervision)
+            aux_out2 = self.aux_heads[1](x)  # [B, num_classes, H/8, W/8]
+            aux_outputs.append(aux_out2)
+        
+        # Stage 3: H/8 -> H/4 (Upsample then MBConv)
+        x = self.decoder3(x)
+        x = self.skip3(p2, x)  # e2 (p2) → decoder3
+        if self.use_deep_supervision:
+            # Output at native resolution (H/4) - NO upsampling (multi-resolution deep supervision)
+            aux_out3 = self.aux_heads[2](x)  # [B, num_classes, H/4, W/4]
+            aux_outputs.append(aux_out3)
+        
+        # Stage 4: H/4 -> H (Upsample then MBConv)
+        x = self.decoder4(x)
+        x = self.skip4(p1, x)  # e1 (p1) → decoder4
+        main_output = self.seg_head(x)
+        
+        if self.use_deep_supervision:
+            return main_output, aux_outputs
+        else:
+            return main_output
+    
+    def get_model_info(self):
+        """Get model information."""
+        return {
+            'decoder_type': 'EfficientNetB4Decoder',
             'encoder_channels': self.encoder_channels,
             'decoder_channels': self.decoder_channels,
             'num_classes': self.num_classes,
@@ -1963,11 +2540,10 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
             img_size=img_size
         )
     elif decoder.lower() == 'efficientnet-b4' or decoder.lower() == 'efficientnet_b4':
-        # Use SimpleDecoder with EfficientNet-B4 variant
-        decoder_module = SimpleDecoder(
+        # Use REAL EfficientNet-B4 decoder with MBConv blocks
+        decoder_module = EfficientNetB4Decoder(
             encoder_channels=encoder_channels,
             num_classes=num_classes,
-            efficientnet_variant=efficientnet_variant,
             use_deep_supervision=use_deep_supervision,
             use_cbam=use_cbam,
             use_smart_skip=use_smart_skip,

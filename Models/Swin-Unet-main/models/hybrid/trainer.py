@@ -13,6 +13,7 @@ import logging
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.nn import CrossEntropyLoss
@@ -218,7 +219,106 @@ def compute_class_weights(train_dataset, num_classes, smoothing=0.05):
     return weights_tensor
 
 
-def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, seed):
+def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6):
+    """
+    Create a WeightedRandomSampler that oversamples images containing rare classes.
+    
+    Uses continuous rarity scores with square-root inverse frequency to prevent
+    overly aggressive oversampling that can cause noisy gradients.
+    
+    Returns None if dataset is invalid.
+    """
+    if not hasattr(train_dataset, 'mask_paths') or len(train_dataset.mask_paths) == 0:
+        return None
+
+    # Build color map for dataset classes (same mapping as compute_class_weights)
+    if num_classes == 6:
+        COLOR_MAP = {
+            (0, 0, 0): 0,
+            (255, 255, 0): 1,
+            (0, 255, 255): 2,
+            (255, 0, 255): 3,
+            (255, 0, 0): 4,
+            (0, 255, 0): 5,
+        }
+    elif num_classes == 5:
+        COLOR_MAP = {
+            (0, 0, 0): 0,
+            (255, 255, 0): 1,
+            (0, 255, 255): 2,
+            (255, 0, 255): 3,
+            (255, 0, 0): 4,
+        }
+    elif num_classes == 4:
+        COLOR_MAP = {
+            (0, 0, 0): 0,
+            (0, 255, 0): 1,
+            (255, 0, 0): 2,
+            (0, 0, 255): 3,
+        }
+    else:
+        return None
+
+    # compute per-class pixel counts
+    class_counts = np.zeros(num_classes, dtype=np.int64)
+    mapping = {k: v for k, v in COLOR_MAP.items()}
+    map_int = { (r << 16) | (g << 8) | b: cls for (r, g, b), cls in mapping.items() }
+
+    for mask_path in train_dataset.mask_paths:
+        mask = np.array(Image.open(mask_path).convert('RGB'))
+        rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
+        flat = rgb_int.ravel()
+        label_flat = np.full(flat.shape, -1, dtype=np.int32)
+        for rgb_val, cls in map_int.items():
+            if np.any(flat == rgb_val):
+                label_flat[flat == rgb_val] = int(cls)
+        valid = label_flat >= 0
+        if np.any(valid):
+            counts = np.bincount(label_flat[valid].astype(np.int64), minlength=num_classes)
+            class_counts += counts
+
+    total = class_counts.sum()
+    if total == 0:
+        return None
+
+    # Compute class frequencies
+    class_freq = class_counts.astype(np.float64) / float(total)
+
+    # Compute continuous rarity scores for all samples
+    # Use square-root inverse frequency to prevent overly aggressive oversampling
+    sample_weights = []
+    for mask_path in train_dataset.mask_paths:
+        mask = np.array(Image.open(mask_path).convert('RGB'))
+        rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
+        present = set()
+        for rgb_val, cls in map_int.items():
+            if np.any(rgb_int == rgb_val):
+                present.add(cls)
+        
+        if len(present) == 0:
+            # No valid classes found, use uniform weight
+            sample_weights.append(1.0)
+        else:
+            # Compute rarity score: sum of square-root inverse frequency for present classes
+            # Square-root provides smoother interpolation than linear inverse frequency
+            w = 0.0
+            for cls in present:
+                w += (1.0 / (class_freq[cls] + eps)) ** 0.5
+            sample_weights.append(float(w))
+
+    # Normalize weights to mean=1 for stable sampling probabilities
+    sw = np.array(sample_weights, dtype=np.float64)
+    sw = sw / (sw.mean() + eps)
+
+    # Create PyTorch sampler
+    weights_tensor = torch.DoubleTensor(sw)
+    from torch.utils.data import WeightedRandomSampler
+    sampler = WeightedRandomSampler(weights=weights_tensor, num_samples=len(weights_tensor), replacement=True)
+    print(f"Balanced sampler created (continuous rarity-based oversampling).")
+    return sampler
+
+
+def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, seed, sampler=None):
     """
     Create data loaders for training and validation.
     
@@ -228,6 +328,7 @@ def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, see
         batch_size: Batch size
         num_workers: Number of data loading workers
         seed: Random seed
+        sampler: Optional sampler for training dataset (e.g., WeightedRandomSampler)
         
     Returns:
         tuple: (train_loader, val_loader)
@@ -257,10 +358,12 @@ def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, see
     import functools
     worker_fn = functools.partial(worker_init_fn, seed=seed)
     
+    # Use sampler if provided, otherwise use shuffle
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=(sampler is None),  # Don't shuffle if using sampler
+        sampler=sampler,  # Use sampler if provided
         num_workers=num_workers,
         pin_memory=True,
         worker_init_fn=worker_fn if num_workers > 0 else None
@@ -337,16 +440,42 @@ def compute_combined_loss(predictions, labels, ce_loss, focal_loss, dice_loss,
         loss_dict['focal'] = loss_focal.item()
         loss_dict['dice'] = loss_dice.item()
         
-        # Auxiliary losses with exponentially decaying weights (matching Network model pattern)
-        aux_weights = [0.4 * (0.8 ** i) for i in range(len(aux_outputs))]
+        # Auxiliary losses with multi-resolution support (MSAGHNet style - matching Network model)
+        # Auxiliary outputs are at native resolutions: [H/16, H/8, H/4]
+        # Scale factors: [16, 8, 4] (downsample GT by these factors)
+        aux_weights = [0.05 * (0.8 ** i) for i in range(len(aux_outputs))]  # Network model weights
         aux_loss = 0.0
         
+        # Prepare labels for multi-resolution loss computation
+        # Ensure labels are in [B, 1, H, W] format for interpolation
+        if labels.dim() == 3:
+            labels_4d = labels.unsqueeze(1)  # [B, 1, H, W]
+        else:
+            labels_4d = labels
+        
         for i, (weight, aux_output) in enumerate(zip(aux_weights, aux_outputs)):
-            aux_ce = ce_loss(aux_output, labels)
-            aux_focal = focal_loss(aux_output, labels)
-            aux_dice = dice_loss(aux_output, labels, softmax=True)
+            # Get target resolution from auxiliary output
+            _, _, aux_h, aux_w = aux_output.shape
+            
+            # Downsample ground truth to match auxiliary output resolution
+            labels_downsampled = F.interpolate(
+                labels_4d.float(), 
+                size=(aux_h, aux_w), 
+                mode='nearest'  # Use nearest neighbor for label downsampling
+            ).long()
+            
+            # Remove channel dimension if needed for loss functions
+            if labels_downsampled.shape[1] == 1:
+                labels_downsampled = labels_downsampled.squeeze(1)  # [B, H, W]
+            
+            # Compute losses at native resolution
+            aux_ce = ce_loss(aux_output, labels_downsampled)
+            aux_focal = focal_loss(aux_output, labels_downsampled)
+            aux_dice = dice_loss(aux_output, labels_downsampled, softmax=True)
             aux_combined = ce_weight * aux_ce + focal_weight * aux_focal + dice_weight * aux_dice
             aux_loss += weight * aux_combined
+            loss_dict[f'aux_{i}'] = (weight * aux_combined).item()
+            loss_dict[f'aux_{i}_res'] = f'{aux_h}x{aux_w}'
             loss_dict[f'aux_{i}_ce'] = aux_ce.item()
             loss_dict[f'aux_{i}_focal'] = aux_focal.item()
             loss_dict[f'aux_{i}_dice'] = aux_dice.item()
@@ -588,9 +717,12 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
                     print("⚠️  Scheduler reached max steps, stopping LR updates.")
                     scheduler_warning_printed = True
         
-        # Accumulate losses from loss_dict
+        # Accumulate losses from loss_dict (skip non-numeric values like resolution strings)
         for key, value in loss_dict.items():
-            epoch_losses[key] += value
+            if isinstance(value, (int, float)):
+                epoch_losses[key] += value
+            elif isinstance(value, torch.Tensor):
+                epoch_losses[key] += value.item()
     
     # Print summary only if batches were skipped
     if skipped_loss_nan > 0 or skipped_grad_nan > 0:
@@ -670,7 +802,11 @@ def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss, max_batche
             
             # Accumulate losses (only if no NaN/Inf detected)
             for key, value in loss_dict.items():
-                epoch_losses[key] += value
+                # Skip non-numeric values like resolution strings
+                if isinstance(value, (int, float)):
+                    epoch_losses[key] += value
+                elif isinstance(value, torch.Tensor):
+                    epoch_losses[key] += value.item()
             
             num_batches += 1
     
@@ -792,7 +928,8 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
         class_weights = torch.ones(args.num_classes, device=device)
     
     # Create loss functions, optimizer, and scheduler
-    ce_loss, focal_loss, dice_loss = create_loss_functions(class_weights, args.num_classes, focal_gamma=2.0)
+    focal_gamma = getattr(args, 'focal_gamma', 2.0)  # Default 2.0, configurable via --focal_gamma
+    ce_loss, focal_loss, dice_loss = create_loss_functions(class_weights, args.num_classes, focal_gamma=focal_gamma)
     optimizer, scheduler = create_optimizer_and_scheduler(model, args.base_lr, args, train_loader)
     
     # Get scheduler type for training loop
