@@ -1,0 +1,101 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# PyTorch
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+*.pkl
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs and outputs
+logs/
+*.log
+runs/
+tensorboard/
+wandb/
+mlruns/
+
+# Model outputs and results
+results/
+outputs/
+output/
+experiments/
+*.csv
+*.json
+
+# Dataset files (large files)
+*.h5
+*.hdf5
+*.npy
+*.npz
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Training artifacts
+*.pth.tar
+best_model.pth
+last_model.pth
+
+# Cache
+.cache/
+*.cache
+
+# Pretrained models (optional - uncomment if you want to ignore)
+ pretrained_ckpt/
+
+# Data directories
+DivaHisDB/
+DivaHisDB_patched/
+U-DIADS-Bib-FS/
+U-DIADS-Bib-FS_patched/
+U-DIADS-Bib-MS/
+U-DIADS-Bib-MS_patched/

@@ -1,41 +1,348 @@
-# DAS_Using_SwinUnet_Missformer
+# Historical Document Segmentation - Advanced Deep Learning Models
 
-This repository contains two main projects for document analysis and segmentation using transformer-based architectures:
+This repository contains state-of-the-art deep learning models for historical document segmentation, featuring transformer-based architectures and hybrid CNN-transformer combinations optimized for manuscript analysis.
 
-- **Swin-Unet-main**: Swin-Unet for medical/document image segmentation, adapted for HPC/SLURM usage.
-- **MISSFormer-main**: MISSFormer for segmentation tasks.
-
-## Directory Structure
+## 📁 Directory Structure
 
 ```
-Models/
-  Swin-Unet-main/
-  MISSFormer-main/
+Transformer_Models/
+├── models/                          # Model-specific implementations
+│   ├── sstrans/                     # Smart Swin Transformer
+│   │   ├── train.py                 # SSTrans training script
+│   │   ├── test.py                  # SSTrans testing script
+│   │   ├── trainer.py               # SSTrans-specific trainer
+│   │   ├── run.sh                   # SSTrans execution script
+│   │   ├── Only_Smart.py            # Smart attention mechanism
+│   │   ├── vision_transformer.py    # SSTrans model implementation
+│   │   ├── modules.py               # SSTrans modules
+│   │   └── ...                      # Other SSTrans-specific files
+│   ├── swinunet/                    # Swin Transformer U-Net
+│   │   ├── train.py                 # SwinUnet training script
+│   │   ├── test.py                  # SwinUnet testing script
+│   │   ├── trainer.py               # SwinUnet-specific trainer
+│   │   ├── run.sh                   # SwinUnet execution script
+│   │   ├── swin_transformer_unet_skip_expand_decoder_sys.py  # Main model
+│   │   ├── vision_transformer.py    # Vision transformer components
+│   │   └── ...                      # Other SwinUnet-specific files
+│   ├── missformer/                  # MissFormer (Multi-scale Transformer)
+│   │   ├── train.py                 # MissFormer training script
+│   │   ├── test.py                  # MissFormer testing script
+│   │   ├── trainer.py               # MissFormer-specific trainer
+│   │   ├── run.sh                   # MissFormer execution script
+│   │   ├── MISSFormer.py            # MissFormer model implementation
+│   │   ├── segformer.py             # SegFormer backbone
+│   │   └── ...                      # Other MissFormer-specific files
+│   ├── hybrid/                      # Hybrid CNN-Transformer Models
+│   │   ├── hybrid2/                 # Swin-EfficientNet Hybrid (Enhanced)
+│   │   │   ├── model.py             # Main hybrid model
+│   │   │   ├── components.py        # Model components
+│   │   │   └── Hybrid2_Architecture_Description.tex  # Architecture docs
+│   │   ├── train.py                 # Unified training script
+│   │   ├── test.py                  # Unified testing script
+│   │   ├── trainer.py               # Hybrid-specific trainer
+│   │   ├── aggregate_results.py     # Results aggregation script
+│   │   ├── run.sh                   # Hybrid execution script
+│   │   ├── run1.sh, run2.sh, run3.sh  # Additional run scripts
+│   │   └── Result/                  # Training results
+│   └── network/                     # CNN-Transformer Network Models
+│       ├── train.py                 # Network training script
+│       ├── test.py                  # Network testing script
+│       ├── trainer.py               # Network-specific trainer
+│       ├── cnn_transformer.py      # CNN-Transformer model
+│       ├── vision_transformer_cnn.py  # Vision Transformer CNN model
+│       ├── components.py            # Network components
+│       ├── visualize_gradcam.py     # GradCAM visualization
+│       ├── run.sh                   # Network execution script
+│       ├── run1.sh, run2.sh, run3.sh  # Additional run scripts
+│       └── Result/                  # Training results
+├── common/                          # Shared components
+│   ├── datasets/                    # Dataset implementations
+│   │   ├── dataset_udiadsbib.py     # U-DIADS-Bib dataset loader
+│   │   ├── dataset_divahisdb.py     # DivaHisDB dataset loader
+│   │   ├── dataset_synapse.py       # Synapse dataset loader
+│   │   ├── sstrans_transforms.py    # SSTrans-specific transforms
+│   │   └── README.md                # Dataset documentation
+│   ├── utils/                       # Utility functions
+│   │   └── utils.py                 # Common utilities (losses, metrics)
+│   └── configs/                     # Configuration files
+│       ├── config.py                # Configuration management
+│       └── swin_tiny_patch4_window7_224_lite.yaml  # SSTrans config
+├── pretrained_ckpt/                 # Pre-trained checkpoints
+├── logs/                            # Training logs
+├── U-DIADS-Bib-MS/                  # U-DIADS-Bib-MS dataset (original)
+├── U-DIADS-Bib-MS_patched/          # U-DIADS-Bib-MS dataset (patched)
+├── U-DIADS-Bib-FS/                  # U-DIADS-Bib-FS dataset (original)
+├── U-DIADS-Bib-FS_patched/          # U-DIADS-Bib-FS dataset (patched)
+├── DivaHisDB/                       # DivaHisDB dataset (original)
+├── DivaHisDB_patched/               # DivaHisDB dataset (patched)
+├── requirements.txt                 # Python dependencies
+└── README.md                        # This file
 ```
 
-## Quick Start (HPC/SLURM)
+## 🚀 Quick Start
 
-1. Enter the desired project directory (e.g., `Swin-Unet-main`).
-2. Edit the SLURM script (e.g., `training.sh`) to match your environment.
-3. Submit your job:
-   ```bash
-   sbatch training.sh
-   ```
-4. Monitor logs in the `logs/` directory.
+### Prerequisites
 
-## Datasets
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-Datasets should be placed in the appropriate subdirectories (see each project's README for details). Large datasets and outputs are excluded from git.
+# Load Python environment (if using module system)
+module load python/pytorch2.6py3.12
+module load cuda/11.8
+module load cudnn
 
-## Requirements
-- Python 3.12 (module: `python/pytorch2.6py3.12`)
-- PyTorch 2.6
-- CUDA 11.8
-- cuDNN
-- Other dependencies: see each project's `requirements.txt`
+# Activate conda environment
+conda activate pytorch2.6-py3.12
+```
 
-## Contact
-For questions or issues, contact:
-- Nitesh Kumar Shah (nitesh.shah@fau.de)
+### Run Individual Models
 
-See each subproject's README for more details and usage instructions.
+Each model has its own execution script:
+
+```bash
+# SSTrans (Smart Swin Transformer with attention mechanisms)
+cd models/sstrans
+./run.sh
+
+# SwinUnet (Standard Swin Transformer U-Net)
+cd models/swinunet
+./run.sh
+
+# MissFormer (Multi-scale Transformer with SegFormer backbone)
+cd models/missformer
+./run.sh
+
+# Hybrid2 (SwinUnet encoder + Enhanced EfficientNet decoder)
+cd models/hybrid
+./run.sh
+
+# Network (CNN-Transformer models)
+cd models/network
+./run.sh
+```
+
+### Custom Training
+
+```bash
+# Train Hybrid2 with custom parameters
+cd models/hybrid
+python3 train.py \
+    --use_baseline \
+    --decoder EfficientNet-B4 \
+    --use_smart_skip \
+    --dataset UDIADS_BIB \
+    --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
+    --manuscript Latin2 \
+    --use_patched_data \
+    --batch_size 16 \
+    --max_epochs 300 \
+    --base_lr 0.0001 \
+    --patience 150 \
+    --output_dir "./Result/a1/Latin2"
+```
+
+## 🔧 Model Architectures & Configurations
+
+### SSTrans (Smart Swin Transformer)
+- **Architecture**: Enhanced Swin Transformer with smart attention mechanisms
+- **Key Features**: 
+  - Smart attention masks for improved focus
+  - Heavy data augmentation pipeline
+  - Advanced normalization strategies
+- **Training**: Standardized with validation and early stopping
+- **Loss Function**: Combined CE, Focal, and Dice losses
+- **Optimizer**: AdamW with weight_decay=0.01
+- **Validation**: Sliding window on full images
+- **Config File**: Requires `--cfg` parameter pointing to config YAML
+
+### SwinUnet (Swin Transformer U-Net)
+- **Architecture**: Standard Swin Transformer with U-Net decoder
+- **Key Features**:
+  - Skip connections between encoder and decoder
+  - Patch merging and expanding operations
+  - Window-based self-attention
+- **Training**: Standardized with validation and early stopping
+- **Loss Function**: Combined CE and Dice losses
+- **Optimizer**: AdamW with weight_decay=0.01
+- **Validation**: Sliding window on full images
+
+### MissFormer (Multi-scale Transformer)
+- **Architecture**: SegFormer backbone with multi-scale feature fusion
+- **Key Features**:
+  - Efficient self-attention mechanisms
+  - Multi-scale feature aggregation
+  - Bridge layers for feature fusion
+- **Training**: Advanced with class weights and sliding window validation
+- **Loss Function**: Combined CE and Dice losses (with class weights)
+- **Optimizer**: AdamW with weight_decay=1e-4
+- **Validation**: Advanced sliding window with mask conversion
+
+### Hybrid2 (Swin-EfficientNet Enhanced)
+- **Architecture**: SwinUnet encoder + Enhanced EfficientNet decoder
+- **Key Features**:
+  - **Swin Transformer Encoder**: 4 stages (96→192→384→768 dim)
+  - **Bottleneck**: 2 Swin Transformer blocks (768 dim, 24 heads)
+  - **EfficientNet-B4 Decoder**: MBConv blocks with channel progression
+  - **Smart Skip Connections**: Attention-based feature fusion
+  - **Positional Embeddings**: 2D learnable positional embeddings
+  - **Deep Supervision**: Optional multi-resolution auxiliary outputs
+  - **CBAM Attention**: Optional channel and spatial attention
+  - **Feature Refinement**: Gradual channel reduction with residual connections
+- **Training**: Advanced with balanced sampling and class-aware augmentation
+- **Loss Function**: Combined CE, Focal (γ=2.0), and Dice losses
+- **Optimizer**: AdamW with differential learning rates
+- **Variants**: B0 (lightweight), B4 (balanced), B5 (heavy)
+- **Decoder Options**: EfficientNet-B4, ResNet50, or simple CNN decoder
+
+### Network (CNN-Transformer)
+- **Architecture**: CNN-Transformer hybrid models
+- **Key Features**:
+  - Vision Transformer CNN integration
+  - GradCAM visualization support
+  - Flexible architecture combinations
+- **Training**: Standardized training pipeline
+- **Visualization**: Includes GradCAM for model interpretability
+
+## 📊 Supported Datasets
+
+### U-DIADS-Bib
+- **Description**: Historical manuscript segmentation dataset
+- **Variants**: 
+  - **MS (Multi-Script)**: Multiple manuscripts (Latin2, Latin14396, Latin16746, Syr341)
+  - **FS (Full-Size)**: Full-size images
+- **Classes**: 6 classes (5 for Syriaque341 manuscripts)
+  - Background, Paratext, Decoration, Main Text, Title, Chapter Headings
+- **Note**: Syriaque341 manuscripts don't have Chapter Headings (5 classes)
+- **Format**: RGB color-coded masks
+- **Usage**: `--dataset UDIADS_BIB --use_patched_data --udiadsbib_root "../../U-DIADS-Bib-MS_patched"`
+
+### DIVAHISDB
+- **Description**: Historical document analysis dataset
+- **Classes**: 4 classes
+  - Background, Comment, Decoration, Main Text
+- **Format**: Bitmask-encoded masks
+- **Usage**: `--dataset DIVAHISDB --use_patched_data`
+
+### Synapse
+- **Description**: Medical image segmentation dataset
+- **Classes**: Variable (typically 9 classes)
+- **Format**: HDF5 format
+- **Usage**: `--dataset Synapse`
+
+## 🔧 Key Benefits of Repository Structure
+
+1. **Modularity**: Each model is self-contained with its own implementation
+2. **Flexibility**: Easy to experiment with different architectures
+3. **Maintainability**: Clear separation between model-specific and shared code
+4. **Extensibility**: Simple to add new models or modify existing ones
+5. **Reproducibility**: Consistent training and evaluation pipelines
+6. **SLURM Integration**: All run scripts include SLURM job submission headers
+
+## 📝 Adding New Models
+
+To add a new model:
+
+1. Create a new folder in `models/`
+2. Copy the structure from an existing model (recommend starting with `hybrid/`)
+3. Implement your model architecture
+4. Modify the training/testing scripts
+5. Update the common trainer if needed
+6. Create run scripts with SLURM headers if needed
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+#### Import Errors
+- Ensure you're running scripts from the correct directory
+- Check that the common directory is in the Python path
+- Verify Python environment is properly loaded (`module load python/pytorch2.6py3.12`)
+- Add user site-packages to PYTHONPATH: `export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"`
+
+#### Model-Specific Issues
+- **SSTrans**: Requires config file (`--cfg` parameter pointing to YAML config)
+- **Hybrid Models**: Check `--decoder` parameter (EfficientNet-B4, ResNet50, or baseline)
+- **MissFormer**: Verify SegFormer dependencies
+- Check individual `trainer.py` files for model-specific logic
+
+#### Training Issues
+- **CUDA Memory**: Reduce batch size if encountering OOM errors
+  - Set `export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` for memory optimization
+- **Data Loading**: Ensure dataset paths are correct and accessible
+- **Checkpoints**: Verify checkpoint paths and model compatibility
+- **SLURM Jobs**: Check job output files in Result directories for detailed error messages
+
+#### Performance Issues
+- **Slow Training**: Consider reducing image size or using mixed precision (`--amp_opt_level O1`)
+- **Poor Convergence**: Adjust learning rate or try different optimizers
+- **Overfitting**: Increase regularization or use more data augmentation
+- **Class Imbalance**: Use `--use_balanced_sampler` and `--use_class_aware_aug` flags
+
+## 📈 Model Performance Comparison
+
+| Model | Architecture | Parameters | Memory | Speed | Best For |
+|-------|-------------|-----------|--------|-------|----------|
+| SSTrans | Smart Swin Transformer | ~28M | Moderate | Fast | Attention-focused tasks |
+| SwinUnet | Standard Swin U-Net | ~27M | Moderate | Fast | General segmentation |
+| MissFormer | Multi-scale Transformer | ~30M | High | Moderate | Multi-scale features |
+| Hybrid2 | Swin-EfficientNet | ~45M | Moderate | Moderate | Enhanced feature extraction |
+| Network | CNN-Transformer | Variable | Variable | Variable | Flexible architectures |
+
+## 🔄 Recent Updates & Improvements
+
+### Hybrid2 Enhancements (Latest)
+- **Smart Skip Connections**: Attention-based feature fusion instead of simple concatenation
+- **Deep Supervision**: Optional multi-resolution auxiliary outputs for better training
+- **Positional Embeddings**: 2D learnable positional embeddings for better spatial understanding
+- **Balanced Sampling**: Oversampling rare classes to handle class imbalance
+- **Class-Aware Augmentation**: Stronger augmentation for rare classes
+- **Class-Balanced Loss**: CB Loss with beta=0.9999 for extreme imbalance handling
+- **Differential Learning Rates**: Different LR for encoder, bottleneck, and decoder
+- **Multiple Decoder Options**: EfficientNet-B4, ResNet50, or simple CNN decoder
+
+### Training Standardization
+- **All Models**: AdamW optimizer with various schedulers (CosineAnnealingWarmRestarts, ReduceLROnPlateau)
+- **Early Stopping**: Configurable patience across all models
+- **Validation**: Proper validation during training with sliding window for transformer models
+- **Logging**: Improved TensorBoard logging and progress tracking
+- **Checkpointing**: Automatic best model saving and cleanup
+- **Results Aggregation**: Scripts to aggregate results across multiple manuscripts
+
+### Key Technical Improvements
+1. **Attention Mechanisms**: CBAM and smart attention for better feature focus
+2. **Skip Connections**: Intelligent fusion instead of simple concatenation
+3. **Residual Learning**: Better gradient flow and training stability
+4. **Multi-scale Processing**: Enhanced feature extraction at different scales
+5. **Advanced Augmentation**: MixUp, CutMix, and sophisticated transforms
+6. **Memory Optimization**: CUDA memory fragmentation reduction for large models
+7. **Mixed Precision**: AMP support for faster training
+
+### Future Enhancements
+- **Model Ensembling**: Combining multiple models for improved performance
+- **Efficient Variants**: Lightweight versions for deployment
+- **Cross-dataset Training**: Multi-dataset learning capabilities
+- **Advanced Visualization**: More interpretability tools
+
+## 📋 SLURM Job Submission
+
+All run scripts include SLURM headers for cluster execution. Key parameters:
+- **Job Name**: Model-specific job names
+- **GPU**: Typically 1 GPU (rtx3080 or generic)
+- **Time Limit**: 22-24 hours
+- **CPUs**: 8 CPUs per task
+- **Output**: Results saved in `Result/` directories
+
+Example SLURM submission:
+```bash
+sbatch models/hybrid/run.sh
+```
+
+## 📚 Additional Resources
+
+- Dataset documentation: `common/datasets/README.md`
+- Hybrid2 architecture: `models/hybrid/hybrid2/Hybrid2_Architecture_Description.tex`
+- Results aggregation: Use `aggregate_results.py` in hybrid models
+
+This repository provides a comprehensive framework for historical document segmentation with state-of-the-art models and best practices.
+

@@ -1,0 +1,852 @@
+[17:01:26.782] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin2FS', model='missformer', dataset='UDIADS_BIB', manuscript='Latin2FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[17:01:26.782] Testing with checkpoint: best_model_latest.pth
+[17:01:26.802] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin2FS/predictions
+[17:01:26.802] Starting inference on UDIADS_BIB dataset
+[17:01:31.784] Found 1620 patches for Latin2FS
+[17:01:31.789] Processing: 076 (54 patches)
+[17:01:37.644] Completed: 076
+[17:01:37.644] Processing: 079 (54 patches)
+[17:01:42.091] Completed: 079
+[17:01:42.092] Processing: 082 (54 patches)
+[17:01:46.425] Completed: 082
+[17:01:46.425] Processing: 095 (54 patches)
+[17:01:50.721] Completed: 095
+[17:01:50.721] Processing: 106 (54 patches)
+[17:01:55.000] Completed: 106
+[17:01:55.000] Processing: 111 (54 patches)
+[17:01:59.303] Completed: 111
+[17:01:59.303] Processing: 115 (54 patches)
+[17:02:03.437] Completed: 115
+[17:02:03.437] Processing: 117 (54 patches)
+[17:02:18.043] Completed: 117
+[17:02:18.044] Processing: 128 (54 patches)
+[17:02:22.265] Completed: 128
+[17:02:22.265] Processing: 134 (54 patches)
+[17:02:26.746] Completed: 134
+[17:02:26.746] Processing: 138 (54 patches)
+[17:02:30.998] Completed: 138
+[17:02:30.998] Processing: 142 (54 patches)
+[17:02:35.338] Completed: 142
+[17:02:35.338] Processing: 159 (54 patches)
+[17:02:39.506] Completed: 159
+[17:02:39.506] Processing: 166 (54 patches)
+[17:02:43.625] Completed: 166
+[17:02:43.626] Processing: 185 (54 patches)
+[17:02:47.731] Completed: 185
+[17:02:47.732] Processing: 200 (54 patches)
+[17:02:52.039] Completed: 200
+[17:02:52.039] Processing: 203 (54 patches)
+[17:02:56.386] Completed: 203
+[17:02:56.387] Processing: 208 (54 patches)
+[17:03:00.554] Completed: 208
+[17:03:00.554] Processing: 229 (54 patches)
+[17:03:05.291] Completed: 229
+[17:03:05.292] Processing: 230 (54 patches)
+[17:03:09.669] Completed: 230
+[17:03:09.669] Processing: 235 (54 patches)
+[17:03:14.271] Completed: 235
+[17:03:14.272] Processing: 236 (54 patches)
+[17:03:18.923] Completed: 236
+[17:03:18.923] Processing: 248 (54 patches)
+[17:03:23.325] Completed: 248
+[17:03:23.325] Processing: 249 (54 patches)
+[17:03:27.760] Completed: 249
+[17:03:27.761] Processing: 250 (54 patches)
+[17:03:32.249] Completed: 250
+[17:03:32.249] Processing: 251 (54 patches)
+[17:03:36.693] Completed: 251
+[17:03:36.693] Processing: 252 (54 patches)
+[17:03:41.149] Completed: 252
+[17:03:41.149] Processing: 275 (54 patches)
+[17:03:45.734] Completed: 275
+[17:03:45.734] Processing: 277 (54 patches)
+[17:03:50.189] Completed: 277
+[17:03:50.189] Processing: 297 (54 patches)
+[17:03:54.761] Completed: 297
+[17:03:54.761] 
+Per-class metrics:
+[17:03:54.761] --------------------------------------------------------------------------------
+[17:03:54.761] Background     : Precision=0.9906, Recall=0.9933, F1=0.9920, IoU=0.9841
+[17:03:54.761] Paratext       : Precision=0.6989, Recall=0.6056, F1=0.6489, IoU=0.4803
+[17:03:54.761] Decoration     : Precision=0.8359, Recall=0.8712, F1=0.8532, IoU=0.7440
+[17:03:54.761] Main Text      : Precision=0.8343, Recall=0.8544, F1=0.8442, IoU=0.7305
+[17:03:54.761] Title          : Precision=0.8523, Recall=0.6199, F1=0.7177, IoU=0.5597
+[17:03:54.761] Chapter Headings: Precision=0.6047, Recall=0.2692, F1=0.3726, IoU=0.2289
+[17:03:54.761] 
+Mean metrics:
+[17:03:54.761] ----------------------------------------
+[17:03:54.761] Mean Precision: 0.8028
+[17:03:54.761] Mean Recall: 0.7023
+[17:03:54.761] Mean F1: 0.7381
+[17:03:54.761] Mean IoU: 0.6212
+[17:03:54.761] Inference completed on 30 images
+[17:26:24.579] Namespace(cfg=None, output_dir='../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin2', model='missformer', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[17:26:24.580] Testing with checkpoint: best_model_latest.pth
+[17:26:24.612] Saving predictions to: ../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin2/predictions
+[17:26:24.612] Starting inference on UDIADS_BIB dataset
+[17:26:28.092] Found 1620 patches for Latin2
+[17:26:28.095] Processing: 076 (54 patches)
+[17:26:33.912] Completed: 076
+[17:26:33.912] Processing: 079 (54 patches)
+[17:26:38.577] Completed: 079
+[17:26:38.577] Processing: 082 (54 patches)
+[17:26:43.153] Completed: 082
+[17:26:43.153] Processing: 095 (54 patches)
+[17:26:47.769] Completed: 095
+[17:26:47.770] Processing: 106 (54 patches)
+[17:26:52.229] Completed: 106
+[17:26:52.229] Processing: 111 (54 patches)
+[17:26:56.638] Completed: 111
+[17:26:56.639] Processing: 115 (54 patches)
+[17:27:01.023] Completed: 115
+[17:27:01.023] Processing: 117 (54 patches)
+[17:27:05.508] Completed: 117
+[17:27:05.508] Processing: 128 (54 patches)
+[17:27:10.027] Completed: 128
+[17:27:10.027] Processing: 134 (54 patches)
+[17:27:15.341] Completed: 134
+[17:27:15.341] Processing: 138 (54 patches)
+[17:27:19.764] Completed: 138
+[17:27:19.764] Processing: 142 (54 patches)
+[17:27:24.185] Completed: 142
+[17:27:24.185] Processing: 159 (54 patches)
+[17:27:28.437] Completed: 159
+[17:27:28.437] Processing: 166 (54 patches)
+[17:27:32.709] Completed: 166
+[17:27:32.709] Processing: 185 (54 patches)
+[17:27:37.044] Completed: 185
+[17:27:37.045] Processing: 200 (54 patches)
+[17:27:41.378] Completed: 200
+[17:27:41.378] Processing: 203 (54 patches)
+[17:27:45.562] Completed: 203
+[17:27:45.562] Processing: 208 (54 patches)
+[17:27:49.968] Completed: 208
+[17:27:49.968] Processing: 229 (54 patches)
+[17:27:54.342] Completed: 229
+[17:27:54.342] Processing: 230 (54 patches)
+[17:27:58.663] Completed: 230
+[17:27:58.663] Processing: 235 (54 patches)
+[17:28:02.830] Completed: 235
+[17:28:02.830] Processing: 236 (54 patches)
+[17:28:07.476] Completed: 236
+[17:28:07.477] Processing: 248 (54 patches)
+[17:28:11.790] Completed: 248
+[17:28:11.790] Processing: 249 (54 patches)
+[17:28:16.080] Completed: 249
+[17:28:16.080] Processing: 250 (54 patches)
+[17:28:20.487] Completed: 250
+[17:28:20.487] Processing: 251 (54 patches)
+[17:28:24.881] Completed: 251
+[17:28:24.881] Processing: 252 (54 patches)
+[17:28:29.176] Completed: 252
+[17:28:29.176] Processing: 275 (54 patches)
+[17:28:33.621] Completed: 275
+[17:28:33.621] Processing: 277 (54 patches)
+[17:28:38.141] Completed: 277
+[17:28:38.141] Processing: 297 (54 patches)
+[17:28:42.479] Completed: 297
+[17:28:42.480] 
+Per-class metrics:
+[17:28:42.480] --------------------------------------------------------------------------------
+[17:28:42.480] Background     : Precision=0.9915, Recall=0.9962, F1=0.9938, IoU=0.9878
+[17:28:42.480] Paratext       : Precision=0.8200, Recall=0.6640, F1=0.7338, IoU=0.5795
+[17:28:42.480] Decoration     : Precision=0.8840, Recall=0.8876, F1=0.8858, IoU=0.7950
+[17:28:42.480] Main Text      : Precision=0.9047, Recall=0.8682, F1=0.8861, IoU=0.7955
+[17:28:42.480] Title          : Precision=0.9133, Recall=0.7171, F1=0.8034, IoU=0.6714
+[17:28:42.480] Chapter Headings: Precision=0.7780, Recall=0.5751, F1=0.6614, IoU=0.4940
+[17:28:42.480] 
+Mean metrics:
+[17:28:42.480] ----------------------------------------
+[17:28:42.480] Mean Precision: 0.8819
+[17:28:42.480] Mean Recall: 0.7847
+[17:28:42.480] Mean F1: 0.8274
+[17:28:42.480] Mean IoU: 0.7205
+[17:28:42.480] Inference completed on 30 images
+[18:33:01.609] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin14396FS', model='missformer', dataset='UDIADS_BIB', manuscript='Latin14396FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[18:33:01.609] Testing with checkpoint: best_model_latest.pth
+[18:33:01.649] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin14396FS/predictions
+[18:33:01.649] Starting inference on UDIADS_BIB dataset
+[18:33:04.339] Found 1620 patches for Latin14396FS
+[18:33:04.343] Processing: 014 (54 patches)
+[18:33:10.059] Completed: 014
+[18:33:10.059] Processing: 032 (54 patches)
+[18:33:15.037] Completed: 032
+[18:33:15.038] Processing: 034 (54 patches)
+[18:33:20.073] Completed: 034
+[18:33:20.073] Processing: 036 (54 patches)
+[18:33:24.961] Completed: 036
+[18:33:24.961] Processing: 038 (54 patches)
+[18:33:29.841] Completed: 038
+[18:33:29.842] Processing: 047 (54 patches)
+[18:33:34.739] Completed: 047
+[18:33:34.740] Processing: 060 (54 patches)
+[18:33:39.542] Completed: 060
+[18:33:39.542] Processing: 085 (54 patches)
+[18:33:44.372] Completed: 085
+[18:33:44.373] Processing: 087 (54 patches)
+[18:33:48.982] Completed: 087
+[18:33:48.982] Processing: 104 (54 patches)
+[18:33:53.533] Completed: 104
+[18:33:53.533] Processing: 105 (54 patches)
+[18:33:58.033] Completed: 105
+[18:33:58.033] Processing: 108 (54 patches)
+[18:34:02.774] Completed: 108
+[18:34:02.775] Processing: 110 (54 patches)
+[18:34:07.671] Completed: 110
+[18:34:07.671] Processing: 136 (54 patches)
+[18:34:12.854] Completed: 136
+[18:34:12.854] Processing: 169 (54 patches)
+[18:34:17.412] Completed: 169
+[18:34:17.412] Processing: 195 (54 patches)
+[18:34:21.876] Completed: 195
+[18:34:21.877] Processing: 196 (54 patches)
+[18:34:30.277] Completed: 196
+[18:34:30.278] Processing: 198 (54 patches)
+[18:34:34.831] Completed: 198
+[18:34:34.832] Processing: 204 (54 patches)
+[18:34:39.496] Completed: 204
+[18:34:39.496] Processing: 223 (54 patches)
+[18:34:43.967] Completed: 223
+[18:34:43.967] Processing: 225 (54 patches)
+[18:34:48.451] Completed: 225
+[18:34:48.451] Processing: 227 (54 patches)
+[18:34:52.897] Completed: 227
+[18:34:52.897] Processing: 229 (54 patches)
+[18:34:57.168] Completed: 229
+[18:34:57.169] Processing: 251 (54 patches)
+[18:35:01.589] Completed: 251
+[18:35:01.590] Processing: 253 (54 patches)
+[18:35:06.588] Completed: 253
+[18:35:06.588] Processing: 255 (54 patches)
+[18:35:11.383] Completed: 255
+[18:35:11.383] Processing: 264 (54 patches)
+[18:35:16.202] Completed: 264
+[18:35:16.203] Processing: 270 (54 patches)
+[18:35:21.204] Completed: 270
+[18:35:21.204] Processing: 276 (54 patches)
+[18:35:26.059] Completed: 276
+[18:35:26.059] Processing: 325 (54 patches)
+[18:35:30.709] Completed: 325
+[18:35:30.710] 
+Per-class metrics:
+[18:35:30.710] --------------------------------------------------------------------------------
+[18:35:30.710] Background     : Precision=0.9917, Recall=0.9929, F1=0.9923, IoU=0.9847
+[18:35:30.710] Paratext       : Precision=0.3706, Recall=0.1292, F1=0.1916, IoU=0.1060
+[18:35:30.710] Decoration     : Precision=0.8928, Recall=0.9021, F1=0.8974, IoU=0.8139
+[18:35:30.710] Main Text      : Precision=0.9202, Recall=0.9144, F1=0.9173, IoU=0.8472
+[18:35:30.710] Title          : Precision=0.8109, Recall=0.7698, F1=0.7898, IoU=0.6526
+[18:35:30.710] Chapter Headings: Precision=0.7362, Recall=0.7200, F1=0.7280, IoU=0.5723
+[18:35:30.710] 
+Mean metrics:
+[18:35:30.710] ----------------------------------------
+[18:35:30.710] Mean Precision: 0.7871
+[18:35:30.710] Mean Recall: 0.7381
+[18:35:30.710] Mean F1: 0.7527
+[18:35:30.710] Mean IoU: 0.6628
+[18:35:30.710] Inference completed on 30 images
+[19:10:06.926] Namespace(cfg=None, output_dir='../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin14396', model='missformer', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[19:10:06.926] Testing with checkpoint: best_model_latest.pth
+[19:10:06.953] Saving predictions to: ../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin14396/predictions
+[19:10:06.954] Starting inference on UDIADS_BIB dataset
+[19:10:15.070] Found 1620 patches for Latin14396
+[19:10:15.072] Processing: 014 (54 patches)
+[19:10:20.646] Completed: 014
+[19:10:20.646] Processing: 032 (54 patches)
+[19:10:25.133] Completed: 032
+[19:10:25.134] Processing: 034 (54 patches)
+[19:10:29.562] Completed: 034
+[19:10:29.562] Processing: 036 (54 patches)
+[19:10:34.163] Completed: 036
+[19:10:34.164] Processing: 038 (54 patches)
+[19:10:38.652] Completed: 038
+[19:10:38.652] Processing: 047 (54 patches)
+[19:10:43.161] Completed: 047
+[19:10:43.161] Processing: 060 (54 patches)
+[19:10:47.816] Completed: 060
+[19:10:47.816] Processing: 085 (54 patches)
+[19:10:52.170] Completed: 085
+[19:10:52.171] Processing: 087 (54 patches)
+[19:10:56.665] Completed: 087
+[19:10:56.665] Processing: 104 (54 patches)
+[19:11:01.191] Completed: 104
+[19:11:01.191] Processing: 105 (54 patches)
+[19:11:05.606] Completed: 105
+[19:11:05.606] Processing: 108 (54 patches)
+[19:11:10.067] Completed: 108
+[19:11:10.067] Processing: 110 (54 patches)
+[19:11:14.376] Completed: 110
+[19:11:14.377] Processing: 136 (54 patches)
+[19:11:18.654] Completed: 136
+[19:11:18.655] Processing: 169 (54 patches)
+[19:11:22.809] Completed: 169
+[19:11:22.809] Processing: 195 (54 patches)
+[19:11:27.065] Completed: 195
+[19:11:27.065] Processing: 196 (54 patches)
+[19:11:31.519] Completed: 196
+[19:11:31.519] Processing: 198 (54 patches)
+[19:11:35.856] Completed: 198
+[19:11:35.856] Processing: 204 (54 patches)
+[19:11:40.363] Completed: 204
+[19:11:40.364] Processing: 223 (54 patches)
+[19:11:44.692] Completed: 223
+[19:11:44.692] Processing: 225 (54 patches)
+[19:11:49.167] Completed: 225
+[19:11:49.167] Processing: 227 (54 patches)
+[19:11:53.710] Completed: 227
+[19:11:53.710] Processing: 229 (54 patches)
+[19:11:57.862] Completed: 229
+[19:11:57.862] Processing: 251 (54 patches)
+[19:12:02.308] Completed: 251
+[19:12:02.308] Processing: 253 (54 patches)
+[19:12:06.506] Completed: 253
+[19:12:06.506] Processing: 255 (54 patches)
+[19:12:10.935] Completed: 255
+[19:12:10.936] Processing: 264 (54 patches)
+[19:12:15.320] Completed: 264
+[19:12:15.320] Processing: 270 (54 patches)
+[19:12:19.762] Completed: 270
+[19:12:19.762] Processing: 276 (54 patches)
+[19:12:24.207] Completed: 276
+[19:12:24.207] Processing: 325 (54 patches)
+[19:12:28.679] Completed: 325
+[19:12:28.679] 
+Per-class metrics:
+[19:12:28.680] --------------------------------------------------------------------------------
+[19:12:28.680] Background     : Precision=0.9938, Recall=0.9944, F1=0.9941, IoU=0.9883
+[19:12:28.680] Paratext       : Precision=0.6949, Recall=0.4647, F1=0.5569, IoU=0.3860
+[19:12:28.680] Decoration     : Precision=0.9129, Recall=0.9460, F1=0.9292, IoU=0.8677
+[19:12:28.680] Main Text      : Precision=0.9374, Recall=0.9408, F1=0.9391, IoU=0.8852
+[19:12:28.680] Title          : Precision=0.8573, Recall=0.8474, F1=0.8523, IoU=0.7427
+[19:12:28.680] Chapter Headings: Precision=0.9362, Recall=0.7376, F1=0.8251, IoU=0.7023
+[19:12:28.680] 
+Mean metrics:
+[19:12:28.680] ----------------------------------------
+[19:12:28.680] Mean Precision: 0.8888
+[19:12:28.680] Mean Recall: 0.8218
+[19:12:28.680] Mean F1: 0.8495
+[19:12:28.680] Mean IoU: 0.7620
+[19:12:28.680] Inference completed on 30 images
+[19:39:22.472] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin16746FS', model='missformer', dataset='UDIADS_BIB', manuscript='Latin16746FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[19:39:22.472] Testing with checkpoint: best_model_latest.pth
+[19:39:22.474] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Latin16746FS/predictions
+[19:39:22.474] Starting inference on UDIADS_BIB dataset
+[19:39:25.099] Found 1620 patches for Latin16746FS
+[19:39:25.103] Processing: 009 (54 patches)
+[19:39:31.121] Completed: 009
+[19:39:31.121] Processing: 020 (54 patches)
+[19:39:35.803] Completed: 020
+[19:39:35.803] Processing: 022 (54 patches)
+[19:39:40.400] Completed: 022
+[19:39:40.400] Processing: 029 (54 patches)
+[19:39:44.938] Completed: 029
+[19:39:44.938] Processing: 035 (54 patches)
+[19:39:49.513] Completed: 035
+[19:39:49.513] Processing: 048 (54 patches)
+[19:39:54.113] Completed: 048
+[19:39:54.113] Processing: 069 (54 patches)
+[19:39:58.473] Completed: 069
+[19:39:58.473] Processing: 082 (54 patches)
+[19:40:02.982] Completed: 082
+[19:40:02.982] Processing: 088 (54 patches)
+[19:40:07.556] Completed: 088
+[19:40:07.556] Processing: 089 (54 patches)
+[19:40:11.948] Completed: 089
+[19:40:11.948] Processing: 091 (54 patches)
+[19:40:16.462] Completed: 091
+[19:40:16.462] Processing: 100 (54 patches)
+[19:40:20.968] Completed: 100
+[19:40:20.968] Processing: 106 (54 patches)
+[19:40:25.220] Completed: 106
+[19:40:25.220] Processing: 117 (54 patches)
+[19:40:29.531] Completed: 117
+[19:40:29.531] Processing: 123 (54 patches)
+[19:40:34.003] Completed: 123
+[19:40:34.004] Processing: 125 (54 patches)
+[19:40:38.299] Completed: 125
+[19:40:38.299] Processing: 130 (54 patches)
+[19:40:43.075] Completed: 130
+[19:40:43.076] Processing: 133 (54 patches)
+[19:40:47.628] Completed: 133
+[19:40:47.629] Processing: 137 (54 patches)
+[19:40:52.215] Completed: 137
+[19:40:52.215] Processing: 146 (54 patches)
+[19:40:56.634] Completed: 146
+[19:40:56.634] Processing: 166 (54 patches)
+[19:41:01.108] Completed: 166
+[19:41:01.108] Processing: 184 (54 patches)
+[19:41:05.619] Completed: 184
+[19:41:05.619] Processing: 215 (54 patches)
+[19:41:09.979] Completed: 215
+[19:41:09.979] Processing: 237 (54 patches)
+[19:41:14.489] Completed: 237
+[19:41:14.489] Processing: 243 (54 patches)
+[19:41:18.906] Completed: 243
+[19:41:18.906] Processing: 255 (54 patches)
+[19:41:23.340] Completed: 255
+[19:41:23.340] Processing: 258 (54 patches)
+[19:41:27.692] Completed: 258
+[19:41:27.692] Processing: 284 (54 patches)
+[19:41:32.060] Completed: 284
+[19:41:32.060] Processing: 325 (54 patches)
+[19:41:36.523] Completed: 325
+[19:41:36.523] Processing: 357 (54 patches)
+[19:41:40.914] Completed: 357
+[19:41:40.914] 
+Per-class metrics:
+[19:41:40.914] --------------------------------------------------------------------------------
+[19:41:40.914] Background     : Precision=0.9903, Recall=0.9943, F1=0.9923, IoU=0.9847
+[19:41:40.914] Paratext       : Precision=0.7812, Recall=0.6877, F1=0.7314, IoU=0.5766
+[19:41:40.915] Decoration     : Precision=0.9722, Recall=0.9045, F1=0.9371, IoU=0.8817
+[19:41:40.915] Main Text      : Precision=0.8862, Recall=0.9394, F1=0.9120, IoU=0.8383
+[19:41:40.915] Title          : Precision=0.6855, Recall=0.7884, F1=0.7334, IoU=0.5790
+[19:41:40.915] Chapter Headings: Precision=0.8140, Recall=0.1754, F1=0.2886, IoU=0.1687
+[19:41:40.915] 
+Mean metrics:
+[19:41:40.915] ----------------------------------------
+[19:41:40.915] Mean Precision: 0.8549
+[19:41:40.915] Mean Recall: 0.7483
+[19:41:40.915] Mean F1: 0.7658
+[19:41:40.915] Mean IoU: 0.6715
+[19:41:40.915] Inference completed on 30 images
+[20:21:27.759] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Syr341FS', model='missformer', dataset='UDIADS_BIB', manuscript='Syr341FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[20:21:27.760] Testing with checkpoint: best_model_latest.pth
+[20:21:27.761] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_FS/udiadsbib_patch224_missformer_Syr341FS/predictions
+[20:21:27.761] Starting inference on UDIADS_BIB dataset
+[20:21:30.415] Found 1620 patches for Syr341FS
+[20:21:30.421] Processing: 031 (54 patches)
+[20:21:36.425] Completed: 031
+[20:21:36.426] Processing: 053 (54 patches)
+[20:21:41.463] Completed: 053
+[20:21:41.463] Processing: 054 (54 patches)
+[20:21:46.372] Completed: 054
+[20:21:46.372] Processing: 071 (54 patches)
+[20:21:51.489] Completed: 071
+[20:21:51.489] Processing: 073 (54 patches)
+[20:21:56.454] Completed: 073
+[20:21:56.454] Processing: 075 (54 patches)
+[20:22:01.393] Completed: 075
+[20:22:01.393] Processing: 100 (54 patches)
+[20:22:06.379] Completed: 100
+[20:22:06.379] Processing: 137 (54 patches)
+[20:22:11.389] Completed: 137
+[20:22:11.389] Processing: 150 (54 patches)
+[20:22:16.317] Completed: 150
+[20:22:16.317] Processing: 160 (54 patches)
+[20:22:21.329] Completed: 160
+[20:22:21.329] Processing: 167 (54 patches)
+[20:22:26.248] Completed: 167
+[20:22:26.248] Processing: 184 (54 patches)
+[20:22:31.191] Completed: 184
+[20:22:31.192] Processing: 190 (54 patches)
+[20:22:36.001] Completed: 190
+[20:22:36.001] Processing: 201 (54 patches)
+[20:22:40.887] Completed: 201
+[20:22:40.887] Processing: 210 (54 patches)
+[20:22:45.821] Completed: 210
+[20:22:45.821] Processing: 222 (54 patches)
+[20:22:50.799] Completed: 222
+[20:22:50.799] Processing: 224 (54 patches)
+[20:22:55.577] Completed: 224
+[20:22:55.577] Processing: 231 (54 patches)
+[20:23:00.455] Completed: 231
+[20:23:00.456] Processing: 241 (54 patches)
+[20:23:05.194] Completed: 241
+[20:23:05.194] Processing: 249 (54 patches)
+[20:23:09.952] Completed: 249
+[20:23:09.952] Processing: 252 (54 patches)
+[20:23:14.984] Completed: 252
+[20:23:14.985] Processing: 267 (54 patches)
+[20:23:20.071] Completed: 267
+[20:23:20.071] Processing: 281 (54 patches)
+[20:23:24.706] Completed: 281
+[20:23:24.706] Processing: 286 (54 patches)
+[20:23:29.613] Completed: 286
+[20:23:29.613] Processing: 290 (54 patches)
+[20:23:34.375] Completed: 290
+[20:23:34.375] Processing: 313 (54 patches)
+[20:23:39.112] Completed: 313
+[20:23:39.112] Processing: 362 (54 patches)
+[20:23:43.781] Completed: 362
+[20:23:43.781] Processing: 368 (54 patches)
+[20:23:48.498] Completed: 368
+[20:23:48.499] Processing: 376 (54 patches)
+[20:23:53.162] Completed: 376
+[20:23:53.162] Processing: 446 (54 patches)
+[20:23:57.962] Completed: 446
+[20:23:57.962] 
+Per-class metrics:
+[20:23:57.962] --------------------------------------------------------------------------------
+[20:23:57.962] Background     : Precision=0.9695, Recall=0.9773, F1=0.9734, IoU=0.9481
+[20:23:57.962] Paratext       : Precision=0.3701, Recall=0.2139, F1=0.2711, IoU=0.1568
+[20:23:57.962] Decoration     : Precision=0.8994, Recall=0.5508, F1=0.6832, IoU=0.5189
+[20:23:57.963] Main Text      : Precision=0.8368, Recall=0.8633, F1=0.8498, IoU=0.7389
+[20:23:57.963] Title          : Precision=0.0471, Recall=0.0276, F1=0.0348, IoU=0.0177
+[20:23:57.963] 
+Mean metrics:
+[20:23:57.963] ----------------------------------------
+[20:23:57.963] Mean Precision: 0.6246
+[20:23:57.963] Mean Recall: 0.5266
+[20:23:57.963] Mean F1: 0.5625
+[20:23:57.963] Mean IoU: 0.4761
+[20:23:57.963] Inference completed on 30 images
+[20:50:15.658] Namespace(cfg=None, output_dir='../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin16746', model='missformer', dataset='UDIADS_BIB', manuscript='Latin16746', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[20:50:15.658] Testing with checkpoint: best_model_latest.pth
+[20:50:15.693] Saving predictions to: ../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Latin16746/predictions
+[20:50:15.693] Starting inference on UDIADS_BIB dataset
+[20:50:21.570] Found 1620 patches for Latin16746
+[20:50:21.572] Processing: 009 (54 patches)
+[20:50:27.375] Completed: 009
+[20:50:27.375] Processing: 020 (54 patches)
+[20:50:31.938] Completed: 020
+[20:50:31.938] Processing: 022 (54 patches)
+[20:50:36.687] Completed: 022
+[20:50:36.687] Processing: 029 (54 patches)
+[20:50:41.112] Completed: 029
+[20:50:41.113] Processing: 035 (54 patches)
+[20:50:45.513] Completed: 035
+[20:50:45.514] Processing: 048 (54 patches)
+[20:50:50.108] Completed: 048
+[20:50:50.109] Processing: 069 (54 patches)
+[20:50:54.643] Completed: 069
+[20:50:54.643] Processing: 082 (54 patches)
+[20:50:58.961] Completed: 082
+[20:50:58.962] Processing: 088 (54 patches)
+[20:51:03.680] Completed: 088
+[20:51:03.681] Processing: 089 (54 patches)
+[20:51:08.114] Completed: 089
+[20:51:08.114] Processing: 091 (54 patches)
+[20:51:12.479] Completed: 091
+[20:51:12.479] Processing: 100 (54 patches)
+[20:51:16.918] Completed: 100
+[20:51:16.919] Processing: 106 (54 patches)
+[20:51:21.218] Completed: 106
+[20:51:21.218] Processing: 117 (54 patches)
+[20:51:25.557] Completed: 117
+[20:51:25.557] Processing: 123 (54 patches)
+[20:51:29.816] Completed: 123
+[20:51:29.816] Processing: 125 (54 patches)
+[20:51:34.915] Completed: 125
+[20:51:34.915] Processing: 130 (54 patches)
+[20:51:39.145] Completed: 130
+[20:51:39.145] Processing: 133 (54 patches)
+[20:51:43.388] Completed: 133
+[20:51:43.388] Processing: 137 (54 patches)
+[20:51:48.827] Completed: 137
+[20:51:48.827] Processing: 146 (54 patches)
+[20:51:53.182] Completed: 146
+[20:51:53.182] Processing: 166 (54 patches)
+[20:51:57.643] Completed: 166
+[20:51:57.643] Processing: 184 (54 patches)
+[20:52:02.068] Completed: 184
+[20:52:02.068] Processing: 215 (54 patches)
+[20:52:06.278] Completed: 215
+[20:52:06.278] Processing: 237 (54 patches)
+[20:52:10.436] Completed: 237
+[20:52:10.437] Processing: 243 (54 patches)
+[20:52:14.586] Completed: 243
+[20:52:14.586] Processing: 255 (54 patches)
+[20:52:18.927] Completed: 255
+[20:52:18.927] Processing: 258 (54 patches)
+[20:52:23.179] Completed: 258
+[20:52:23.180] Processing: 284 (54 patches)
+[20:52:27.436] Completed: 284
+[20:52:27.436] Processing: 325 (54 patches)
+[20:52:31.771] Completed: 325
+[20:52:31.771] Processing: 357 (54 patches)
+[20:52:35.853] Completed: 357
+[20:52:35.854] 
+Per-class metrics:
+[20:52:35.854] --------------------------------------------------------------------------------
+[20:52:35.854] Background     : Precision=0.9924, Recall=0.9949, F1=0.9937, IoU=0.9874
+[20:52:35.854] Paratext       : Precision=0.7952, Recall=0.8502, F1=0.8218, IoU=0.6975
+[20:52:35.854] Decoration     : Precision=0.9852, Recall=0.9258, F1=0.9546, IoU=0.9131
+[20:52:35.854] Main Text      : Precision=0.9325, Recall=0.9537, F1=0.9430, IoU=0.8921
+[20:52:35.854] Title          : Precision=0.8480, Recall=0.7978, F1=0.8222, IoU=0.6980
+[20:52:35.854] Chapter Headings: Precision=0.9410, Recall=0.6923, F1=0.7977, IoU=0.6635
+[20:52:35.854] 
+Mean metrics:
+[20:52:35.854] ----------------------------------------
+[20:52:35.854] Mean Precision: 0.9157
+[20:52:35.854] Mean Recall: 0.8691
+[20:52:35.854] Mean F1: 0.8888
+[20:52:35.854] Mean IoU: 0.8086
+[20:52:35.854] Inference completed on 30 images
+[08:57:30.712] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CB55', model='missformer', dataset='DIVAHISDB', manuscript='CB55', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[08:57:30.712] Testing with checkpoint: best_model_latest.pth
+[08:57:30.714] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CB55/predictions
+[08:57:30.714] Starting inference on DIVAHISDB dataset
+[08:57:36.722] Found 6090 patches for CB55
+[08:57:36.731] Processing: e-codices_fmb-cb-0055_0098v_max (609 patches)
+[08:58:10.047] Resizing ground truth for e-codices_fmb-cb-0055_0098v_max
+[08:58:24.726] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[08:58:25.212] Completed: e-codices_fmb-cb-0055_0098v_max
+[08:58:25.212] Processing: e-codices_fmb-cb-0055_0099v_max (609 patches)
+[08:58:56.982] Resizing ground truth for e-codices_fmb-cb-0055_0099v_max
+[08:59:11.412] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[08:59:11.811] Completed: e-codices_fmb-cb-0055_0099v_max
+[08:59:11.811] Processing: e-codices_fmb-cb-0055_0102v_max (609 patches)
+[08:59:43.541] Resizing ground truth for e-codices_fmb-cb-0055_0102v_max
+[08:59:57.971] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[08:59:58.361] Completed: e-codices_fmb-cb-0055_0102v_max
+[08:59:58.361] Processing: e-codices_fmb-cb-0055_0105r_max (609 patches)
+[09:00:33.163] Resizing ground truth for e-codices_fmb-cb-0055_0105r_max
+[09:00:47.485] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:00:47.856] Completed: e-codices_fmb-cb-0055_0105r_max
+[09:00:47.856] Processing: e-codices_fmb-cb-0055_0107v_max (609 patches)
+[09:01:18.545] Resizing ground truth for e-codices_fmb-cb-0055_0107v_max
+[09:01:32.889] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:01:33.260] Completed: e-codices_fmb-cb-0055_0107v_max
+[09:01:33.260] Processing: e-codices_fmb-cb-0055_0108v_max (609 patches)
+[09:02:04.674] Resizing ground truth for e-codices_fmb-cb-0055_0108v_max
+[09:02:19.725] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:02:20.091] Completed: e-codices_fmb-cb-0055_0108v_max
+[09:02:20.091] Processing: e-codices_fmb-cb-0055_0116r_max (609 patches)
+[09:02:50.989] Resizing ground truth for e-codices_fmb-cb-0055_0116r_max
+[09:03:05.371] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:03:05.742] Completed: e-codices_fmb-cb-0055_0116r_max
+[09:03:05.742] Processing: e-codices_fmb-cb-0055_0159v_max (609 patches)
+[09:03:36.513] Resizing ground truth for e-codices_fmb-cb-0055_0159v_max
+[09:03:50.894] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:03:51.267] Completed: e-codices_fmb-cb-0055_0159v_max
+[09:03:51.267] Processing: e-codices_fmb-cb-0055_0160v_max (609 patches)
+[09:04:22.093] Resizing ground truth for e-codices_fmb-cb-0055_0160v_max
+[09:04:36.512] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:04:36.880] Completed: e-codices_fmb-cb-0055_0160v_max
+[09:04:36.880] Processing: e-codices_fmb-cb-0055_0162v_max (609 patches)
+[09:05:07.362] Resizing ground truth for e-codices_fmb-cb-0055_0162v_max
+[09:05:21.660] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:05:22.035] Completed: e-codices_fmb-cb-0055_0162v_max
+[09:05:22.035] 
+Per-class metrics:
+[09:05:22.035] --------------------------------------------------------------------------------
+[09:05:22.035] Background     : Precision=0.9900, Recall=0.9926, F1=0.9913, IoU=0.9828
+[09:05:22.035] Comment        : Precision=0.9674, Recall=0.9585, F1=0.9629, IoU=0.9285
+[09:05:22.035] Decoration     : Precision=0.9260, Recall=0.8580, F1=0.8907, IoU=0.8029
+[09:05:22.035] Main Text      : Precision=0.9539, Recall=0.9454, F1=0.9496, IoU=0.9041
+[09:05:22.036] 
+Mean metrics:
+[09:05:22.036] ----------------------------------------
+[09:05:22.036] Mean Precision: 0.9593
+[09:05:22.036] Mean Recall: 0.9386
+[09:05:22.036] Mean F1: 0.9486
+[09:05:22.036] Mean IoU: 0.9046
+[09:05:22.036] Inference completed on 10 images
+[15:39:54.226] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG18', model='missformer', dataset='DIVAHISDB', manuscript='CSG18', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[15:39:54.226] Testing with checkpoint: best_model_latest.pth
+[15:39:54.230] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG18/predictions
+[15:39:54.230] Starting inference on DIVAHISDB dataset
+[15:39:57.066] Found 3080 patches for CSG18
+[15:39:57.073] Processing: e-codices_csg-0018_061_max (308 patches)
+[15:40:12.142] Resizing ground truth for e-codices_csg-0018_061_max
+[15:40:20.436] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:40:20.674] Completed: e-codices_csg-0018_061_max
+[15:40:20.674] Processing: e-codices_csg-0018_064_max (308 patches)
+[15:40:35.378] Resizing ground truth for e-codices_csg-0018_064_max
+[15:40:43.416] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:40:43.643] Completed: e-codices_csg-0018_064_max
+[15:40:43.643] Processing: e-codices_csg-0018_096_max (308 patches)
+[15:40:58.438] Resizing ground truth for e-codices_csg-0018_096_max
+[15:41:06.450] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:41:06.645] Completed: e-codices_csg-0018_096_max
+[15:41:06.645] Processing: e-codices_csg-0018_098_max (308 patches)
+[15:41:21.301] Resizing ground truth for e-codices_csg-0018_098_max
+[15:41:29.286] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:41:29.489] Completed: e-codices_csg-0018_098_max
+[15:41:29.489] Processing: e-codices_csg-0018_120_max (308 patches)
+[15:41:45.106] Resizing ground truth for e-codices_csg-0018_120_max
+[15:41:53.100] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:41:53.296] Completed: e-codices_csg-0018_120_max
+[15:41:53.296] Processing: e-codices_csg-0018_151_max (308 patches)
+[15:42:07.562] Resizing ground truth for e-codices_csg-0018_151_max
+[15:42:15.479] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:42:15.674] Completed: e-codices_csg-0018_151_max
+[15:42:15.674] Processing: e-codices_csg-0018_159_max (308 patches)
+[15:42:29.851] Resizing ground truth for e-codices_csg-0018_159_max
+[15:42:37.799] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:42:38.001] Completed: e-codices_csg-0018_159_max
+[15:42:38.001] Processing: e-codices_csg-0018_160_max (308 patches)
+[15:42:52.529] Resizing ground truth for e-codices_csg-0018_160_max
+[15:43:00.494] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:43:00.686] Completed: e-codices_csg-0018_160_max
+[15:43:00.686] Processing: e-codices_csg-0018_161_max (308 patches)
+[15:43:15.258] Resizing ground truth for e-codices_csg-0018_161_max
+[15:43:23.196] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:43:23.395] Completed: e-codices_csg-0018_161_max
+[15:43:23.395] Processing: e-codices_csg-0018_164_max (308 patches)
+[15:43:37.712] Resizing ground truth for e-codices_csg-0018_164_max
+[15:43:45.665] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[15:43:45.859] Completed: e-codices_csg-0018_164_max
+[15:43:45.859] 
+Per-class metrics:
+[15:43:45.859] --------------------------------------------------------------------------------
+[15:43:45.859] Background     : Precision=0.9918, Recall=0.9914, F1=0.9916, IoU=0.9834
+[15:43:45.859] Comment        : Precision=0.9372, Recall=0.9463, F1=0.9417, IoU=0.8899
+[15:43:45.859] Decoration     : Precision=0.9293, Recall=0.8766, F1=0.9022, IoU=0.8217
+[15:43:45.859] Main Text      : Precision=0.9559, Recall=0.9560, F1=0.9560, IoU=0.9156
+[15:43:45.859] 
+Mean metrics:
+[15:43:45.859] ----------------------------------------
+[15:43:45.859] Mean Precision: 0.9535
+[15:43:45.860] Mean Recall: 0.9426
+[15:43:45.860] Mean F1: 0.9479
+[15:43:45.860] Mean IoU: 0.9027
+[15:43:45.860] Inference completed on 10 images
+[21:47:02.628] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG863', model='missformer', dataset='DIVAHISDB', manuscript='CSG863', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[21:47:02.629] Testing with checkpoint: best_model_latest.pth
+[21:47:02.648] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG863/predictions
+[21:47:02.648] Starting inference on DIVAHISDB dataset
+[21:47:12.900] Found 3080 patches for CSG863
+[21:47:12.909] Processing: e-codices_csg-0863_013_max (308 patches)
+[21:47:30.889] Resizing ground truth for e-codices_csg-0863_013_max
+[21:47:38.992] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:47:39.192] Completed: e-codices_csg-0863_013_max
+[21:47:39.193] Processing: e-codices_csg-0863_016_max (308 patches)
+[21:47:54.022] Resizing ground truth for e-codices_csg-0863_016_max
+[21:48:01.929] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:48:02.132] Completed: e-codices_csg-0863_016_max
+[21:48:02.132] Processing: e-codices_csg-0863_017_max (308 patches)
+[21:48:17.095] Resizing ground truth for e-codices_csg-0863_017_max
+[21:48:24.973] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:48:25.161] Completed: e-codices_csg-0863_017_max
+[21:48:25.162] Processing: e-codices_csg-0863_021_max (308 patches)
+[21:48:47.301] Resizing ground truth for e-codices_csg-0863_021_max
+[21:48:55.214] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:48:55.412] Completed: e-codices_csg-0863_021_max
+[21:48:55.412] Processing: e-codices_csg-0863_022_max (308 patches)
+[21:49:18.393] Resizing ground truth for e-codices_csg-0863_022_max
+[21:49:26.266] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:49:26.454] Completed: e-codices_csg-0863_022_max
+[21:49:26.454] Processing: e-codices_csg-0863_025_max (308 patches)
+[21:49:44.639] Resizing ground truth for e-codices_csg-0863_025_max
+[21:49:52.545] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:49:52.745] Completed: e-codices_csg-0863_025_max
+[21:49:52.745] Processing: e-codices_csg-0863_042_max (308 patches)
+[21:50:07.226] Resizing ground truth for e-codices_csg-0863_042_max
+[21:50:15.245] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:50:15.470] Completed: e-codices_csg-0863_042_max
+[21:50:15.470] Processing: e-codices_csg-0863_050_max (308 patches)
+[21:50:30.830] Resizing ground truth for e-codices_csg-0863_050_max
+[21:50:38.726] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:50:38.917] Completed: e-codices_csg-0863_050_max
+[21:50:38.917] Processing: e-codices_csg-0863_070_max (308 patches)
+[21:50:54.215] Resizing ground truth for e-codices_csg-0863_070_max
+[21:51:02.132] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:51:02.326] Completed: e-codices_csg-0863_070_max
+[21:51:02.326] Processing: e-codices_csg-0863_071_max (308 patches)
+[21:51:17.629] Resizing ground truth for e-codices_csg-0863_071_max
+[21:51:25.680] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[21:51:25.909] Completed: e-codices_csg-0863_071_max
+[21:51:25.909] 
+Per-class metrics:
+[21:51:25.909] --------------------------------------------------------------------------------
+[21:51:25.909] Background     : Precision=0.9875, Recall=0.9930, F1=0.9903, IoU=0.9807
+[21:51:25.909] Comment        : Precision=0.9554, Recall=0.8990, F1=0.9263, IoU=0.8628
+[21:51:25.909] Decoration     : Precision=0.8977, Recall=0.8365, F1=0.8661, IoU=0.7638
+[21:51:25.909] Main Text      : Precision=0.9676, Recall=0.9536, F1=0.9605, IoU=0.9241
+[21:51:25.909] 
+Mean metrics:
+[21:51:25.909] ----------------------------------------
+[21:51:25.909] Mean Precision: 0.9521
+[21:51:25.909] Mean Recall: 0.9205
+[21:51:25.909] Mean F1: 0.9358
+[21:51:25.909] Mean IoU: 0.8828
+[21:51:25.909] Inference completed on 10 images
+[22:15:25.419] Namespace(cfg=None, output_dir='./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG863', model='missformer', dataset='DIVAHISDB', manuscript='CSG863', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[22:15:25.419] Testing with checkpoint: best_model_latest.pth
+[22:15:25.420] Saving predictions to: ./All_Results_with_No_FocalLoss/missformer/DIVAHISDB/divahisdb_patch224_missformer_CSG863/predictions
+[22:15:25.420] Starting inference on DIVAHISDB dataset
+[22:15:28.835] Found 3080 patches for CSG863
+[22:15:28.842] Processing: e-codices_csg-0863_013_max (308 patches)
+[22:15:39.709] Resizing ground truth for e-codices_csg-0863_013_max
+[22:15:47.868] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[22:15:48.079] Completed: e-codices_csg-0863_013_max
+[22:15:48.079] Processing: e-codices_csg-0863_016_max (308 patches)
+[22:15:58.107] Resizing ground truth for e-codices_csg-0863_016_max
+[22:16:06.017] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[22:16:06.224] Completed: e-codices_csg-0863_016_max
+[22:16:06.224] Processing: e-codices_csg-0863_017_max (308 patches)
+[22:16:16.054] Resizing ground truth for e-codices_csg-0863_017_max
+[22:16:23.970] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
+[22:16:24.160] Completed: e-codices_csg-0863_017_max
+[22:16:24.160] Processing: e-codices_csg-0863_021_max (308 patches)
+[01:53:22.923] Namespace(cfg=None, output_dir='../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Syr341', model='missformer', dataset='UDIADS_BIB', manuscript='Syr341', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[01:53:22.924] Testing with checkpoint: best_model_latest.pth
+[01:53:22.925] Saving predictions to: ../../All_Results_with_No_FocalLoss/missformer/UDIADS_BIB_MS/udiadsbib_patch224_missformer_Syr341/predictions
+[01:53:22.926] Starting inference on UDIADS_BIB dataset
+[01:53:25.063] Found 1620 patches for Syr341
+[01:53:25.068] Processing: 031 (54 patches)
+[01:53:29.733] Completed: 031
+[01:53:29.733] Processing: 053 (54 patches)
+[01:53:33.509] Completed: 053
+[01:53:33.509] Processing: 054 (54 patches)
+[01:53:37.247] Completed: 054
+[01:53:37.247] Processing: 071 (54 patches)
+[01:53:41.104] Completed: 071
+[01:53:41.104] Processing: 073 (54 patches)
+[01:53:44.891] Completed: 073
+[01:53:44.891] Processing: 075 (54 patches)
+[01:53:48.734] Completed: 075
+[01:53:48.734] Processing: 100 (54 patches)
+[01:53:52.578] Completed: 100
+[01:53:52.578] Processing: 137 (54 patches)
+[01:53:56.372] Completed: 137
+[01:53:56.372] Processing: 150 (54 patches)
+[01:54:00.216] Completed: 150
+[01:54:00.216] Processing: 160 (54 patches)
+[01:54:04.031] Completed: 160
+[01:54:04.031] Processing: 167 (54 patches)
+[01:54:07.821] Completed: 167
+[01:54:07.821] Processing: 184 (54 patches)
+[01:54:11.625] Completed: 184
+[01:54:11.625] Processing: 190 (54 patches)
+[01:54:15.456] Completed: 190
+[01:54:15.456] Processing: 201 (54 patches)
+[01:54:19.330] Completed: 201
+[01:54:19.330] Processing: 210 (54 patches)
+[01:54:23.119] Completed: 210
+[01:54:23.120] Processing: 222 (54 patches)
+[01:54:26.954] Completed: 222
+[01:54:26.954] Processing: 224 (54 patches)
+[01:54:30.786] Completed: 224
+[01:54:30.786] Processing: 231 (54 patches)
+[01:54:34.626] Completed: 231
+[01:54:34.627] Processing: 241 (54 patches)
+[01:54:38.431] Completed: 241
+[01:54:38.431] Processing: 249 (54 patches)
+[01:54:42.246] Completed: 249
+[01:54:42.246] Processing: 252 (54 patches)
+[01:54:46.084] Completed: 252
+[01:54:46.084] Processing: 267 (54 patches)
+[01:54:49.905] Completed: 267
+[01:54:49.905] Processing: 281 (54 patches)
+[01:54:53.639] Completed: 281
+[01:54:53.639] Processing: 286 (54 patches)
+[01:54:57.254] Completed: 286
+[01:54:57.254] Processing: 290 (54 patches)
+[01:55:00.890] Completed: 290
+[01:55:00.890] Processing: 313 (54 patches)
+[01:55:04.587] Completed: 313
+[01:55:04.587] Processing: 362 (54 patches)
+[01:55:08.226] Completed: 362
+[01:55:08.226] Processing: 368 (54 patches)
+[01:55:11.940] Completed: 368
+[01:55:11.940] Processing: 376 (54 patches)
+[01:55:15.731] Completed: 376
+[01:55:15.731] Processing: 446 (54 patches)
+[01:55:19.478] Completed: 446
+[01:55:19.478] 
+Per-class metrics:
+[01:55:19.478] --------------------------------------------------------------------------------
+[01:55:19.478] Background     : Precision=0.9736, Recall=0.9831, F1=0.9783, IoU=0.9575
+[01:55:19.478] Paratext       : Precision=0.5648, Recall=0.4520, F1=0.5021, IoU=0.3352
+[01:55:19.478] Decoration     : Precision=0.9771, Recall=0.7691, F1=0.8607, IoU=0.7554
+[01:55:19.478] Main Text      : Precision=0.8784, Recall=0.8590, F1=0.8686, IoU=0.7677
+[01:55:19.478] Title          : Precision=0.5700, Recall=0.5949, F1=0.5822, IoU=0.4106
+[01:55:19.478] 
+Mean metrics:
+[01:55:19.478] ----------------------------------------
+[01:55:19.478] Mean Precision: 0.7928
+[01:55:19.478] Mean Recall: 0.7316
+[01:55:19.478] Mean F1: 0.7584
+[01:55:19.478] Mean IoU: 0.6453
+[01:55:19.478] Inference completed on 30 images

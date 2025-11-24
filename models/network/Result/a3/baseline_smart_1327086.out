@@ -1,0 +1,2181 @@
+### Starting TaskPrologue of job 1327086 on tg067 at Sat Nov 15 03:11:29 PM CET 2025
+Running on cores 4-5,12-13,16,21,28-29 with governor ondemand
+Sat Nov 15 15:11:29 2025       
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 580.95.05              Driver Version: 580.95.05      CUDA Version: 13.0     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA GeForce RTX 2080 Ti     On  |   00000000:86:00.0 Off |                  N/A |
+| 29%   39C    P8             15W /  250W |       1MiB /  11264MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+### Finished TaskPrologue
+
+============================================================================
+CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+============================================================================
+Configuration: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+
+Component Details:
+  ✓ EfficientNet-B4 Encoder
+  ✓ Bottleneck: 2 Swin Transformer blocks (enabled)
+  ✓ Swin Transformer Decoder
+  ✓ Fusion Method: smart (attention-based smart skip connections)
+  ✓ Adapter mode: streaming (integrated)
+  ✓ GroupNorm: enabled
+  ✗ Deep Supervision: disabled (base model)
+  ✗ Multi-Scale Aggregation: disabled (base model)
+  ✗ Fourier Feature Fusion: disabled (using smart fusion)
+  ✗ Smart Skip Connections: disabled (using smart fusion)
+  ✗ Simple Skip Connections: disabled (using smart fusion)
+
+Training Parameters:
+  - Batch Size: 12
+  - Max Epochs: 300
+  - Learning Rate: 0.0001
+  - Scheduler: CosineAnnealingWarmRestarts
+  - Early Stopping: 150 epochs patience
+============================================================================
+
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TRAINING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin2
+╚════════════════════════════════════════════════════════════════════════╝
+
+Configuration: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+Output Directory: ./Result/a2/Latin2
+
+Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+All arguments validated successfully!
+Setting random seed to 1234 for reproducible training...
+Setting up U-DIADS-Bib dataset...
+Using 6 classes for manuscript: Latin2
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin2/Image/training
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin2/mask/training_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin2/Image/validation
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin2/mask/validation_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Loading CNN-Transformer model...
+================================================================================
+🚀 Loading CNN-Transformer Model
+================================================================================
+Model Configuration:
+  ✓ EfficientNet-B4 Encoder
+  ✓ Bottleneck: Enabled
+  ✓ Swin Transformer Decoder
+  ✓ Fusion Method: smart
+  ✓ Adapter Mode: streaming
+  ✓ Deep Supervision: Disabled
+  ✓ Multi-Scale Aggregation: Disabled
+  ✓ Normalization: GroupNorm
+================================================================================
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+Model moved to CUDA
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Model created successfully with 6 classes
+
+=== Starting Training ===
+Dataset: UDIADS_BIB
+Model: CNN-Transformer
+Batch size: 4
+Max epochs: 300
+Learning rate: 0.0001
+
+
+================================================================================
+TRAINING CONFIGURATION
+================================================================================
+Dataset: UDIADS_BIB
+Manuscript: Latin2
+Model: CNN-Transformer (EfficientNet-B4 + Swin-UNet Decoder)
+Configuration: Bo + AFF + FL
+  • Bottleneck: ✓
+  • Adapter Mode: streaming
+  • Deep Supervision: ✗
+  • Fusion Method: SMART
+  • Multi-Scale Aggregation: ✗
+  • Normalization: GroupNorm
+Batch Size: 4
+Max Epochs: 300
+Learning Rate: 0.0001
+Number of Classes: 6
+Early Stopping Patience: 150 epochs
+Output Directory: ./Result/a2/Latin2
+================================================================================
+
+📊 Dataset Statistics:
+   - Training samples: 540
+   - Validation samples: 540
+   - Batch size: 4
+   - Steps per epoch: 135
+
+
+================================================================================
+COMPUTING CLASS WEIGHTS
+================================================================================
+
+------------------------------------------------------------
+Class Name           Percentage      Weight         
+------------------------------------------------------------
+Background            92.66%       1.0000
+Paratext               0.13%       1.0000
+Decoration             2.36%       1.0000
+Main Text              3.97%       1.0000
+Title                  0.38%       1.0000
+Chapter Heading        0.51%       1.0000
+------------------------------------------------------------
+Total pixels: 27,095,040.0
+Weight ratio (max/min): 1.00
+================================================================================
+
+📈 Class weights computed with rarity-based boosting (mean scaled)
+   Final weights: [1. 1. 1. 1. 1. 1.]
+
+✓ Loss functions created: CE (weighted), Focal (γ=2.0, no weights), Dice
+
+================================================================================
+OPTIMIZER CONFIGURATION
+================================================================================
+Encoder     : LR=0.000005, WD=0.000100, Params=16,742,216
+Bottleneck  : LR=0.000100, WD=0.000500, Params=14,183,856
+Decoder     : LR=0.000100, WD=0.001000, Params=10,577,440
+Scheduler:   CosineAnnealingWarmRestarts (T_0=50)
+================================================================================
+
+🚀 Using automatic mixed precision (AMP) for faster training (2-3x speedup)
+
+🔍 Checking for checkpoint at: ./Result/a2/Latin2/best_model_latest.pth
+   Absolute path: /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network/Result/a2/Latin2/best_model_latest.pth
+   File exists: True
+
+📂 Found checkpoint: ./Result/a2/Latin2/best_model_latest.pth
+   Attempting to resume training...
+   ✓ Loaded model state
+   ✓ Loaded optimizer state
+   ✓ Loaded scheduler state
+   ✓ Loaded scaler state (AMP)
+   ✓ Successfully loaded checkpoint from epoch 285
+   ✓ Best validation loss: 0.3805
+   ✓ Resuming from epoch 286
+
+================================================================================
+🚀 STARTING TRAINING
+================================================================================
+Loss: 0.3*CE + 0.2*Focal + 0.5*Dice
+Early stopping: 150 epochs patience
+Resuming from epoch: 286
+================================================================================
+
+
+EPOCH 287/300
+--------------------------------------------------
+  ⚠️  Skipped 31 batches (0 NaN/Inf loss, 31 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2936
+  • Validation Loss: 0.4339
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4339, best: 0.3805)
+    ⚠ No improvement for 1 epochs (patience: 150, remaining: 149)
+
+EPOCH 288/300
+--------------------------------------------------
+  ⚠️  Skipped 29 batches (0 NaN/Inf loss, 29 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2974
+  • Validation Loss: 0.4326
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4326, best: 0.3805)
+    ⚠ No improvement for 2 epochs (patience: 150, remaining: 148)
+
+EPOCH 289/300
+--------------------------------------------------
+  ⚠️  Skipped 23 batches (0 NaN/Inf loss, 23 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.3085
+  • Validation Loss: 0.4323
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4323, best: 0.3805)
+    ⚠ No improvement for 3 epochs (patience: 150, remaining: 147)
+
+EPOCH 290/300
+--------------------------------------------------
+  ⚠️  Skipped 52 batches (0 NaN/Inf loss, 52 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2400
+  • Validation Loss: 0.4342
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4342, best: 0.3805)
+    ⚠ No improvement for 4 epochs (patience: 150, remaining: 146)
+
+EPOCH 291/300
+--------------------------------------------------
+  ⚠️  Skipped 43 batches (0 NaN/Inf loss, 43 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2597
+  • Validation Loss: 0.4329
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4329, best: 0.3805)
+    ⚠ No improvement for 5 epochs (patience: 150, remaining: 145)
+
+EPOCH 292/300
+--------------------------------------------------
+  ⚠️  Skipped 48 batches (0 NaN/Inf loss, 48 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2496
+  • Validation Loss: 0.4330
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4330, best: 0.3805)
+    ⚠ No improvement for 6 epochs (patience: 150, remaining: 144)
+
+EPOCH 293/300
+--------------------------------------------------
+  ⚠️  Skipped 47 batches (0 NaN/Inf loss, 47 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2494
+  • Validation Loss: 0.4330
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4330, best: 0.3805)
+    ⚠ No improvement for 7 epochs (patience: 150, remaining: 143)
+
+EPOCH 294/300
+--------------------------------------------------
+  ⚠️  Skipped 41 batches (0 NaN/Inf loss, 41 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2642
+  • Validation Loss: 0.4340
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4340, best: 0.3805)
+    ⚠ No improvement for 8 epochs (patience: 150, remaining: 142)
+
+EPOCH 295/300
+--------------------------------------------------
+  ⚠️  Skipped 41 batches (0 NaN/Inf loss, 41 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2694
+  • Validation Loss: 0.4344
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4344, best: 0.3805)
+    ⚠ No improvement for 9 epochs (patience: 150, remaining: 141)
+
+EPOCH 296/300
+--------------------------------------------------
+  ⚠️  Skipped 40 batches (0 NaN/Inf loss, 40 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2751
+  • Validation Loss: 0.4336
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4336, best: 0.3805)
+    ⚠ No improvement for 10 epochs (patience: 150, remaining: 140)
+
+EPOCH 297/300
+--------------------------------------------------
+  ⚠️  Skipped 49 batches (0 NaN/Inf loss, 49 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2461
+  • Validation Loss: 0.4341
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4341, best: 0.3805)
+    ⚠ No improvement for 11 epochs (patience: 150, remaining: 139)
+
+EPOCH 298/300
+--------------------------------------------------
+  ⚠️  Skipped 52 batches (0 NaN/Inf loss, 52 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2342
+  • Validation Loss: 0.4343
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4343, best: 0.3805)
+    ⚠ No improvement for 12 epochs (patience: 150, remaining: 138)
+
+EPOCH 299/300
+--------------------------------------------------
+  ⚠️  Skipped 47 batches (0 NaN/Inf loss, 47 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2484
+  • Validation Loss: 0.4334
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4334, best: 0.3805)
+    ⚠ No improvement for 13 epochs (patience: 150, remaining: 137)
+
+EPOCH 300/300
+--------------------------------------------------
+  ⚠️  Skipped 43 batches (0 NaN/Inf loss, 43 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2597
+  • Validation Loss: 0.4332
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+   💾 Periodic checkpoint: epoch_300.pth
+    No improvement (current: 0.4332, best: 0.3805)
+    ⚠ No improvement for 14 epochs (patience: 150, remaining: 136)
+
+================================================================================
+TRAINING COMPLETED
+================================================================================
+Best Val Loss:  0.3805
+Total Epochs:   300
+Models Saved:   ./Result/a2/Latin2
+TensorBoard:    ./Result/a2/Latin2/tensorboard_logs
+================================================================================
+
+[15:19:14] Training completed. Best val loss: 0.3805
+
+=== TRAINING COMPLETED SUCCESSFULLY ===
+Training Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TRAINING COMPLETED: Latin2
+╚════════════════════════════════════════════════════════════════════════╝
+
+Proceeding to testing...
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TESTING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin2
+╚════════════════════════════════════════════════════════════════════════╝
+
+Test Configuration:
+  ✓ Test-Time Augmentation (TTA): ENABLED
+  ✗ CRF Post-processing: DISABLED
+  - Batch Size: 1 (reduced for smart skip connections + TTA memory efficiency)
+    Note: Smart skip connections use attention mechanisms which are memory-intensive
+
+WARNING:root:Component flags ['use_smart_fusion', 'use_groupnorm'] are typically used with --use_baseline flag
+WARNING:root:Consider using --use_baseline for baseline configuration
+WARNING:timm.models._builder:Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+=== Historical Document Segmentation Testing ===
+
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Loaded checkpoint: best_model_latest.pth
+
+=== Starting Testing ===
+Dataset: UDIADS_BIB | Manuscript: Latin2
+--------------------------------------------------------------------------------
+TEST-TIME AUGMENTATION (TTA): ✓ ENABLED
+  → Using 4 augmentations: original, horizontal flip, vertical flip, rotation 90°
+  → Averaging predictions across all augmentations
+CRF POST-PROCESSING: ✗ DISABLED
+--------------------------------------------------------------------------------
+
+
+Found 30 original images to process
+Processing: 076 (54 patches)
+✓ Ground truth found for 076
+✓ Completed: 076
+Processing: 079 (54 patches)
+✓ Ground truth found for 079
+✓ Completed: 079
+Processing: 082 (54 patches)
+✓ Ground truth found for 082
+✓ Completed: 082
+Processing: 095 (54 patches)
+✓ Ground truth found for 095
+✓ Completed: 095
+Processing: 106 (54 patches)
+✓ Ground truth found for 106
+✓ Completed: 106
+Processing: 111 (54 patches)
+✓ Ground truth found for 111
+✓ Completed: 111
+Processing: 115 (54 patches)
+✓ Ground truth found for 115
+✓ Completed: 115
+Processing: 117 (54 patches)
+✓ Ground truth found for 117
+✓ Completed: 117
+Processing: 128 (54 patches)
+✓ Ground truth found for 128
+✓ Completed: 128
+Processing: 134 (54 patches)
+✓ Ground truth found for 134
+✓ Completed: 134
+Processing: 138 (54 patches)
+✓ Ground truth found for 138
+✓ Completed: 138
+Processing: 142 (54 patches)
+✓ Ground truth found for 142
+✓ Completed: 142
+Processing: 159 (54 patches)
+✓ Ground truth found for 159
+✓ Completed: 159
+Processing: 166 (54 patches)
+✓ Ground truth found for 166
+✓ Completed: 166
+Processing: 185 (54 patches)
+✓ Ground truth found for 185
+✓ Completed: 185
+Processing: 200 (54 patches)
+✓ Ground truth found for 200
+✓ Completed: 200
+Processing: 203 (54 patches)
+✓ Ground truth found for 203
+✓ Completed: 203
+Processing: 208 (54 patches)
+✓ Ground truth found for 208
+✓ Completed: 208
+Processing: 229 (54 patches)
+✓ Ground truth found for 229
+✓ Completed: 229
+Processing: 230 (54 patches)
+✓ Ground truth found for 230
+✓ Completed: 230
+Processing: 235 (54 patches)
+✓ Ground truth found for 235
+✓ Completed: 235
+Processing: 236 (54 patches)
+✓ Ground truth found for 236
+✓ Completed: 236
+Processing: 248 (54 patches)
+✓ Ground truth found for 248
+✓ Completed: 248
+Processing: 249 (54 patches)
+✓ Ground truth found for 249
+✓ Completed: 249
+Processing: 250 (54 patches)
+✓ Ground truth found for 250
+✓ Completed: 250
+Processing: 251 (54 patches)
+✓ Ground truth found for 251
+✓ Completed: 251
+Processing: 252 (54 patches)
+✓ Ground truth found for 252
+✓ Completed: 252
+Processing: 275 (54 patches)
+✓ Ground truth found for 275
+✓ Completed: 275
+Processing: 277 (54 patches)
+✓ Ground truth found for 277
+✓ Completed: 277
+Processing: 297 (54 patches)
+✓ Ground truth found for 297
+✓ Completed: 297
+
+================================================================================
+Testing Summary: Processed 30 images with ground truth
+================================================================================
+
+
+================================================================================
+SEGMENTATION METRICS
+================================================================================
+Images Processed: 30
+
+Per-class metrics:
+--------------------------------------------------------------------------------
+Background          : Precision=0.9900, Recall=0.9943, F1=0.9921, IoU=0.9843
+Paratext            : Precision=0.6902, Recall=0.7340, F1=0.7114, IoU=0.5521
+Decoration          : Precision=0.9073, Recall=0.8990, F1=0.9031, IoU=0.8234
+Main Text           : Precision=0.8892, Recall=0.8467, F1=0.8675, IoU=0.7659
+Title               : Precision=0.8281, Recall=0.8651, F1=0.8462, IoU=0.7334
+Chapter Headings    : Precision=0.8117, Recall=0.5646, F1=0.6660, IoU=0.4993
+
+Mean metrics:
+--------------------------------------------------------------------------------
+Mean Precision: 0.8528
+Mean Recall:    0.8173
+Mean F1-Score:  0.8311
+Mean IoU:       0.7264
+================================================================================
+
+=== TESTING COMPLETED SUCCESSFULLY ===
+Testing Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TESTING COMPLETED: Latin2
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TRAINING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin14396
+╚════════════════════════════════════════════════════════════════════════╝
+
+Configuration: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+Output Directory: ./Result/a2/Latin14396
+
+Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+All arguments validated successfully!
+Setting random seed to 1234 for reproducible training...
+Setting up U-DIADS-Bib dataset...
+Using 6 classes for manuscript: Latin14396
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin14396/Image/training
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin14396/mask/training_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin14396/Image/validation
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin14396/mask/validation_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Loading CNN-Transformer model...
+================================================================================
+🚀 Loading CNN-Transformer Model
+================================================================================
+Model Configuration:
+  ✓ EfficientNet-B4 Encoder
+  ✓ Bottleneck: Enabled
+  ✓ Swin Transformer Decoder
+  ✓ Fusion Method: smart
+  ✓ Adapter Mode: streaming
+  ✓ Deep Supervision: Disabled
+  ✓ Multi-Scale Aggregation: Disabled
+  ✓ Normalization: GroupNorm
+================================================================================
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+Model moved to CUDA
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Model created successfully with 6 classes
+
+=== Starting Training ===
+Dataset: UDIADS_BIB
+Model: CNN-Transformer
+Batch size: 4
+Max epochs: 300
+Learning rate: 0.0001
+
+
+================================================================================
+TRAINING CONFIGURATION
+================================================================================
+Dataset: UDIADS_BIB
+Manuscript: Latin14396
+Model: CNN-Transformer (EfficientNet-B4 + Swin-UNet Decoder)
+Configuration: Bo + AFF + FL
+  • Bottleneck: ✓
+  • Adapter Mode: streaming
+  • Deep Supervision: ✗
+  • Fusion Method: SMART
+  • Multi-Scale Aggregation: ✗
+  • Normalization: GroupNorm
+Batch Size: 4
+Max Epochs: 300
+Learning Rate: 0.0001
+Number of Classes: 6
+Early Stopping Patience: 150 epochs
+Output Directory: ./Result/a2/Latin14396
+================================================================================
+
+📊 Dataset Statistics:
+   - Training samples: 540
+   - Validation samples: 540
+   - Batch size: 4
+   - Steps per epoch: 135
+
+
+================================================================================
+COMPUTING CLASS WEIGHTS
+================================================================================
+
+------------------------------------------------------------
+Class Name           Percentage      Weight         
+------------------------------------------------------------
+Background            89.45%       0.9839
+Paratext               0.09%       1.0807
+Decoration             1.70%       0.9839
+Main Text              7.59%       0.9839
+Title                  0.61%       0.9839
+Chapter Heading        0.57%       0.9839
+------------------------------------------------------------
+Total pixels: 27,095,040.0
+Weight ratio (max/min): 1.10
+================================================================================
+
+📈 Class weights computed with rarity-based boosting (mean scaled)
+   Final weights: [0.9838655  1.0806724  0.9838655  0.9838655  0.98386556 0.9838657 ]
+
+✓ Loss functions created: CE (weighted), Focal (γ=2.0, no weights), Dice
+
+================================================================================
+OPTIMIZER CONFIGURATION
+================================================================================
+Encoder     : LR=0.000005, WD=0.000100, Params=16,742,216
+Bottleneck  : LR=0.000100, WD=0.000500, Params=14,183,856
+Decoder     : LR=0.000100, WD=0.001000, Params=10,577,440
+Scheduler:   CosineAnnealingWarmRestarts (T_0=50)
+================================================================================
+
+🚀 Using automatic mixed precision (AMP) for faster training (2-3x speedup)
+
+🔍 Checking for checkpoint at: ./Result/a2/Latin14396/best_model_latest.pth
+   Absolute path: /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network/Result/a2/Latin14396/best_model_latest.pth
+   File exists: True
+
+📂 Found checkpoint: ./Result/a2/Latin14396/best_model_latest.pth
+   Attempting to resume training...
+   ✓ Loaded model state
+   ✓ Loaded optimizer state
+   ✓ Loaded scheduler state
+   ✓ Loaded scaler state (AMP)
+   ✓ Successfully loaded checkpoint from epoch 282
+   ✓ Best validation loss: 0.4082
+   ✓ Resuming from epoch 283
+
+================================================================================
+🚀 STARTING TRAINING
+================================================================================
+Loss: 0.3*CE + 0.2*Focal + 0.5*Dice
+Early stopping: 150 epochs patience
+Resuming from epoch: 283
+================================================================================
+
+
+EPOCH 284/300
+--------------------------------------------------
+  ⚠️  Skipped 82 batches (0 NaN/Inf loss, 82 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1615
+  • Validation Loss: 0.4457
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4457, best: 0.4082)
+    ⚠ No improvement for 1 epochs (patience: 150, remaining: 149)
+
+EPOCH 285/300
+--------------------------------------------------
+  ⚠️  Skipped 82 batches (0 NaN/Inf loss, 82 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1648
+  • Validation Loss: 0.4433
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4433, best: 0.4082)
+    ⚠ No improvement for 2 epochs (patience: 150, remaining: 148)
+
+EPOCH 286/300
+--------------------------------------------------
+  ⚠️  Skipped 80 batches (0 NaN/Inf loss, 80 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1761
+  • Validation Loss: 0.4446
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4446, best: 0.4082)
+    ⚠ No improvement for 3 epochs (patience: 150, remaining: 147)
+
+EPOCH 287/300
+--------------------------------------------------
+  ⚠️  Skipped 82 batches (0 NaN/Inf loss, 82 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1663
+  • Validation Loss: 0.4426
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4426, best: 0.4082)
+    ⚠ No improvement for 4 epochs (patience: 150, remaining: 146)
+
+EPOCH 288/300
+--------------------------------------------------
+  ⚠️  Skipped 90 batches (0 NaN/Inf loss, 90 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1391
+  • Validation Loss: 0.4421
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4421, best: 0.4082)
+    ⚠ No improvement for 5 epochs (patience: 150, remaining: 145)
+
+EPOCH 289/300
+--------------------------------------------------
+  ⚠️  Skipped 87 batches (0 NaN/Inf loss, 87 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1468
+  • Validation Loss: 0.4441
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4441, best: 0.4082)
+    ⚠ No improvement for 6 epochs (patience: 150, remaining: 144)
+
+EPOCH 290/300
+--------------------------------------------------
+  ⚠️  Skipped 93 batches (0 NaN/Inf loss, 93 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1297
+  • Validation Loss: 0.4429
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4429, best: 0.4082)
+    ⚠ No improvement for 7 epochs (patience: 150, remaining: 143)
+
+EPOCH 291/300
+--------------------------------------------------
+  ⚠️  Skipped 89 batches (0 NaN/Inf loss, 89 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1441
+  • Validation Loss: 0.4449
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4449, best: 0.4082)
+    ⚠ No improvement for 8 epochs (patience: 150, remaining: 142)
+
+EPOCH 292/300
+--------------------------------------------------
+  ⚠️  Skipped 89 batches (0 NaN/Inf loss, 89 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1418
+  • Validation Loss: 0.4448
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4448, best: 0.4082)
+    ⚠ No improvement for 9 epochs (patience: 150, remaining: 141)
+
+EPOCH 293/300
+--------------------------------------------------
+  ⚠️  Skipped 78 batches (0 NaN/Inf loss, 78 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1777
+  • Validation Loss: 0.4423
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4423, best: 0.4082)
+    ⚠ No improvement for 10 epochs (patience: 150, remaining: 140)
+
+EPOCH 294/300
+--------------------------------------------------
+  ⚠️  Skipped 92 batches (0 NaN/Inf loss, 92 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1354
+  • Validation Loss: 0.4420
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4420, best: 0.4082)
+    ⚠ No improvement for 11 epochs (patience: 150, remaining: 139)
+
+EPOCH 295/300
+--------------------------------------------------
+  ⚠️  Skipped 93 batches (0 NaN/Inf loss, 93 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1332
+  • Validation Loss: 0.4466
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4466, best: 0.4082)
+    ⚠ No improvement for 12 epochs (patience: 150, remaining: 138)
+
+EPOCH 296/300
+--------------------------------------------------
+  ⚠️  Skipped 105 batches (0 NaN/Inf loss, 105 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.0961
+  • Validation Loss: 0.4425
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4425, best: 0.4082)
+    ⚠ No improvement for 13 epochs (patience: 150, remaining: 137)
+
+EPOCH 297/300
+--------------------------------------------------
+  ⚠️  Skipped 107 batches (0 NaN/Inf loss, 107 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.0930
+  • Validation Loss: 0.4423
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4423, best: 0.4082)
+    ⚠ No improvement for 14 epochs (patience: 150, remaining: 136)
+
+EPOCH 298/300
+--------------------------------------------------
+  ⚠️  Skipped 106 batches (0 NaN/Inf loss, 106 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.0944
+  • Validation Loss: 0.4451
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4451, best: 0.4082)
+    ⚠ No improvement for 15 epochs (patience: 150, remaining: 135)
+
+EPOCH 299/300
+--------------------------------------------------
+  ⚠️  Skipped 104 batches (0 NaN/Inf loss, 104 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.0973
+  • Validation Loss: 0.4428
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4428, best: 0.4082)
+    ⚠ No improvement for 16 epochs (patience: 150, remaining: 134)
+
+EPOCH 300/300
+--------------------------------------------------
+  ⚠️  Skipped 102 batches (0 NaN/Inf loss, 102 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1077
+  • Validation Loss: 0.4453
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+   💾 Periodic checkpoint: epoch_300.pth
+    No improvement (current: 0.4453, best: 0.4082)
+    ⚠ No improvement for 17 epochs (patience: 150, remaining: 133)
+
+================================================================================
+TRAINING COMPLETED
+================================================================================
+Best Val Loss:  0.4082
+Total Epochs:   300
+Models Saved:   ./Result/a2/Latin14396
+TensorBoard:    ./Result/a2/Latin14396/tensorboard_logs
+================================================================================
+
+[15:30:12] Training completed. Best val loss: 0.4082
+
+=== TRAINING COMPLETED SUCCESSFULLY ===
+Training Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TRAINING COMPLETED: Latin14396
+╚════════════════════════════════════════════════════════════════════════╝
+
+Proceeding to testing...
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TESTING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin14396
+╚════════════════════════════════════════════════════════════════════════╝
+
+Test Configuration:
+  ✓ Test-Time Augmentation (TTA): ENABLED
+  ✗ CRF Post-processing: DISABLED
+  - Batch Size: 1 (reduced for smart skip connections + TTA memory efficiency)
+    Note: Smart skip connections use attention mechanisms which are memory-intensive
+
+WARNING:root:Component flags ['use_smart_fusion', 'use_groupnorm'] are typically used with --use_baseline flag
+WARNING:root:Consider using --use_baseline for baseline configuration
+WARNING:timm.models._builder:Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+=== Historical Document Segmentation Testing ===
+
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Loaded checkpoint: best_model_latest.pth
+
+=== Starting Testing ===
+Dataset: UDIADS_BIB | Manuscript: Latin14396
+--------------------------------------------------------------------------------
+TEST-TIME AUGMENTATION (TTA): ✓ ENABLED
+  → Using 4 augmentations: original, horizontal flip, vertical flip, rotation 90°
+  → Averaging predictions across all augmentations
+CRF POST-PROCESSING: ✗ DISABLED
+--------------------------------------------------------------------------------
+
+
+Found 30 original images to process
+Processing: 014 (54 patches)
+✓ Ground truth found for 014
+✓ Completed: 014
+Processing: 032 (54 patches)
+✓ Ground truth found for 032
+✓ Completed: 032
+Processing: 034 (54 patches)
+✓ Ground truth found for 034
+✓ Completed: 034
+Processing: 036 (54 patches)
+✓ Ground truth found for 036
+✓ Completed: 036
+Processing: 038 (54 patches)
+✓ Ground truth found for 038
+✓ Completed: 038
+Processing: 047 (54 patches)
+✓ Ground truth found for 047
+✓ Completed: 047
+Processing: 060 (54 patches)
+✓ Ground truth found for 060
+✓ Completed: 060
+Processing: 085 (54 patches)
+✓ Ground truth found for 085
+✓ Completed: 085
+Processing: 087 (54 patches)
+✓ Ground truth found for 087
+✓ Completed: 087
+Processing: 104 (54 patches)
+✓ Ground truth found for 104
+✓ Completed: 104
+Processing: 105 (54 patches)
+✓ Ground truth found for 105
+✓ Completed: 105
+Processing: 108 (54 patches)
+✓ Ground truth found for 108
+✓ Completed: 108
+Processing: 110 (54 patches)
+✓ Ground truth found for 110
+✓ Completed: 110
+Processing: 136 (54 patches)
+✓ Ground truth found for 136
+✓ Completed: 136
+Processing: 169 (54 patches)
+✓ Ground truth found for 169
+✓ Completed: 169
+Processing: 195 (54 patches)
+✓ Ground truth found for 195
+✓ Completed: 195
+Processing: 196 (54 patches)
+✓ Ground truth found for 196
+✓ Completed: 196
+Processing: 198 (54 patches)
+✓ Ground truth found for 198
+✓ Completed: 198
+Processing: 204 (54 patches)
+✓ Ground truth found for 204
+✓ Completed: 204
+Processing: 223 (54 patches)
+✓ Ground truth found for 223
+✓ Completed: 223
+Processing: 225 (54 patches)
+✓ Ground truth found for 225
+✓ Completed: 225
+Processing: 227 (54 patches)
+✓ Ground truth found for 227
+✓ Completed: 227
+Processing: 229 (54 patches)
+✓ Ground truth found for 229
+✓ Completed: 229
+Processing: 251 (54 patches)
+✓ Ground truth found for 251
+✓ Completed: 251
+Processing: 253 (54 patches)
+✓ Ground truth found for 253
+✓ Completed: 253
+Processing: 255 (54 patches)
+✓ Ground truth found for 255
+✓ Completed: 255
+Processing: 264 (54 patches)
+✓ Ground truth found for 264
+✓ Completed: 264
+Processing: 270 (54 patches)
+✓ Ground truth found for 270
+✓ Completed: 270
+Processing: 276 (54 patches)
+✓ Ground truth found for 276
+✓ Completed: 276
+Processing: 325 (54 patches)
+✓ Ground truth found for 325
+✓ Completed: 325
+
+================================================================================
+Testing Summary: Processed 30 images with ground truth
+================================================================================
+
+
+================================================================================
+SEGMENTATION METRICS
+================================================================================
+Images Processed: 30
+
+Per-class metrics:
+--------------------------------------------------------------------------------
+Background          : Precision=0.9883, Recall=0.9911, F1=0.9897, IoU=0.9796
+Paratext            : Precision=0.5777, Recall=0.5094, F1=0.5414, IoU=0.3712
+Decoration          : Precision=0.9105, Recall=0.9318, F1=0.9211, IoU=0.8537
+Main Text           : Precision=0.8944, Recall=0.8809, F1=0.8876, IoU=0.7979
+Title               : Precision=0.7984, Recall=0.7359, F1=0.7659, IoU=0.6206
+Chapter Headings    : Precision=0.8593, Recall=0.6489, F1=0.7394, IoU=0.5866
+
+Mean metrics:
+--------------------------------------------------------------------------------
+Mean Precision: 0.8381
+Mean Recall:    0.7830
+Mean F1-Score:  0.8075
+Mean IoU:       0.7016
+================================================================================
+
+=== TESTING COMPLETED SUCCESSFULLY ===
+Testing Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TESTING COMPLETED: Latin14396
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TRAINING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin16746
+╚════════════════════════════════════════════════════════════════════════╝
+
+Configuration: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+Output Directory: ./Result/a2/Latin16746
+
+Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+All arguments validated successfully!
+Setting random seed to 1234 for reproducible training...
+Setting up U-DIADS-Bib dataset...
+Using 6 classes for manuscript: Latin16746
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin16746/Image/training
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin16746/mask/training_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Latin16746/Image/validation
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Latin16746/mask/validation_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Loading CNN-Transformer model...
+================================================================================
+🚀 Loading CNN-Transformer Model
+================================================================================
+Model Configuration:
+  ✓ EfficientNet-B4 Encoder
+  ✓ Bottleneck: Enabled
+  ✓ Swin Transformer Decoder
+  ✓ Fusion Method: smart
+  ✓ Adapter Mode: streaming
+  ✓ Deep Supervision: Disabled
+  ✓ Multi-Scale Aggregation: Disabled
+  ✓ Normalization: GroupNorm
+================================================================================
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+Model moved to CUDA
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Model created successfully with 6 classes
+
+=== Starting Training ===
+Dataset: UDIADS_BIB
+Model: CNN-Transformer
+Batch size: 4
+Max epochs: 300
+Learning rate: 0.0001
+
+
+================================================================================
+TRAINING CONFIGURATION
+================================================================================
+Dataset: UDIADS_BIB
+Manuscript: Latin16746
+Model: CNN-Transformer (EfficientNet-B4 + Swin-UNet Decoder)
+Configuration: Bo + AFF + FL
+  • Bottleneck: ✓
+  • Adapter Mode: streaming
+  • Deep Supervision: ✗
+  • Fusion Method: SMART
+  • Multi-Scale Aggregation: ✗
+  • Normalization: GroupNorm
+Batch Size: 4
+Max Epochs: 300
+Learning Rate: 0.0001
+Number of Classes: 6
+Early Stopping Patience: 150 epochs
+Output Directory: ./Result/a2/Latin16746
+================================================================================
+
+📊 Dataset Statistics:
+   - Training samples: 540
+   - Validation samples: 540
+   - Batch size: 4
+   - Steps per epoch: 135
+
+
+================================================================================
+COMPUTING CLASS WEIGHTS
+================================================================================
+
+------------------------------------------------------------
+Class Name           Percentage      Weight         
+------------------------------------------------------------
+Background            88.42%       1.0000
+Paratext               0.34%       1.0000
+Decoration             2.52%       1.0000
+Main Text              7.49%       1.0000
+Title                  0.18%       1.0000
+Chapter Heading        1.04%       1.0000
+------------------------------------------------------------
+Total pixels: 27,095,040.0
+Weight ratio (max/min): 1.00
+================================================================================
+
+📈 Class weights computed with rarity-based boosting (mean scaled)
+   Final weights: [1. 1. 1. 1. 1. 1.]
+
+✓ Loss functions created: CE (weighted), Focal (γ=2.0, no weights), Dice
+
+================================================================================
+OPTIMIZER CONFIGURATION
+================================================================================
+Encoder     : LR=0.000005, WD=0.000100, Params=16,742,216
+Bottleneck  : LR=0.000100, WD=0.000500, Params=14,183,856
+Decoder     : LR=0.000100, WD=0.001000, Params=10,577,440
+Scheduler:   CosineAnnealingWarmRestarts (T_0=50)
+================================================================================
+
+🚀 Using automatic mixed precision (AMP) for faster training (2-3x speedup)
+
+🔍 Checking for checkpoint at: ./Result/a2/Latin16746/best_model_latest.pth
+   Absolute path: /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network/Result/a2/Latin16746/best_model_latest.pth
+   File exists: True
+
+📂 Found checkpoint: ./Result/a2/Latin16746/best_model_latest.pth
+   Attempting to resume training...
+   ✓ Loaded model state
+   ✓ Loaded optimizer state
+   ✓ Loaded scheduler state
+   ✓ Loaded scaler state (AMP)
+   ✓ Successfully loaded checkpoint from epoch 270
+   ✓ Best validation loss: 0.3745
+   ✓ Resuming from epoch 271
+
+================================================================================
+🚀 STARTING TRAINING
+================================================================================
+Loss: 0.3*CE + 0.2*Focal + 0.5*Dice
+Early stopping: 150 epochs patience
+Resuming from epoch: 271
+================================================================================
+
+
+EPOCH 272/300
+--------------------------------------------------
+  ⚠️  Skipped 58 batches (0 NaN/Inf loss, 58 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2173
+  • Validation Loss: 0.4285
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4285, best: 0.3745)
+    ⚠ No improvement for 1 epochs (patience: 150, remaining: 149)
+
+EPOCH 273/300
+--------------------------------------------------
+  ⚠️  Skipped 67 batches (0 NaN/Inf loss, 67 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1939
+  • Validation Loss: 0.4254
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4254, best: 0.3745)
+    ⚠ No improvement for 2 epochs (patience: 150, remaining: 148)
+
+EPOCH 274/300
+--------------------------------------------------
+  ⚠️  Skipped 73 batches (0 NaN/Inf loss, 73 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1776
+  • Validation Loss: 0.4261
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4261, best: 0.3745)
+    ⚠ No improvement for 3 epochs (patience: 150, remaining: 147)
+
+EPOCH 275/300
+--------------------------------------------------
+  ⚠️  Skipped 92 batches (0 NaN/Inf loss, 92 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1340
+  • Validation Loss: 0.4249
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4249, best: 0.3745)
+    ⚠ No improvement for 4 epochs (patience: 150, remaining: 146)
+
+EPOCH 276/300
+--------------------------------------------------
+  ⚠️  Skipped 96 batches (0 NaN/Inf loss, 96 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1159
+  • Validation Loss: 0.4242
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4242, best: 0.3745)
+    ⚠ No improvement for 5 epochs (patience: 150, remaining: 145)
+
+EPOCH 277/300
+--------------------------------------------------
+  ⚠️  Skipped 96 batches (0 NaN/Inf loss, 96 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1173
+  • Validation Loss: 0.4247
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4247, best: 0.3745)
+    ⚠ No improvement for 6 epochs (patience: 150, remaining: 144)
+
+EPOCH 278/300
+--------------------------------------------------
+  ⚠️  Skipped 90 batches (0 NaN/Inf loss, 90 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1372
+  • Validation Loss: 0.4242
+  • Learning Rate: 0.000002 (Encoder: 0.000002)
+    No improvement (current: 0.4242, best: 0.3745)
+    ⚠ No improvement for 7 epochs (patience: 150, remaining: 143)
+
+EPOCH 279/300
+--------------------------------------------------
+  ⚠️  Skipped 90 batches (0 NaN/Inf loss, 90 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1392
+  • Validation Loss: 0.4260
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4260, best: 0.3745)
+    ⚠ No improvement for 8 epochs (patience: 150, remaining: 142)
+
+EPOCH 280/300
+--------------------------------------------------
+  ⚠️  Skipped 93 batches (0 NaN/Inf loss, 93 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1281
+  • Validation Loss: 0.4279
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4279, best: 0.3745)
+    ⚠ No improvement for 9 epochs (patience: 150, remaining: 141)
+
+EPOCH 281/300
+--------------------------------------------------
+  ⚠️  Skipped 93 batches (0 NaN/Inf loss, 93 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1262
+  • Validation Loss: 0.4233
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4233, best: 0.3745)
+    ⚠ No improvement for 10 epochs (patience: 150, remaining: 140)
+
+EPOCH 282/300
+--------------------------------------------------
+  ⚠️  Skipped 94 batches (0 NaN/Inf loss, 94 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1182
+  • Validation Loss: 0.4231
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4231, best: 0.3745)
+    ⚠ No improvement for 11 epochs (patience: 150, remaining: 139)
+
+EPOCH 283/300
+--------------------------------------------------
+  ⚠️  Skipped 88 batches (0 NaN/Inf loss, 88 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1344
+  • Validation Loss: 0.4229
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4229, best: 0.3745)
+    ⚠ No improvement for 12 epochs (patience: 150, remaining: 138)
+
+EPOCH 284/300
+--------------------------------------------------
+  ⚠️  Skipped 92 batches (0 NaN/Inf loss, 92 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1245
+  • Validation Loss: 0.4246
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4246, best: 0.3745)
+    ⚠ No improvement for 13 epochs (patience: 150, remaining: 137)
+
+EPOCH 285/300
+--------------------------------------------------
+  ⚠️  Skipped 86 batches (0 NaN/Inf loss, 86 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1448
+  • Validation Loss: 0.4237
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4237, best: 0.3745)
+    ⚠ No improvement for 14 epochs (patience: 150, remaining: 136)
+
+EPOCH 286/300
+--------------------------------------------------
+  ⚠️  Skipped 92 batches (0 NaN/Inf loss, 92 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1208
+  • Validation Loss: 0.4244
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4244, best: 0.3745)
+    ⚠ No improvement for 15 epochs (patience: 150, remaining: 135)
+
+EPOCH 287/300
+--------------------------------------------------
+  ⚠️  Skipped 94 batches (0 NaN/Inf loss, 94 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1197
+  • Validation Loss: 0.4244
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4244, best: 0.3745)
+    ⚠ No improvement for 16 epochs (patience: 150, remaining: 134)
+
+EPOCH 288/300
+--------------------------------------------------
+  ⚠️  Skipped 86 batches (0 NaN/Inf loss, 86 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1456
+  • Validation Loss: 0.4259
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4259, best: 0.3745)
+    ⚠ No improvement for 17 epochs (patience: 150, remaining: 133)
+
+EPOCH 289/300
+--------------------------------------------------
+  ⚠️  Skipped 93 batches (0 NaN/Inf loss, 93 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1313
+  • Validation Loss: 0.4244
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4244, best: 0.3745)
+    ⚠ No improvement for 18 epochs (patience: 150, remaining: 132)
+
+EPOCH 290/300
+--------------------------------------------------
+  ⚠️  Skipped 88 batches (0 NaN/Inf loss, 88 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1352
+  • Validation Loss: 0.4224
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4224, best: 0.3745)
+    ⚠ No improvement for 19 epochs (patience: 150, remaining: 131)
+
+EPOCH 291/300
+--------------------------------------------------
+  ⚠️  Skipped 83 batches (0 NaN/Inf loss, 83 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1518
+  • Validation Loss: 0.4238
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4238, best: 0.3745)
+    ⚠ No improvement for 20 epochs (patience: 150, remaining: 130)
+
+EPOCH 292/300
+--------------------------------------------------
+  ⚠️  Skipped 81 batches (0 NaN/Inf loss, 81 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1595
+  • Validation Loss: 0.4249
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4249, best: 0.3745)
+    ⚠ No improvement for 21 epochs (patience: 150, remaining: 129)
+
+EPOCH 293/300
+--------------------------------------------------
+  ⚠️  Skipped 84 batches (0 NaN/Inf loss, 84 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1500
+  • Validation Loss: 0.4225
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4225, best: 0.3745)
+    ⚠ No improvement for 22 epochs (patience: 150, remaining: 128)
+
+EPOCH 294/300
+--------------------------------------------------
+  ⚠️  Skipped 85 batches (0 NaN/Inf loss, 85 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1427
+  • Validation Loss: 0.4232
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4232, best: 0.3745)
+    ⚠ No improvement for 23 epochs (patience: 150, remaining: 127)
+
+EPOCH 295/300
+--------------------------------------------------
+  ⚠️  Skipped 86 batches (0 NaN/Inf loss, 86 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1429
+  • Validation Loss: 0.4222
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4222, best: 0.3745)
+    ⚠ No improvement for 24 epochs (patience: 150, remaining: 126)
+
+EPOCH 296/300
+--------------------------------------------------
+  ⚠️  Skipped 82 batches (0 NaN/Inf loss, 82 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1542
+  • Validation Loss: 0.4224
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4224, best: 0.3745)
+    ⚠ No improvement for 25 epochs (patience: 150, remaining: 125)
+
+EPOCH 297/300
+--------------------------------------------------
+  ⚠️  Skipped 88 batches (0 NaN/Inf loss, 88 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1373
+  • Validation Loss: 0.4216
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4216, best: 0.3745)
+    ⚠ No improvement for 26 epochs (patience: 150, remaining: 124)
+
+EPOCH 298/300
+--------------------------------------------------
+  ⚠️  Skipped 86 batches (0 NaN/Inf loss, 86 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1443
+  • Validation Loss: 0.4233
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4233, best: 0.3745)
+    ⚠ No improvement for 27 epochs (patience: 150, remaining: 123)
+
+EPOCH 299/300
+--------------------------------------------------
+  ⚠️  Skipped 88 batches (0 NaN/Inf loss, 88 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1413
+  • Validation Loss: 0.4244
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4244, best: 0.3745)
+    ⚠ No improvement for 28 epochs (patience: 150, remaining: 122)
+
+EPOCH 300/300
+--------------------------------------------------
+  ⚠️  Skipped 90 batches (0 NaN/Inf loss, 90 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1352
+  • Validation Loss: 0.4233
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+   💾 Periodic checkpoint: epoch_300.pth
+    No improvement (current: 0.4233, best: 0.3745)
+    ⚠ No improvement for 29 epochs (patience: 150, remaining: 121)
+
+================================================================================
+TRAINING COMPLETED
+================================================================================
+Best Val Loss:  0.3745
+Total Epochs:   300
+Models Saved:   ./Result/a2/Latin16746
+TensorBoard:    ./Result/a2/Latin16746/tensorboard_logs
+================================================================================
+
+[15:46:35] Training completed. Best val loss: 0.3745
+
+=== TRAINING COMPLETED SUCCESSFULLY ===
+Training Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TRAINING COMPLETED: Latin16746
+╚════════════════════════════════════════════════════════════════════════╝
+
+Proceeding to testing...
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TESTING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Latin16746
+╚════════════════════════════════════════════════════════════════════════╝
+
+Test Configuration:
+  ✓ Test-Time Augmentation (TTA): ENABLED
+  ✗ CRF Post-processing: DISABLED
+  - Batch Size: 1 (reduced for smart skip connections + TTA memory efficiency)
+    Note: Smart skip connections use attention mechanisms which are memory-intensive
+
+WARNING:root:Component flags ['use_smart_fusion', 'use_groupnorm'] are typically used with --use_baseline flag
+WARNING:root:Consider using --use_baseline for baseline configuration
+WARNING:timm.models._builder:Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+=== Historical Document Segmentation Testing ===
+
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 6
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Loaded checkpoint: best_model_latest.pth
+
+=== Starting Testing ===
+Dataset: UDIADS_BIB | Manuscript: Latin16746
+--------------------------------------------------------------------------------
+TEST-TIME AUGMENTATION (TTA): ✓ ENABLED
+  → Using 4 augmentations: original, horizontal flip, vertical flip, rotation 90°
+  → Averaging predictions across all augmentations
+CRF POST-PROCESSING: ✗ DISABLED
+--------------------------------------------------------------------------------
+
+
+Found 30 original images to process
+Processing: 009 (54 patches)
+✓ Ground truth found for 009
+✓ Completed: 009
+Processing: 020 (54 patches)
+✓ Ground truth found for 020
+✓ Completed: 020
+Processing: 022 (54 patches)
+✓ Ground truth found for 022
+✓ Completed: 022
+Processing: 029 (54 patches)
+✓ Ground truth found for 029
+✓ Completed: 029
+Processing: 035 (54 patches)
+✓ Ground truth found for 035
+✓ Completed: 035
+Processing: 048 (54 patches)
+✓ Ground truth found for 048
+✓ Completed: 048
+Processing: 069 (54 patches)
+✓ Ground truth found for 069
+✓ Completed: 069
+Processing: 082 (54 patches)
+✓ Ground truth found for 082
+✓ Completed: 082
+Processing: 088 (54 patches)
+✓ Ground truth found for 088
+✓ Completed: 088
+Processing: 089 (54 patches)
+✓ Ground truth found for 089
+✓ Completed: 089
+Processing: 091 (54 patches)
+✓ Ground truth found for 091
+✓ Completed: 091
+Processing: 100 (54 patches)
+✓ Ground truth found for 100
+✓ Completed: 100
+Processing: 106 (54 patches)
+✓ Ground truth found for 106
+✓ Completed: 106
+Processing: 117 (54 patches)
+✓ Ground truth found for 117
+✓ Completed: 117
+Processing: 123 (54 patches)
+✓ Ground truth found for 123
+✓ Completed: 123
+Processing: 125 (54 patches)
+✓ Ground truth found for 125
+✓ Completed: 125
+Processing: 130 (54 patches)
+✓ Ground truth found for 130
+✓ Completed: 130
+Processing: 133 (54 patches)
+✓ Ground truth found for 133
+✓ Completed: 133
+Processing: 137 (54 patches)
+✓ Ground truth found for 137
+✓ Completed: 137
+Processing: 146 (54 patches)
+✓ Ground truth found for 146
+✓ Completed: 146
+Processing: 166 (54 patches)
+✓ Ground truth found for 166
+✓ Completed: 166
+Processing: 184 (54 patches)
+✓ Ground truth found for 184
+✓ Completed: 184
+Processing: 215 (54 patches)
+✓ Ground truth found for 215
+✓ Completed: 215
+Processing: 237 (54 patches)
+✓ Ground truth found for 237
+✓ Completed: 237
+Processing: 243 (54 patches)
+✓ Ground truth found for 243
+✓ Completed: 243
+Processing: 255 (54 patches)
+✓ Ground truth found for 255
+✓ Completed: 255
+Processing: 258 (54 patches)
+✓ Ground truth found for 258
+✓ Completed: 258
+Processing: 284 (54 patches)
+✓ Ground truth found for 284
+✓ Completed: 284
+Processing: 325 (54 patches)
+✓ Ground truth found for 325
+✓ Completed: 325
+Processing: 357 (54 patches)
+✓ Ground truth found for 357
+✓ Completed: 357
+
+================================================================================
+Testing Summary: Processed 30 images with ground truth
+================================================================================
+
+
+================================================================================
+SEGMENTATION METRICS
+================================================================================
+Images Processed: 30
+
+Per-class metrics:
+--------------------------------------------------------------------------------
+Background          : Precision=0.9865, Recall=0.9924, F1=0.9894, IoU=0.9790
+Paratext            : Precision=0.7586, Recall=0.7709, F1=0.7647, IoU=0.6190
+Decoration          : Precision=0.9735, Recall=0.9282, F1=0.9503, IoU=0.9053
+Main Text           : Precision=0.9146, Recall=0.8936, F1=0.9040, IoU=0.8248
+Title               : Precision=0.8165, Recall=0.6599, F1=0.7299, IoU=0.5747
+Chapter Headings    : Precision=0.8850, Recall=0.6798, F1=0.7690, IoU=0.6246
+
+Mean metrics:
+--------------------------------------------------------------------------------
+Mean Precision: 0.8891
+Mean Recall:    0.8208
+Mean F1-Score:  0.8512
+Mean IoU:       0.7546
+================================================================================
+
+=== TESTING COMPLETED SUCCESSFULLY ===
+Testing Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TESTING COMPLETED: Latin16746
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TRAINING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Syr341
+╚════════════════════════════════════════════════════════════════════════╝
+
+Configuration: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+Output Directory: ./Result/a2/Syr341
+
+Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+All arguments validated successfully!
+Setting random seed to 1234 for reproducible training...
+Setting up U-DIADS-Bib dataset...
+Detected Syriaque341 manuscript: using 5 classes (no Chapter Headings)
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Syr341/Image/training
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Syr341/mask/training_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Looking for images in: ../../U-DIADS-Bib-MS_patched/Syr341/Image/validation
+Looking for masks in: ../../U-DIADS-Bib-MS_patched/Syr341/mask/validation_labels
+Found 540 patch images
+Successfully matched 540 image-mask pairs
+Loading CNN-Transformer model...
+================================================================================
+🚀 Loading CNN-Transformer Model
+================================================================================
+Model Configuration:
+  ✓ EfficientNet-B4 Encoder
+  ✓ Bottleneck: Enabled
+  ✓ Swin Transformer Decoder
+  ✓ Fusion Method: smart
+  ✓ Adapter Mode: streaming
+  ✓ Deep Supervision: Disabled
+  ✓ Multi-Scale Aggregation: Disabled
+  ✓ Normalization: GroupNorm
+================================================================================
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 5
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+Model moved to CUDA
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Model created successfully with 5 classes
+
+=== Starting Training ===
+Dataset: UDIADS_BIB
+Model: CNN-Transformer
+Batch size: 4
+Max epochs: 300
+Learning rate: 0.0001
+
+
+================================================================================
+TRAINING CONFIGURATION
+================================================================================
+Dataset: UDIADS_BIB
+Manuscript: Syr341
+Model: CNN-Transformer (EfficientNet-B4 + Swin-UNet Decoder)
+Configuration: Bo + AFF + FL
+  • Bottleneck: ✓
+  • Adapter Mode: streaming
+  • Deep Supervision: ✗
+  • Fusion Method: SMART
+  • Multi-Scale Aggregation: ✗
+  • Normalization: GroupNorm
+Batch Size: 4
+Max Epochs: 300
+Learning Rate: 0.0001
+Number of Classes: 5
+Early Stopping Patience: 150 epochs
+Output Directory: ./Result/a2/Syr341
+================================================================================
+
+📊 Dataset Statistics:
+   - Training samples: 540
+   - Validation samples: 540
+   - Batch size: 4
+   - Steps per epoch: 135
+
+
+================================================================================
+COMPUTING CLASS WEIGHTS
+================================================================================
+
+------------------------------------------------------------
+Class Name           Percentage      Weight         
+------------------------------------------------------------
+Background            83.95%       1.0000
+Paratext               0.17%       1.0000
+Decoration             4.62%       1.0000
+Main Text             11.13%       1.0000
+Title                  0.12%       1.0000
+------------------------------------------------------------
+Total pixels: 27,095,040.0
+Weight ratio (max/min): 1.00
+================================================================================
+
+📈 Class weights computed with rarity-based boosting (mean scaled)
+   Final weights: [1. 1. 1. 1. 1.]
+
+✓ Loss functions created: CE (weighted), Focal (γ=2.0, no weights), Dice
+
+================================================================================
+OPTIMIZER CONFIGURATION
+================================================================================
+Encoder     : LR=0.000005, WD=0.000100, Params=16,742,216
+Bottleneck  : LR=0.000100, WD=0.000500, Params=14,183,856
+Decoder     : LR=0.000100, WD=0.001000, Params=10,577,375
+Scheduler:   CosineAnnealingWarmRestarts (T_0=50)
+================================================================================
+
+🚀 Using automatic mixed precision (AMP) for faster training (2-3x speedup)
+
+🔍 Checking for checkpoint at: ./Result/a2/Syr341/best_model_latest.pth
+   Absolute path: /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network/Result/a2/Syr341/best_model_latest.pth
+   File exists: True
+
+📂 Found checkpoint: ./Result/a2/Syr341/best_model_latest.pth
+   Attempting to resume training...
+   ✓ Loaded model state
+   ✓ Loaded optimizer state
+   ✓ Loaded scheduler state
+   ✓ Loaded scaler state (AMP)
+   ✓ Successfully loaded checkpoint from epoch 282
+   ✓ Best validation loss: 0.4193
+   ✓ Resuming from epoch 283
+
+================================================================================
+🚀 STARTING TRAINING
+================================================================================
+Loss: 0.3*CE + 0.2*Focal + 0.5*Dice
+Early stopping: 150 epochs patience
+Resuming from epoch: 283
+================================================================================
+
+
+EPOCH 284/300
+--------------------------------------------------
+  ⚠️  Skipped 71 batches (0 NaN/Inf loss, 71 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2129
+  • Validation Loss: 0.4465
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4465, best: 0.4193)
+    ⚠ No improvement for 1 epochs (patience: 150, remaining: 149)
+
+EPOCH 285/300
+--------------------------------------------------
+  ⚠️  Skipped 60 batches (0 NaN/Inf loss, 60 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2473
+  • Validation Loss: 0.4499
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4499, best: 0.4193)
+    ⚠ No improvement for 2 epochs (patience: 150, remaining: 148)
+
+EPOCH 286/300
+--------------------------------------------------
+  ⚠️  Skipped 64 batches (0 NaN/Inf loss, 64 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2342
+  • Validation Loss: 0.4493
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4493, best: 0.4193)
+    ⚠ No improvement for 3 epochs (patience: 150, remaining: 147)
+
+EPOCH 287/300
+--------------------------------------------------
+  ⚠️  Skipped 68 batches (0 NaN/Inf loss, 68 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2198
+  • Validation Loss: 0.4454
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4454, best: 0.4193)
+    ⚠ No improvement for 4 epochs (patience: 150, remaining: 146)
+
+EPOCH 288/300
+--------------------------------------------------
+  ⚠️  Skipped 68 batches (0 NaN/Inf loss, 68 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.2220
+  • Validation Loss: 0.4462
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4462, best: 0.4193)
+    ⚠ No improvement for 5 epochs (patience: 150, remaining: 145)
+
+EPOCH 289/300
+--------------------------------------------------
+  ⚠️  Skipped 75 batches (0 NaN/Inf loss, 75 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1984
+  • Validation Loss: 0.4479
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4479, best: 0.4193)
+    ⚠ No improvement for 6 epochs (patience: 150, remaining: 144)
+
+EPOCH 290/300
+--------------------------------------------------
+  ⚠️  Skipped 78 batches (0 NaN/Inf loss, 78 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1916
+  • Validation Loss: 0.4466
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4466, best: 0.4193)
+    ⚠ No improvement for 7 epochs (patience: 150, remaining: 143)
+
+EPOCH 291/300
+--------------------------------------------------
+  ⚠️  Skipped 84 batches (0 NaN/Inf loss, 84 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1715
+  • Validation Loss: 0.4467
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4467, best: 0.4193)
+    ⚠ No improvement for 8 epochs (patience: 150, remaining: 142)
+
+EPOCH 292/300
+--------------------------------------------------
+  ⚠️  Skipped 81 batches (0 NaN/Inf loss, 81 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1809
+  • Validation Loss: 0.4482
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4482, best: 0.4193)
+    ⚠ No improvement for 9 epochs (patience: 150, remaining: 141)
+
+EPOCH 293/300
+--------------------------------------------------
+  ⚠️  Skipped 92 batches (0 NaN/Inf loss, 92 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1447
+  • Validation Loss: 0.4482
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4482, best: 0.4193)
+    ⚠ No improvement for 10 epochs (patience: 150, remaining: 140)
+
+EPOCH 294/300
+--------------------------------------------------
+  ⚠️  Skipped 80 batches (0 NaN/Inf loss, 80 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1846
+  • Validation Loss: 0.4481
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4481, best: 0.4193)
+    ⚠ No improvement for 11 epochs (patience: 150, remaining: 139)
+
+EPOCH 295/300
+--------------------------------------------------
+  ⚠️  Skipped 89 batches (0 NaN/Inf loss, 89 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1559
+  • Validation Loss: 0.4481
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4481, best: 0.4193)
+    ⚠ No improvement for 12 epochs (patience: 150, remaining: 138)
+
+EPOCH 296/300
+--------------------------------------------------
+  ⚠️  Skipped 82 batches (0 NaN/Inf loss, 82 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1779
+  • Validation Loss: 0.4483
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4483, best: 0.4193)
+    ⚠ No improvement for 13 epochs (patience: 150, remaining: 137)
+
+EPOCH 297/300
+--------------------------------------------------
+  ⚠️  Skipped 81 batches (0 NaN/Inf loss, 81 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1821
+  • Validation Loss: 0.4485
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4485, best: 0.4193)
+    ⚠ No improvement for 14 epochs (patience: 150, remaining: 136)
+
+EPOCH 298/300
+--------------------------------------------------
+  ⚠️  Skipped 84 batches (0 NaN/Inf loss, 84 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1720
+  • Validation Loss: 0.4475
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4475, best: 0.4193)
+    ⚠ No improvement for 15 epochs (patience: 150, remaining: 135)
+
+EPOCH 299/300
+--------------------------------------------------
+  ⚠️  Skipped 91 batches (0 NaN/Inf loss, 91 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1471
+  • Validation Loss: 0.4477
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+    No improvement (current: 0.4477, best: 0.4193)
+    ⚠ No improvement for 16 epochs (patience: 150, remaining: 134)
+
+EPOCH 300/300
+--------------------------------------------------
+  ⚠️  Skipped 83 batches (0 NaN/Inf loss, 83 NaN/Inf gradients)
+Results:
+  • Train Loss: 0.1779
+  • Validation Loss: 0.4478
+  • Learning Rate: 0.000001 (Encoder: 0.000001)
+   💾 Periodic checkpoint: epoch_300.pth
+    No improvement (current: 0.4478, best: 0.4193)
+    ⚠ No improvement for 17 epochs (patience: 150, remaining: 133)
+
+================================================================================
+TRAINING COMPLETED
+================================================================================
+Best Val Loss:  0.4193
+Total Epochs:   300
+Models Saved:   ./Result/a2/Syr341
+TensorBoard:    ./Result/a2/Syr341/tensorboard_logs
+================================================================================
+
+[15:57:45] Training completed. Best val loss: 0.4193
+
+=== TRAINING COMPLETED SUCCESSFULLY ===
+Training Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TRAINING COMPLETED: Syr341
+╚════════════════════════════════════════════════════════════════════════╝
+
+Proceeding to testing...
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  TESTING CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS: Syr341
+╚════════════════════════════════════════════════════════════════════════╝
+
+Test Configuration:
+  ✓ Test-Time Augmentation (TTA): ENABLED
+  ✗ CRF Post-processing: DISABLED
+  - Batch Size: 1 (reduced for smart skip connections + TTA memory efficiency)
+    Note: Smart skip connections use attention mechanisms which are memory-intensive
+
+WARNING:root:Component flags ['use_smart_fusion', 'use_groupnorm'] are typically used with --use_baseline flag
+WARNING:root:Consider using --use_baseline for baseline configuration
+WARNING:timm.models._builder:Unexpected keys (bn2.num_batches_tracked, bn2.bias, bn2.running_mean, bn2.running_var, bn2.weight, classifier.bias, classifier.weight, conv_head.weight) found while loading pretrained weights. This may be expected if model is being adapted.
+=== Historical Document Segmentation Testing ===
+
+CNN-Transformer U-Net initialized:
+  - Image size: 224
+  - Number of classes: 5
+  - EfficientNet variant: tf_efficientnet_b4_ns
+  - Embed dimension: 96
+  - Deep Supervision: DISABLED
+  - Fusion Method: SMART
+  - Bottleneck (2 Swin blocks): ENABLED
+  - Adapter Mode: STREAMING
+  - ✅ GroupNorm: ENABLED (in adapters)
+CNN-Transformer model uses EfficientNet pretrained weights automatically.
+No additional pretrained weights loading required.
+Loaded checkpoint: best_model_latest.pth
+
+=== Starting Testing ===
+Dataset: UDIADS_BIB | Manuscript: Syr341
+--------------------------------------------------------------------------------
+TEST-TIME AUGMENTATION (TTA): ✓ ENABLED
+  → Using 4 augmentations: original, horizontal flip, vertical flip, rotation 90°
+  → Averaging predictions across all augmentations
+CRF POST-PROCESSING: ✗ DISABLED
+--------------------------------------------------------------------------------
+
+
+Found 30 original images to process
+Processing: 031 (54 patches)
+✓ Ground truth found for 031
+✓ Completed: 031
+Processing: 053 (54 patches)
+✓ Ground truth found for 053
+✓ Completed: 053
+Processing: 054 (54 patches)
+✓ Ground truth found for 054
+✓ Completed: 054
+Processing: 071 (54 patches)
+✓ Ground truth found for 071
+✓ Completed: 071
+Processing: 073 (54 patches)
+✓ Ground truth found for 073
+✓ Completed: 073
+Processing: 075 (54 patches)
+✓ Ground truth found for 075
+✓ Completed: 075
+Processing: 100 (54 patches)
+✓ Ground truth found for 100
+✓ Completed: 100
+Processing: 137 (54 patches)
+✓ Ground truth found for 137
+✓ Completed: 137
+Processing: 150 (54 patches)
+✓ Ground truth found for 150
+✓ Completed: 150
+Processing: 160 (54 patches)
+✓ Ground truth found for 160
+✓ Completed: 160
+Processing: 167 (54 patches)
+✓ Ground truth found for 167
+✓ Completed: 167
+Processing: 184 (54 patches)
+✓ Ground truth found for 184
+✓ Completed: 184
+Processing: 190 (54 patches)
+✓ Ground truth found for 190
+✓ Completed: 190
+Processing: 201 (54 patches)
+✓ Ground truth found for 201
+✓ Completed: 201
+Processing: 210 (54 patches)
+✓ Ground truth found for 210
+✓ Completed: 210
+Processing: 222 (54 patches)
+✓ Ground truth found for 222
+✓ Completed: 222
+Processing: 224 (54 patches)
+✓ Ground truth found for 224
+✓ Completed: 224
+Processing: 231 (54 patches)
+✓ Ground truth found for 231
+✓ Completed: 231
+Processing: 241 (54 patches)
+✓ Ground truth found for 241
+✓ Completed: 241
+Processing: 249 (54 patches)
+✓ Ground truth found for 249
+✓ Completed: 249
+Processing: 252 (54 patches)
+✓ Ground truth found for 252
+✓ Completed: 252
+Processing: 267 (54 patches)
+✓ Ground truth found for 267
+✓ Completed: 267
+Processing: 281 (54 patches)
+✓ Ground truth found for 281
+✓ Completed: 281
+Processing: 286 (54 patches)
+✓ Ground truth found for 286
+✓ Completed: 286
+Processing: 290 (54 patches)
+✓ Ground truth found for 290
+✓ Completed: 290
+Processing: 313 (54 patches)
+✓ Ground truth found for 313
+✓ Completed: 313
+Processing: 362 (54 patches)
+✓ Ground truth found for 362
+✓ Completed: 362
+Processing: 368 (54 patches)
+✓ Ground truth found for 368
+✓ Completed: 368
+Processing: 376 (54 patches)
+✓ Ground truth found for 376
+✓ Completed: 376
+Processing: 446 (54 patches)
+✓ Ground truth found for 446
+✓ Completed: 446
+
+================================================================================
+Testing Summary: Processed 30 images with ground truth
+================================================================================
+
+
+================================================================================
+SEGMENTATION METRICS
+================================================================================
+Images Processed: 30
+
+Per-class metrics:
+--------------------------------------------------------------------------------
+Background          : Precision=0.9637, Recall=0.9836, F1=0.9736, IoU=0.9485
+Paratext            : Precision=0.4917, Recall=0.4099, F1=0.4471, IoU=0.2879
+Decoration          : Precision=0.9484, Recall=0.6461, F1=0.7686, IoU=0.6242
+Main Text           : Precision=0.8746, Recall=0.8113, F1=0.8418, IoU=0.7268
+Title               : Precision=0.4057, Recall=0.0534, F1=0.0944, IoU=0.0496
+
+Mean metrics:
+--------------------------------------------------------------------------------
+Mean Precision: 0.7368
+Mean Recall:    0.5809
+Mean F1-Score:  0.6251
+Mean IoU:       0.5274
+================================================================================
+
+================================================================================
+AVERAGE METRICS ACROSS ALL MANUSCRIPTS
+================================================================================
+Manuscripts: Latin2, Latin14396, Latin16746, Syr341
+--------------------------------------------------------------------------------
+Mean Precision: 0.8292
+Mean Recall:    0.7505
+Mean F1-Score:  0.7787
+Mean IoU:       0.6775
+================================================================================
+
+=== TESTING COMPLETED SUCCESSFULLY ===
+Testing Finished!
+
+╔════════════════════════════════════════════════════════════════════════╗
+║  ✓ TESTING COMPLETED: Syr341
+╚════════════════════════════════════════════════════════════════════════╝
+
+
+============================================================================
+ALL MANUSCRIPTS PROCESSED
+============================================================================
+Configuration Used: CNN-TRANSFORMER BASE MODEL + SMART SKIP CONNECTIONS
+Results Location: ./Result/a2/
+============================================================================
+=== JOB_STATISTICS ===
+=== current date     : Sat Nov 15 04:00:44 PM CET 2025
+= Job-ID             : 1327086 on tinygpu
+= Job-Name           : 2nd
+= Job-Command        : /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network/run1.sh
+= Initial workdir    : /home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network
+= Queue/Partition    : work
+= Slurm account      : iwi5 with QOS=normal
+= Requested resources:  for 22:00:00
+= Elapsed runtime    : 00:49:30
+= Total RAM usage    : 7.2 GiB of requested  GiB (%)   
+= Node list          : tg067
+= Subm/Elig/Start/End: 2025-11-15T15:11:10 / 2025-11-15T15:11:10 / 2025-11-15T15:11:25 / 2025-11-15T16:00:55
+======================
+=== Quota infos ======
+    Path                 Used     SoftQ    HardQ    Gracetime  Filec    FileQ    FiHaQ    FileGrace    
+    /home/hpc              56.9G   104.9G   209.7G        N/A     235K     500K   1,000K        N/A    
+    /home/woody             0.0K  1000.0G  1500.0G        N/A       1    5,000K   7,500K        N/A    
+======================
+=== GPU utilization ==
+gpu_name, gpu_bus_id, pid, gpu_utilization [%], mem_utilization [%], max_memory_usage [MiB], time [ms]
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 774534, 45 %, 29 %, 3622 MiB, 444943 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 775126, 26 %, 17 %, 1218 MiB, 164944 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 775185, 50 %, 32 %, 3622 MiB, 473844 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 775909, 25 %, 16 %, 1218 MiB, 167126 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 775959, 50 %, 33 %, 3622 MiB, 799189 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 777175, 26 %, 17 %, 1218 MiB, 165656 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 777235, 48 %, 31 %, 3620 MiB, 487942 ms
+NVIDIA GeForce RTX 2080 Ti, 00000000:86:00.0, 777928, 25 %, 16 %, 1218 MiB, 170369 ms

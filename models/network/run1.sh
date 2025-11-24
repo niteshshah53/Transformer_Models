@@ -28,7 +28,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Change to script directory (where this script is located)
 # This ensures we can find visualize_gradcam.py and other modules
-SCRIPT_DIR="/home/hpc/iwi5/iwi5250h/DAS_Using_SwinUnet_Missformer/Models/Swin-Unet-main/models/network"
+SCRIPT_DIR="/home/hpc/iwi5/iwi5250h/Transformer_Models/models/network"
 cd "$SCRIPT_DIR"
 echo "Changed to script directory: $SCRIPT_DIR"
 echo "Current directory: $(pwd)"
