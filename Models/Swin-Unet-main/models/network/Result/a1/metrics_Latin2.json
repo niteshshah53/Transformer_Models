@@ -1,8 +1,0 @@
-{
-  "manuscript": "Latin2",
-  "mean_precision": 0.8265648322925007,
-  "mean_recall": 0.7632222880314533,
-  "mean_f1": 0.7888725975583918,
-  "mean_iou": 0.6678988225495927,
-  "num_images": 30
-}
