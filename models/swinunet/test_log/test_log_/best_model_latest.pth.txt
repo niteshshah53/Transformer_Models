@@ -1078,3 +1078,389 @@ Mean metrics:
 [18:12:17.756] Mean F1: 0.9309
 [18:12:17.756] Mean IoU: 0.8749
 [18:12:17.756] Inference completed on 10 images
+[17:29:32.167] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[17:29:32.167] Testing with checkpoint: best_model_latest.pth
+[17:29:32.168] Saving predictions to: ./Results/Latin2/predictions
+[17:29:32.168] Starting inference on UDIADS_BIB dataset
+[17:29:32.385] Found 1620 patches for Latin2
+[17:29:32.387] Processing: 076 (54 patches)
+[17:29:38.539] Completed: 076
+[17:29:38.539] Processing: 079 (54 patches)
+[17:29:44.131] Completed: 079
+[17:29:44.131] Processing: 082 (54 patches)
+[17:29:50.069] Completed: 082
+[17:29:50.070] Processing: 095 (54 patches)
+[17:29:55.409] Completed: 095
+[17:29:55.409] Processing: 106 (54 patches)
+[17:30:00.761] Completed: 106
+[17:30:00.762] Processing: 111 (54 patches)
+[17:30:08.557] Completed: 111
+[17:30:08.557] Processing: 115 (54 patches)
+[17:30:14.079] Completed: 115
+[17:30:14.079] Processing: 117 (54 patches)
+[17:30:19.533] Completed: 117
+[17:30:19.533] Processing: 128 (54 patches)
+[17:30:24.796] Completed: 128
+[17:30:24.796] Processing: 134 (54 patches)
+[17:30:30.008] Completed: 134
+[17:30:30.008] Processing: 138 (54 patches)
+[17:30:35.192] Completed: 138
+[17:30:35.192] Processing: 142 (54 patches)
+[17:30:40.540] Completed: 142
+[17:30:40.540] Processing: 159 (54 patches)
+[17:30:45.915] Completed: 159
+[17:30:45.916] Processing: 166 (54 patches)
+[17:30:51.257] Completed: 166
+[17:30:51.258] Processing: 185 (54 patches)
+[17:30:56.747] Completed: 185
+[17:30:56.747] Processing: 200 (54 patches)
+[17:31:02.640] Completed: 200
+[17:31:02.641] Processing: 203 (54 patches)
+[17:31:07.772] Completed: 203
+[17:31:07.772] Processing: 208 (54 patches)
+[17:31:12.930] Completed: 208
+[17:31:12.930] Processing: 229 (54 patches)
+[17:31:18.100] Completed: 229
+[17:31:18.101] Processing: 230 (54 patches)
+[17:31:23.193] Completed: 230
+[17:31:23.193] Processing: 235 (54 patches)
+[17:31:28.286] Completed: 235
+[17:31:28.286] Processing: 236 (54 patches)
+[17:31:33.602] Completed: 236
+[17:31:33.602] Processing: 248 (54 patches)
+[17:31:39.173] Completed: 248
+[17:31:39.173] Processing: 249 (54 patches)
+[17:31:44.776] Completed: 249
+[17:31:44.776] Processing: 250 (54 patches)
+[17:31:50.189] Completed: 250
+[17:31:50.190] Processing: 251 (54 patches)
+[17:31:55.687] Completed: 251
+[17:31:55.687] Processing: 252 (54 patches)
+[17:32:01.013] Completed: 252
+[17:32:01.013] Processing: 275 (54 patches)
+[17:32:06.590] Completed: 275
+[17:32:06.590] Processing: 277 (54 patches)
+[17:32:11.941] Completed: 277
+[17:32:11.941] Processing: 297 (54 patches)
+[17:32:17.179] Completed: 297
+[17:32:17.179] 
+Per-class metrics:
+[17:32:17.179] --------------------------------------------------------------------------------
+[17:32:17.179] Background     : Precision=0.9304, Recall=1.0000, F1=0.9639, IoU=0.9304
+[17:32:17.179] Paratext       : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[17:32:17.179] Decoration     : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[17:32:17.179] Main Text      : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[17:32:17.179] Title          : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[17:32:17.179] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[17:32:17.179] 
+Mean metrics:
+[17:32:17.179] ----------------------------------------
+[17:32:17.179] Mean Precision: 0.1551
+[17:32:17.179] Mean Recall: 0.1667
+[17:32:17.180] Mean F1: 0.1607
+[17:32:17.180] Mean IoU: 0.1551
+[17:32:17.180] Inference completed on 30 images
+[20:33:01.271] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin14396', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[20:33:01.271] Testing with checkpoint: best_model_latest.pth
+[20:33:01.299] Saving predictions to: ./Results/Latin14396/predictions
+[20:33:01.300] Starting inference on UDIADS_BIB dataset
+[20:33:01.481] Found 1620 patches for Latin14396
+[20:33:01.484] Processing: 014 (54 patches)
+[20:33:07.333] Completed: 014
+[20:33:07.333] Processing: 032 (54 patches)
+[20:33:12.747] Completed: 032
+[20:33:12.747] Processing: 034 (54 patches)
+[20:33:18.318] Completed: 034
+[20:33:18.318] Processing: 036 (54 patches)
+[20:33:23.941] Completed: 036
+[20:33:23.941] Processing: 038 (54 patches)
+[20:33:29.538] Completed: 038
+[20:33:29.538] Processing: 047 (54 patches)
+[20:33:34.914] Completed: 047
+[20:33:34.914] Processing: 060 (54 patches)
+[20:33:40.574] Completed: 060
+[20:33:40.574] Processing: 085 (54 patches)
+[20:33:45.934] Completed: 085
+[20:33:45.934] Processing: 087 (54 patches)
+[20:33:51.508] Completed: 087
+[20:33:51.508] Processing: 104 (54 patches)
+[20:33:57.093] Completed: 104
+[20:33:57.093] Processing: 105 (54 patches)
+[20:34:02.491] Completed: 105
+[20:34:02.492] Processing: 108 (54 patches)
+[20:34:07.742] Completed: 108
+[20:34:07.742] Processing: 110 (54 patches)
+[20:34:13.229] Completed: 110
+[20:34:13.229] Processing: 136 (54 patches)
+[20:34:18.831] Completed: 136
+[20:34:18.831] Processing: 169 (54 patches)
+[20:34:24.490] Completed: 169
+[20:34:24.491] Processing: 195 (54 patches)
+[20:34:30.000] Completed: 195
+[20:34:30.001] Processing: 196 (54 patches)
+[20:34:35.293] Completed: 196
+[20:34:35.293] Processing: 198 (54 patches)
+[20:34:40.418] Completed: 198
+[20:34:40.418] Processing: 204 (54 patches)
+[20:34:45.667] Completed: 204
+[20:34:45.667] Processing: 223 (54 patches)
+[20:34:50.941] Completed: 223
+[20:34:50.941] Processing: 225 (54 patches)
+[20:34:56.243] Completed: 225
+[20:34:56.244] Processing: 227 (54 patches)
+[20:35:01.544] Completed: 227
+[20:35:01.544] Processing: 229 (54 patches)
+[20:35:07.040] Completed: 229
+[20:35:07.040] Processing: 251 (54 patches)
+[20:35:12.432] Completed: 251
+[20:35:12.433] Processing: 253 (54 patches)
+[20:35:17.784] Completed: 253
+[20:35:17.784] Processing: 255 (54 patches)
+[20:35:23.209] Completed: 255
+[20:35:23.209] Processing: 264 (54 patches)
+[20:35:28.675] Completed: 264
+[20:35:28.675] Processing: 270 (54 patches)
+[20:35:34.308] Completed: 270
+[20:35:34.309] Processing: 276 (54 patches)
+[20:35:39.773] Completed: 276
+[20:35:39.773] Processing: 325 (54 patches)
+[20:35:45.271] Completed: 325
+[20:35:45.271] 
+Per-class metrics:
+[20:35:45.271] --------------------------------------------------------------------------------
+[20:35:45.271] Background     : Precision=0.8924, Recall=1.0000, F1=0.9431, IoU=0.8924
+[20:35:45.272] Paratext       : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[20:35:45.272] Decoration     : Precision=0.0338, Recall=0.0000, F1=0.0001, IoU=0.0000
+[20:35:45.272] Main Text      : Precision=1.0000, Recall=0.0002, F1=0.0003, IoU=0.0002
+[20:35:45.272] Title          : Precision=0.9028, Recall=0.0002, F1=0.0004, IoU=0.0002
+[20:35:45.272] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
+[20:35:45.272] 
+Mean metrics:
+[20:35:45.272] ----------------------------------------
+[20:35:45.272] Mean Precision: 0.4715
+[20:35:45.272] Mean Recall: 0.1667
+[20:35:45.272] Mean F1: 0.1573
+[20:35:45.272] Mean IoU: 0.1488
+[20:35:45.272] Inference completed on 30 images
+[22:03:40.800] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[22:03:40.801] Testing with checkpoint: best_model_latest.pth
+[22:03:40.802] Saving predictions to: ./Results/Latin2/predictions
+[22:03:40.802] Starting inference on UDIADS_BIB dataset
+[22:03:41.014] Found 1620 patches for Latin2
+[22:03:41.015] Processing: 076 (54 patches)
+[22:03:48.759] Completed: 076
+[22:03:48.760] Processing: 079 (54 patches)
+[22:03:54.482] Completed: 079
+[22:03:54.482] Processing: 082 (54 patches)
+[22:04:00.245] Completed: 082
+[22:04:00.245] Processing: 095 (54 patches)
+[22:04:05.683] Completed: 095
+[22:04:05.683] Processing: 106 (54 patches)
+[22:04:11.127] Completed: 106
+[22:04:11.128] Processing: 111 (54 patches)
+[22:04:16.561] Completed: 111
+[22:04:16.562] Processing: 115 (54 patches)
+[22:04:21.945] Completed: 115
+[22:04:21.945] Processing: 117 (54 patches)
+[22:04:27.507] Completed: 117
+[22:04:27.507] Processing: 128 (54 patches)
+[22:04:33.032] Completed: 128
+[22:04:33.032] Processing: 134 (54 patches)
+[22:04:38.692] Completed: 134
+[22:04:38.692] Processing: 138 (54 patches)
+[22:04:44.008] Completed: 138
+[22:04:44.008] Processing: 142 (54 patches)
+[22:04:49.450] Completed: 142
+[22:04:49.450] Processing: 159 (54 patches)
+[22:04:55.008] Completed: 159
+[22:04:55.008] Processing: 166 (54 patches)
+[22:05:00.723] Completed: 166
+[22:05:00.723] Processing: 185 (54 patches)
+[22:05:06.095] Completed: 185
+[22:05:06.095] Processing: 200 (54 patches)
+[22:05:11.586] Completed: 200
+[22:05:11.586] Processing: 203 (54 patches)
+[22:05:16.685] Completed: 203
+[22:05:16.685] Processing: 208 (54 patches)
+[22:05:21.904] Completed: 208
+[22:05:21.905] Processing: 229 (54 patches)
+[22:05:27.039] Completed: 229
+[22:05:27.039] Processing: 230 (54 patches)
+[22:05:32.079] Completed: 230
+[22:05:32.079] Processing: 235 (54 patches)
+[22:05:37.216] Completed: 235
+[22:05:37.217] Processing: 236 (54 patches)
+[22:05:42.444] Completed: 236
+[22:05:42.444] Processing: 248 (54 patches)
+[22:05:47.677] Completed: 248
+[22:05:47.677] Processing: 249 (54 patches)
+[22:05:53.096] Completed: 249
+[22:05:53.096] Processing: 250 (54 patches)
+[22:05:58.488] Completed: 250
+[22:05:58.488] Processing: 251 (54 patches)
+[22:06:03.704] Completed: 251
+[22:06:03.704] Processing: 252 (54 patches)
+[22:06:09.132] Completed: 252
+[22:06:09.132] Processing: 275 (54 patches)
+[22:06:14.568] Completed: 275
+[22:06:14.568] Processing: 277 (54 patches)
+[22:06:20.142] Completed: 277
+[22:06:20.142] Processing: 297 (54 patches)
+[22:06:25.568] Completed: 297
+[22:06:25.569] 
+Per-class metrics:
+[22:06:25.569] --------------------------------------------------------------------------------
+[22:06:25.569] Background     : Precision=0.9946, Recall=0.9958, F1=0.9952, IoU=0.9904
+[22:06:25.569] Paratext       : Precision=0.8960, Recall=0.7248, F1=0.8014, IoU=0.6685
+[22:06:25.569] Decoration     : Precision=0.9361, Recall=0.8842, F1=0.9094, IoU=0.8339
+[22:06:25.569] Main Text      : Precision=0.8950, Recall=0.9094, F1=0.9021, IoU=0.8217
+[22:06:25.569] Title          : Precision=0.9084, Recall=0.7844, F1=0.8418, IoU=0.7269
+[22:06:25.569] Chapter Headings: Precision=0.6850, Recall=0.5758, F1=0.6257, IoU=0.4552
+[22:06:25.569] 
+Mean metrics:
+[22:06:25.569] ----------------------------------------
+[22:06:25.569] Mean Precision: 0.8858
+[22:06:25.569] Mean Recall: 0.8124
+[22:06:25.569] Mean F1: 0.8459
+[22:06:25.569] Mean IoU: 0.7494
+[22:06:25.569] Inference completed on 30 images
+[22:06:45.827] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin14396', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[22:06:45.827] Testing with checkpoint: best_model_latest.pth
+[22:06:45.828] Saving predictions to: ./Results/Latin14396/predictions
+[22:06:45.828] Starting inference on UDIADS_BIB dataset
+[22:06:45.994] Found 1620 patches for Latin14396
+[22:06:45.996] Processing: 014 (54 patches)
+[22:06:51.502] Completed: 014
+[22:06:51.502] Processing: 032 (54 patches)
+[22:06:56.642] Completed: 032
+[22:06:56.643] Processing: 034 (54 patches)
+[22:07:02.080] Completed: 034
+[22:07:02.081] Processing: 036 (54 patches)
+[22:07:07.163] Completed: 036
+[22:07:07.163] Processing: 038 (54 patches)
+[22:07:12.101] Completed: 038
+[22:07:12.101] Processing: 047 (54 patches)
+[22:07:17.137] Completed: 047
+[22:07:17.137] Processing: 060 (54 patches)
+[22:07:22.250] Completed: 060
+[22:07:22.250] Processing: 085 (54 patches)
+[22:07:27.062] Completed: 085
+[22:07:27.062] Processing: 087 (54 patches)
+[22:07:31.852] Completed: 087
+[22:07:31.852] Processing: 104 (54 patches)
+[22:07:36.637] Completed: 104
+[22:07:36.637] Processing: 105 (54 patches)
+[22:07:41.374] Completed: 105
+[22:07:41.375] Processing: 108 (54 patches)
+[22:07:46.085] Completed: 108
+[22:07:46.086] Processing: 110 (54 patches)
+[22:07:51.259] Completed: 110
+[22:07:51.260] Processing: 136 (54 patches)
+[22:07:56.159] Completed: 136
+[22:07:56.160] Processing: 169 (54 patches)
+[22:08:00.962] Completed: 169
+[22:08:00.962] Processing: 195 (54 patches)
+[22:08:06.140] Completed: 195
+[22:08:06.140] Processing: 196 (54 patches)
+[22:08:11.136] Completed: 196
+[22:08:11.136] Processing: 198 (54 patches)
+[22:08:16.076] Completed: 198
+[22:08:16.076] Processing: 204 (54 patches)
+[22:08:21.107] Completed: 204
+[22:08:21.107] Processing: 223 (54 patches)
+[22:08:26.055] Completed: 223
+[22:08:26.055] Processing: 225 (54 patches)
+[22:08:31.097] Completed: 225
+[22:08:31.097] Processing: 227 (54 patches)
+[22:08:36.175] Completed: 227
+[22:08:36.175] Processing: 229 (54 patches)
+[22:08:41.075] Completed: 229
+[22:08:41.075] Processing: 251 (54 patches)
+[22:08:46.159] Completed: 251
+[22:08:46.159] Processing: 253 (54 patches)
+[22:08:51.071] Completed: 253
+[22:08:51.071] Processing: 255 (54 patches)
+[22:08:56.027] Completed: 255
+[22:08:56.027] Processing: 264 (54 patches)
+[22:09:06.873] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin16746', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin16746', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[22:09:06.873] Testing with checkpoint: best_model_latest.pth
+[22:09:06.921] Saving predictions to: ./Results/Latin16746/predictions
+[22:09:06.921] Starting inference on UDIADS_BIB dataset
+[22:09:07.135] Found 1620 patches for Latin16746
+[22:09:07.136] Processing: 009 (54 patches)
+[22:09:13.234] Completed: 009
+[22:09:13.235] Processing: 020 (54 patches)
+[22:09:18.936] Completed: 020
+[22:09:18.936] Processing: 022 (54 patches)
+                                                                                                                  [22:09:24.734] Completed: 022
+[22:09:24.735] Processing: 029 (54 patches)
+[22:09:30.130] Completed: 029
+[22:09:30.130] Processing: 035 (54 patches)
+[22:09:35.595] Completed: 035
+[22:09:35.595] Processing: 048 (54 patches)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [22:09:41.116] Completed: 048
+[22:09:41.116] Processing: 069 (54 patches)
+[22:09:46.642] Completed: 069
+[22:09:46.643] Processing: 082 (54 patches)
+[22:09:52.024] Completed: 082
+[22:09:52.024] Processing: 088 (54 patches)
+[22:09:57.348] Completed: 088
+[22:09:57.348] Processing: 089 (54 patches)
+[22:10:02.679] Completed: 089
+[22:10:02.679] Processing: 091 (54 patches)
+                                                                                                                                                    [22:10:08.225] Completed: 091
+[22:10:08.225] Processing: 100 (54 patches)
+[22:10:13.584] Completed: 100
+[22:10:13.584] Processing: 106 (54 patches)
+[22:10:18.993] Completed: 106
+[22:10:18.993] Processing: 117 (54 patches)
+[22:10:38.265] Completed: 117
+[22:10:38.265] Processing: 123 (54 patches)
+[22:10:43.591] Completed: 123
+[22:10:43.591] Processing: 125 (54 patches)
+[22:10:49.085] Completed: 125
+[22:10:49.085] Processing: 130 (54 patches)
+[22:10:54.198] Completed: 130
+[22:10:54.198] Processing: 133 (54 patches)
+[22:10:59.441] Completed: 133
+[22:10:59.441] Processing: 137 (54 patches)
+                                                                                                                                                    [22:11:04.861] Completed: 137
+[22:11:04.861] Processing: 146 (54 patches)
+[22:11:10.097] Completed: 146
+[22:11:10.097] Processing: 166 (54 patches)
+[22:11:15.493] Completed: 166
+[22:11:15.493] Processing: 184 (54 patches)
+[22:11:20.899] Completed: 184
+[22:11:20.899] Processing: 215 (54 patches)
+[22:11:26.422] Completed: 215
+[22:11:26.422] Processing: 237 (54 patches)
+[22:11:31.823] Completed: 237
+[22:11:31.823] Processing: 243 (54 patches)
+                                                                          [22:11:37.347] Completed: 243
+[22:11:37.347] Processing: 255 (54 patches)
+[22:11:42.727] Completed: 255
+[22:11:42.727] Processing: 258 (54 patches)
+[22:11:48.060] Completed: 258
+[22:11:48.060] Processing: 284 (54 patches)
+[22:11:53.451] Completed: 284
+[22:11:53.451] Processing: 325 (54 patches)
+[22:11:58.542] Completed: 325
+[22:11:58.542] Processing: 357 (54 patches)
+[22:12:03.615] Completed: 357
+[22:12:03.615] 
+Per-class metrics:
+[22:12:03.615] --------------------------------------------------------------------------------
+[22:12:03.615] Background     : Precision=0.9940, Recall=0.9960, F1=0.9950, IoU=0.9900
+[22:12:03.615] Paratext       : Precision=0.8705, Recall=0.7286, F1=0.7933, IoU=0.6574
+[22:12:03.615] Decoration     : Precision=0.9882, Recall=0.9517, F1=0.9696, IoU=0.9410
+[22:12:03.615] Main Text      : Precision=0.9032, Recall=0.9607, F1=0.9311, IoU=0.8711
+[22:12:03.615] Title          : Precision=0.7893, Recall=0.9068, F1=0.8440, IoU=0.7301
+[22:12:03.615] Chapter Headings: Precision=0.9578, Recall=0.2741, F1=0.4262, IoU=0.2708
+[22:12:03.615] 
+Mean metrics:
+[22:12:03.615] ----------------------------------------
+[22:12:03.615] Mean Precision: 0.9172
+[22:12:03.615] Mean Recall: 0.8030
+[22:12:03.615] Mean F1: 0.8265
+[22:12:03.615] Mean IoU: 0.7434
+[22:12:03.615] Inference completed on 30 images

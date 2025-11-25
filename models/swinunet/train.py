@@ -60,7 +60,17 @@ def get_model(args, config):
     else:
         print("CUDA not available, using CPU")
     
-    model.load_from(config)
+    # Load pretrained weights if available
+    try:
+        model.load_from(config)
+        print("Pretrained weights loaded successfully")
+    except FileNotFoundError as e:
+        print(f"Warning: Pretrained checkpoint not found: {e}")
+        print("Continuing training without pretrained weights (random initialization)")
+    except Exception as e:
+        print(f"Warning: Failed to load pretrained weights: {e}")
+        print("Continuing training without pretrained weights (random initialization)")
+    
     return model
 
 
@@ -178,7 +188,10 @@ def parse_arguments():
     
     # Model configuration
     parser.add_argument('--model', type=str, default='swinunet', help='Model type (swinunet)')
-    parser.add_argument('--cfg', type=str, required=True, help='Path to config file')
+    parser.add_argument('--cfg', type=str, required=False, help='Path to config file (optional when using --yaml)')
+    parser.add_argument('--yaml', type=str, default='swintiny',
+                        choices=['swintiny', 'simmim'],
+                        help="Choose which preset YAML to use from common/configs: 'swintiny' or 'simmim'. If provided, --cfg is optional and will be overridden.")
     parser.add_argument('--img_size', type=int, default=224, help='Input image size')
     parser.add_argument('--num_classes', type=int, default=5, help='Number of classes')
     
@@ -227,6 +240,26 @@ def main():
     """
     # Parse arguments
     args = parse_arguments()
+    
+    # Map the --yaml shortcut to an actual config file path in the repo.
+    # This must be set BEFORE validate_arguments(args) which checks args.cfg exists.
+    base_config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/configs'))
+    
+    if args.yaml == 'swintiny':
+        # keep existing swintiny yaml name (adjust name if your repo uses different file)
+        default_cfg = os.path.join(base_config_dir, 'swin_tiny_patch4_window7_224_lite.yaml')
+    elif args.yaml == 'simmim':
+        default_cfg = os.path.join(base_config_dir, 'simmim_swin_base_patch4_window7_224.yaml')
+    else:
+        default_cfg = None
+    
+    # If user passed explicit --cfg, prefer that; otherwise use shorthand mapping
+    if not args.cfg:
+        if default_cfg and os.path.exists(default_cfg):
+            args.cfg = default_cfg
+        else:
+            # If the chosen config file is missing, raise a helpful error
+            raise FileNotFoundError(f"Config for --yaml {args.yaml} not found at {default_cfg}. Make sure the file exists.")
     
     # Validate arguments
     validate_arguments(args)

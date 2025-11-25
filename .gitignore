@@ -58,6 +58,8 @@ wandb/
 mlruns/
 
 # Model outputs and results
+test_log/
+Results/
 results/
 outputs/
 output/
@@ -65,6 +67,7 @@ experiments/
 *.csv
 *.json
 *.out
+*.txt
 
 # Dataset files (large files)
 *.h5

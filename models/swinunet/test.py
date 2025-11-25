@@ -48,21 +48,24 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Test on U-DIADS-Bib dataset with SwinUnet
-  python test.py --cfg ../../common/configs/swin_tiny_patch4_window7_224_lite.yaml --output_dir ./models/ \\
-                 --dataset UDIADS_BIB --manuscript Latin2 --is_savenii
+  # Test on U-DIADS-Bib dataset with SwinUnet using swintiny config
+  python test.py --yaml swintiny --output_dir ./models/ --manuscript Latin2 --is_savenii
   
-  # Test on DIVAHISDB dataset with SwinUnet
-  python test.py --cfg ../../common/configs/swin_tiny_patch4_window7_224_lite.yaml --dataset DIVAHISDB \\
-                 --output_dir ./models/ --manuscript Latin2
+  # Test using simmim config
+  python test.py --yaml simmim --output_dir ./models/ --manuscript Latin2
         """
     )
     
     # Core arguments
-    parser.add_argument('--cfg', type=str, required=True, metavar="FILE",
-                       help='Path to model configuration file')
+    parser.add_argument('--cfg', type=str, required=False, metavar="FILE",
+                       help='Path to model configuration file (optional when using --yaml)')
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Directory containing trained model checkpoints')
+    
+    # New shorthand flag to choose a preset config
+    parser.add_argument('--yaml', type=str, default='swintiny',
+                        choices=['swintiny', 'simmim'],
+                        help="Choose which preset YAML to use from common/configs: 'swintiny' or 'simmim'. If provided, --cfg is optional and will be overridden.")
     
     # Model selection
     parser.add_argument('--model', type=str, default='swinunet',
@@ -174,7 +177,18 @@ def get_model(args, config):
     """
     from vision_transformer import SwinUnet as ViT_seg
     model = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
-    model.load_from(config)
+    
+    # Load pretrained weights if available
+    try:
+        model.load_from(config)
+        print("Pretrained weights loaded successfully")
+    except FileNotFoundError as e:
+        print(f"Warning: Pretrained checkpoint not found: {e}")
+        print("Continuing without pretrained weights (random initialization)")
+    except Exception as e:
+        print(f"Warning: Failed to load pretrained weights: {e}")
+        print("Continuing without pretrained weights (random initialization)")
+    
     return model
 
 
@@ -436,7 +450,16 @@ def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patc
         
         # Load and process patch
         patch = Image.open(patch_path).convert("RGB")
-        patch_tensor = TF.to_tensor(patch).unsqueeze(0).cuda()
+        patch_tensor = TF.to_tensor(patch)
+        
+        # Apply ImageNet normalization (same as training)
+        # This matches the normalization applied in dataset_udiadsbib.py for swinunet
+        patch_tensor = TF.normalize(
+            patch_tensor,
+            mean=[0.485, 0.456, 0.406],  # ImageNet mean
+            std=[0.229, 0.224, 0.225]     # ImageNet std
+        )
+        patch_tensor = patch_tensor.unsqueeze(0).cuda()
         
         with torch.no_grad():
             output = model(patch_tensor)
@@ -697,6 +720,26 @@ def main():
     
     # Parse and validate arguments
     args = parse_arguments()
+    
+    # Map the --yaml shortcut to an actual config file path in the repo.
+    # This must be set BEFORE validate_arguments(args) which checks args.cfg exists.
+    base_config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/configs'))
+    
+    if args.yaml == 'swintiny':
+        # keep existing swintiny yaml name (adjust name if your repo uses different file)
+        default_cfg = os.path.join(base_config_dir, 'swin_tiny_patch4_window7_224_lite.yaml')
+    elif args.yaml == 'simmim':
+        default_cfg = os.path.join(base_config_dir, 'simmim_swin_base_patch4_window7_224.yaml')
+    else:
+        default_cfg = None
+    
+    # If user passed explicit --cfg, prefer that; otherwise use shorthand mapping
+    if not args.cfg:
+        if default_cfg and os.path.exists(default_cfg):
+            args.cfg = default_cfg
+        else:
+            # If the chosen config file is missing, raise a helpful error
+            raise FileNotFoundError(f"Config for --yaml {args.yaml} not found at {default_cfg}. Make sure the file exists.")
     
     try:
         validate_arguments(args)
