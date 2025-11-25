@@ -64,6 +64,7 @@ output/
 experiments/
 *.csv
 *.json
+*.out
 
 # Dataset files (large files)
 *.h5
