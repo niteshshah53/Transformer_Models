@@ -24,7 +24,7 @@ Transformer_Models/
 │   │   ├── swin_transformer_unet_skip_expand_decoder_sys.py  # Main model
 │   │   ├── vision_transformer.py    # Vision transformer components
 │   │   └── ...                      # Other SwinUnet-specific files
-│   ├── missformer/                  # MissFormer (Multi-scale Transformer)
+│   ├── missformer/                  # MissFormer 
 │   │   ├── train.py                 # MissFormer training script
 │   │   ├── test.py                  # MissFormer testing script
 │   │   ├── trainer.py               # MissFormer-specific trainer
@@ -179,7 +179,7 @@ python3 train.py \
   - **Batch Processing**: Efficient patch batching for faster inference
   - **Probability Accumulation**: Correct overlap handling by accumulating probabilities, not class indices
 
-### MissFormer (Multi-scale Transformer)
+### MissFormer
 - **Architecture**: SegFormer backbone with multi-scale feature fusion
 - **Key Features**:
   - Efficient self-attention mechanisms
@@ -207,14 +207,31 @@ python3 train.py \
 - **Variants**: B0 (lightweight), B4 (balanced), B5 (heavy)
 - **Decoder Options**: EfficientNet-B4, ResNet50, or simple CNN decoder
 
-### Network (CNN-Transformer)
-- **Architecture**: CNN-Transformer hybrid models
+### Network (EfficientNet-Swin Transformer)
+- **Architecture**: Hybrid CNN-Transformer U-Net with EfficientNet/ResNet-50 encoder and Swin Transformer decoder
 - **Key Features**:
-  - Vision Transformer CNN integration
-  - GradCAM visualization support
-  - Flexible architecture combinations
-- **Training**: Standardized training pipeline
-- **Visualization**: Includes GradCAM for model interpretability
+  - **Encoder Options**: EfficientNet-B4 (default) or ResNet-50 with ImageNet pretrained weights
+  - **Swin Transformer Decoder**: 4-stage decoder with window-based self-attention (96→192→384→768 dims)
+  - **Feature Adapters**: Convert CNN features to transformer format (external or streaming mode)
+  - **Bottleneck**: Optional 2 Swin Transformer blocks or MSFA+MCT hybrid bottleneck
+  - **Skip Connection Fusion**: Multiple fusion methods:
+    - `simple`: Basic concatenation + linear projection
+    - `smart`: Attention-based fusion (cross-attention between encoder/decoder)
+    - `fourier`: Fourier feature fusion for frequency domain integration
+    - `gcff`: Global Context Feature Fusion (from MSAGHNet)
+  - **Deep Supervision**: Optional multi-resolution auxiliary outputs (all upsampled to full resolution)
+  - **Multi-Scale Aggregation**: Optional fusion of all encoder scales in bottleneck
+  - **SE-MSFE**: Optional Squeeze-Excitation Multi-Scale Feature Extraction (replaces MBConv in EfficientNet)
+  - **Normalization**: GroupNorm (default) or LayerNorm for better small-batch training
+- **Training**: Advanced with class imbalance handling
+  - **Class Weighting**: Effective Number of Samples (ENS) method with capping
+  - **Balanced Sampling**: Optional continuous rarity-based oversampling
+  - **Loss Function**: Combined CE, Focal (γ=3.0), and Dice losses (configurable weighting)
+  - **Optimizer**: AdamW with weight_decay=0.01
+  - **Scheduler**: CosineAnnealingWarmRestarts, ReduceLROnPlateau, or OneCycleLR
+  - **Mixed Precision**: AMP support for faster training
+- **Validation**: Sliding window on full images with per-class metrics
+- **Visualization**: GradCAM support for model interpretability
 
 ## 📊 Supported Datasets
 
@@ -296,60 +313,6 @@ To add a new model:
 | Hybrid2 | Swin-EfficientNet | ~45M | Moderate | Moderate | Enhanced feature extraction |
 | Network | CNN-Transformer | Variable | Variable | Variable | Flexible architectures |
 
-## 🔄 Recent Updates & Improvements
-
-### Hybrid2 Enhancements (Latest)
-- **Smart Skip Connections**: Attention-based feature fusion instead of simple concatenation
-- **Deep Supervision**: Optional multi-resolution auxiliary outputs for better training
-- **Positional Embeddings**: 2D learnable positional embeddings for better spatial understanding
-- **Balanced Sampling**: Oversampling rare classes to handle class imbalance
-- **Class-Aware Augmentation**: Stronger augmentation for rare classes
-- **Class-Balanced Loss**: CB Loss with beta=0.9999 for extreme imbalance handling
-- **Differential Learning Rates**: Different LR for encoder, bottleneck, and decoder
-- **Multiple Decoder Options**: EfficientNet-B4, ResNet50, or simple CNN decoder
-
-### Training Standardization
-- **All Models**: AdamW optimizer with various schedulers (CosineAnnealingWarmRestarts, ReduceLROnPlateau)
-- **Early Stopping**: Configurable patience across all models
-- **Validation**: Proper validation during training with sliding window for transformer models
-- **Logging**: Improved TensorBoard logging and progress tracking
-- **Checkpointing**: Automatic best model saving and cleanup
-- **Results Aggregation**: Scripts to aggregate results across multiple manuscripts
-
-### Key Technical Improvements
-1. **Attention Mechanisms**: CBAM and smart attention for better feature focus
-2. **Skip Connections**: Intelligent fusion instead of simple concatenation
-3. **Residual Learning**: Better gradient flow and training stability
-4. **Multi-scale Processing**: Enhanced feature extraction at different scales
-5. **Advanced Augmentation**: MixUp, CutMix, and sophisticated transforms
-6. **Memory Optimization**: CUDA memory fragmentation reduction for large models
-7. **Mixed Precision**: AMP support for faster training
-
-### Future Enhancements
-- **Model Ensembling**: Combining multiple models for improved performance
-- **Efficient Variants**: Lightweight versions for deployment
-- **Cross-dataset Training**: Multi-dataset learning capabilities
-- **Advanced Visualization**: More interpretability tools
-
-## 📋 SLURM Job Submission
-
-All run scripts include SLURM headers for cluster execution. Key parameters:
-- **Job Name**: Model-specific job names
-- **GPU**: Typically 1 GPU (rtx3080 or generic)
-- **Time Limit**: 22-24 hours
-- **CPUs**: 8 CPUs per task
-- **Output**: Results saved in `Result/` directories
-
-Example SLURM submission:
-```bash
-sbatch models/hybrid/run.sh
-```
-
-## 📚 Additional Resources
-
-- Dataset documentation: `common/datasets/README.md`
-- Hybrid2 architecture: `models/hybrid/hybrid2/Hybrid2_Architecture_Description.tex`
-- Results aggregation: Use `aggregate_results.py` in hybrid models
 
 This repository provides a comprehensive framework for historical document segmentation with state-of-the-art models and best practices.
 
