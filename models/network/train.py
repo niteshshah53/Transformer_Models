@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore")
 from trainer import trainer_synapse
 
 # Import dataset classes
-from datasets.dataset_udiadsbib import UDiadsBibDataset
+from datasets.dataset_udiadsbib_2 import UDiadsBibDataset
 try:
     from datasets.dataset_divahisdb import DivaHisDBDataset
     DIVAHISDB_AVAILABLE = True

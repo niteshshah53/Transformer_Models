@@ -342,7 +342,7 @@ def load_model_checkpoint(model, args):
 def get_dataset_info(dataset_type, manuscript=None):
     """Get dataset-specific information."""
     if dataset_type.upper() == "UDIADS_BIB":
-        from datasets.dataset_udiadsbib import rgb_to_class
+        from datasets.dataset_udiadsbib_2 import rgb_to_class
         
         class_colors = [
             (0, 0, 0), (255, 255, 0), (0, 255, 255), (255, 0, 255),
