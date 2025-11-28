@@ -221,8 +221,8 @@ python3 train.py \
 ### U-DIADS-Bib
 - **Description**: Historical manuscript segmentation dataset
 - **Variants**: 
-  - **MS (Multi-Script)**: Multiple manuscripts (Latin2, Latin14396, Latin16746, Syr341)
-  - **FS (Full-Size)**: Full-size images
+  - **MS (Full Dataset)**: Full Datasets
+  - **FS (Few-Shot)**: Few Images or Few-Shot Dataset
 - **Classes**: 6 classes (5 for Syriaque341 manuscripts)
   - Background, Paratext, Decoration, Main Text, Title, Chapter Headings
 - **Note**: Syriaque341 manuscripts don't have Chapter Headings (5 classes)
