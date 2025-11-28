@@ -236,11 +236,6 @@ python3 train.py \
 - **Format**: Bitmask-encoded masks
 - **Usage**: `--dataset DIVAHISDB --use_patched_data`
 
-### Synapse
-- **Description**: Medical image segmentation dataset
-- **Classes**: Variable (typically 9 classes)
-- **Format**: HDF5 format
-- **Usage**: `--dataset Synapse`
 
 ## 🔧 Key Benefits of Repository Structure
 
