@@ -57,9 +57,9 @@ Transformer_Models/
 │       └── Result/                  # Training results
 ├── common/                          # Shared components
 │   ├── datasets/                    # Dataset implementations
-│   │   ├── dataset_udiadsbib.py     # U-DIADS-Bib dataset loader
+│   │   ├── dataset_udiadsbib.py     # U-DIADS-Bib dataset loader (legacy)
+│   │   ├── dataset_udiadsbib_2.py   # U-DIADS-Bib dataset loader (enhanced with class-aware augmentation)
 │   │   ├── dataset_divahisdb.py     # DivaHisDB dataset loader
-│   │   ├── dataset_synapse.py       # Synapse dataset loader
 │   │   ├── sstrans_transforms.py    # SSTrans-specific transforms
 │   │   └── README.md                # Dataset documentation
 │   ├── utils/                       # Utility functions
@@ -162,10 +162,22 @@ python3 train.py \
   - Skip connections between encoder and decoder
   - Patch merging and expanding operations
   - Window-based self-attention
-- **Training**: Standardized with validation and early stopping
-- **Loss Function**: Combined CE and Dice losses
+  - ImageNet-pretrained weights for better initialization
+- **Training**: Advanced with class imbalance handling
+  - **Class Weighting**: Effective Number of Samples (ENS) method with aggressive rare class boosting
+  - **Balanced Sampling**: Optional oversampling of rare classes
+  - **Class-Aware Augmentation**: Stronger augmentation for rare classes (Title, Paratext, Decoration, Chapter Headings)
+  - **Loss Function**: Combined CE (15%), Focal (55%, γ=5), and Dice (30%) losses
+  - **Early Stopping**: Based on mean foreground Dice score (better reflects rare class performance)
+  - **Learning Rate Warmup**: Gradual LR increase over first N epochs
+  - **Scheduler**: CosineAnnealingWarmRestarts (T_0=50, T_mult=2) optimized for imbalanced data
 - **Optimizer**: AdamW with weight_decay=0.01
-- **Validation**: Sliding window on full images
+- **Validation**: Sliding window on full images with per-class Dice tracking
+- **Inference**: 
+  - **Test-Time Augmentation (TTA)**: 8 augmentations (original, flips, rotations, combinations)
+  - **Multi-Scale Testing**: 3 scales (0.75x, 1.0x, 1.25x) with probability averaging
+  - **Batch Processing**: Efficient patch batching for faster inference
+  - **Probability Accumulation**: Correct overlap handling by accumulating probabilities, not class indices
 
 ### MissFormer (Multi-scale Transformer)
 - **Architecture**: SegFormer backbone with multi-scale feature fusion
