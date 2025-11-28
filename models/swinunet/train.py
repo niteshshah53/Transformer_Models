@@ -25,7 +25,7 @@ from configs.config import get_config
 from trainer import trainer_synapse
 
 # Import dataset classes
-from datasets.dataset_udiadsbib import UDiadsBibDataset
+from datasets.dataset_udiadsbib_2 import UDiadsBibDataset
 try:
     from datasets.dataset_divahisdb import DivaHisDBDataset
     DIVAHISDB_AVAILABLE = True
@@ -98,6 +98,15 @@ def setup_datasets(args):
         # Update args with correct number of classes
         args.num_classes = num_classes
         
+        # Check if class-aware augmentation is enabled
+        use_class_aware_aug = getattr(args, 'use_class_aware_aug', False)
+        if use_class_aware_aug:
+            print("✓ Class-aware augmentation enabled (stronger augmentation for rare classes)")
+            if num_classes == 5:
+                print("  Rare classes: Paratext, Decoration, Title")
+            else:  # num_classes == 6
+                print("  Rare classes: Paratext, Decoration, Title, Chapter Headings")
+        
         # Create datasets
         train_dataset = UDiadsBibDataset(
             root_dir=args.udiadsbib_root,
@@ -106,7 +115,8 @@ def setup_datasets(args):
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
             model_type='swinunet',
-            num_classes=num_classes
+            num_classes=num_classes,
+            use_class_aware_aug=use_class_aware_aug
         )
         
         val_dataset = UDiadsBibDataset(
@@ -116,7 +126,8 @@ def setup_datasets(args):
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
             model_type='swinunet',
-            num_classes=num_classes
+            num_classes=num_classes,
+            use_class_aware_aug=False  # Never use augmentation for validation
         )
         
     elif args.dataset == 'DIVAHISDB' and DIVAHISDB_AVAILABLE:
@@ -212,6 +223,19 @@ def parse_arguments():
     parser.add_argument('--max_epochs', type=int, default=300, help='Maximum number of epochs')
     parser.add_argument('--base_lr', type=float, default=0.0003, help='Base learning rate')
     parser.add_argument('--patience', type=int, default=30, help='Early stopping patience')
+    parser.add_argument('--scheduler_type', type=str, default='CosineAnnealingWarmRestarts',
+                       choices=['ReduceLROnPlateau', 'OneCycleLR', 'CosineAnnealingLR', 'CosineAnnealingWarmRestarts'],
+                       help='Learning rate scheduler type (default: CosineAnnealingWarmRestarts for imbalanced data)')
+    parser.add_argument('--scheduler_t0', type=int, default=50,
+                       help='Initial cycle length for CosineAnnealingWarmRestarts (default: 50 epochs for faster adaptation)')
+    parser.add_argument('--scheduler_t_mult', type=int, default=2,
+                       help='Cycle length multiplier for CosineAnnealingWarmRestarts (default: 2, doubles each restart)')
+    parser.add_argument('--warmup_epochs', type=int, default=10,
+                       help='Number of warmup epochs for learning rate scheduler')
+    parser.add_argument('--use_amp', action='store_true', default=True,
+                       help='Use automatic mixed precision (AMP) for faster training (2-3x speedup)')
+    parser.add_argument('--no_amp', dest='use_amp', action='store_false',
+                       help='Disable AMP (use FP32 training)')
     parser.add_argument('--n_gpu', type=int, default=1, help='Number of GPUs')
     parser.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
     parser.add_argument('--seed', type=int, default=1234, help='Random seed')
@@ -219,11 +243,24 @@ def parse_arguments():
     # Output configuration
     parser.add_argument('--output_dir', type=str, required=True, help='Output directory for results')
     
+    # Checkpoint resume configuration
+    parser.add_argument('--resume', type=str, default=None,
+                       help='Path to checkpoint to resume from (default: auto-detect best_model_latest.pth in output_dir)')
+    parser.add_argument('--no_auto_resume', action='store_true', default=False,
+                       help='Disable automatic resume from best_model_latest.pth (start fresh training)')
+    
+    # Data sampling configuration
+    parser.add_argument('--use_balanced_sampler', action='store_true', default=False,
+                       help='Use balanced sampler to oversample rare classes (helps with class imbalance)')
+    
+    # Data augmentation configuration
+    parser.add_argument('--use_class_aware_aug', action='store_true', default=False,
+                       help='Use class-aware augmentation (stronger augmentation for rare classes like Title, Paratext, Decoration)')
+    
     # Additional options for config override
     parser.add_argument('--opts', nargs='*', default=None, help='Additional options to override config')
     parser.add_argument('--zip', action='store_true', help='Use zipped dataset instead of folder dataset')
     parser.add_argument('--cache_mode', type=str, default='part', choices=['no', 'full', 'part'], help='Cache mode')
-    parser.add_argument('--resume', type=str, help='Resume from checkpoint')
     parser.add_argument('--accumulation_steps', type=int, help='Gradient accumulation steps')
     parser.add_argument('--use_checkpoint', action='store_true', help='Whether to use gradient checkpointing to save memory')
     parser.add_argument('--amp_opt_level', type=str, default='O1', choices=['O0', 'O1', 'O2'], help='Mixed precision opt level')

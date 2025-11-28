@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #SBATCH --job-name=1st
-#SBATCH --output=./Results/train_test_%j.out
-#SBATCH --error=./Results/train_test_%j.out
+#SBATCH --output=./Results/a1/simmim_%j.out
+#SBATCH --error=./Results/a1/simmim_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
@@ -18,13 +18,19 @@ module load cuda/11.8
 module load cudnn
 
 # Create logs directory 
-mkdir -p ../../logs
+mkdir -p ./Results/a1
 
 # Training configuration for SwinUnet:
 # - model: swinunet (requires config file)
 # - dataset: UDIADS_BIB (5 classes for Syr341FS, 6 classes for others)
 # - base_lr: Initial learning rate
 # - patience: Early stopping patience
+# - scheduler_type: Learning rate scheduler (ReduceLROnPlateau for better convergence)
+# - warmup_epochs: Warmup epochs for scheduler
+# - use_amp: Automatic Mixed Precision for 2-3x faster training
+# - use_balanced_sampler: Oversample rare classes for better class balance
+# - use_class_aware_aug: Stronger augmentation for rare classes (Title, Paratext, Decoration)
+# - use_tta: Test-Time Augmentation for improved test accuracy (4 augmentations averaged)
 
 conda activate pytorch2.6-py3.12
 
@@ -38,22 +44,29 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
-        --yaml simmim \
         --use_patched_data \
-        --batch_size 12 \
+        --batch_size 8 \
         --max_epochs 300 \
         --base_lr 0.0002 \
-        --patience 30 \
-        --output_dir "./Results/${MANUSCRIPT}"
+        --warmup_epochs 20 \
+        --patience 60 \
+        --num_workers 8 \
+        --yaml simmim \
+        --cfg "../../common/configs/simmim_swin_base_patch4_window7_224.yaml" \
+        --scheduler_type CosineAnnealingWarmRestarts \
+        --use_class_aware_aug \
+        --output_dir "./Results/a1/${MANUSCRIPT}"
 
     echo "=== Testing $MANUSCRIPT ==="
     python3 test.py \
-        --model swinunet \
+        --yaml simmim \
+        --cfg "../../common/configs/simmim_swin_base_patch4_window7_224.yaml" \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
-        --yaml simmim \
         --use_patched_data \
         --is_savenii \
-        --output_dir "./Results/${MANUSCRIPT}"
+        --use_tta \
+        --multiscale \
+        --output_dir "./Results/a1/${MANUSCRIPT}"
 done

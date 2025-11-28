@@ -60,6 +60,8 @@ mlruns/
 # Model outputs and results
 test_log/
 Results/
+Result/
+Results/
 results/
 outputs/
 output/

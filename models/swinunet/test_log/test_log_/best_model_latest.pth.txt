@@ -1,1466 +1,470 @@
-[02:09:45.970] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin2', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[02:09:45.971] Testing with checkpoint: best_model_latest.pth
-[02:09:46.005] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin2/predictions
-[02:09:46.005] Starting inference on UDIADS_BIB dataset
-[02:09:46.180] Found 1620 patches for Latin2
-[02:09:46.182] Processing: 076 (54 patches)
-[02:09:52.703] Completed: 076
-[02:09:52.704] Processing: 079 (54 patches)
-[02:09:56.987] Completed: 079
-[02:09:56.988] Processing: 082 (54 patches)
-[02:10:01.147] Completed: 082
-[02:10:01.148] Processing: 095 (54 patches)
-[02:10:05.235] Completed: 095
-[02:10:05.236] Processing: 106 (54 patches)
-[02:10:09.504] Completed: 106
-[02:10:09.504] Processing: 111 (54 patches)
-[02:10:13.450] Completed: 111
-[02:10:13.450] Processing: 115 (54 patches)
-[02:10:17.328] Completed: 115
-[02:10:17.328] Processing: 117 (54 patches)
-[02:10:21.225] Completed: 117
-[02:10:21.225] Processing: 128 (54 patches)
-[02:10:25.162] Completed: 128
-[02:10:25.162] Processing: 134 (54 patches)
-[02:10:29.318] Completed: 134
-[02:10:29.318] Processing: 138 (54 patches)
-[02:10:33.479] Completed: 138
-[02:10:33.479] Processing: 142 (54 patches)
-[02:10:37.481] Completed: 142
-[02:10:37.481] Processing: 159 (54 patches)
-[02:10:41.613] Completed: 159
-[02:10:41.613] Processing: 166 (54 patches)
-[02:10:45.650] Completed: 166
-[02:10:45.650] Processing: 185 (54 patches)
-[02:10:49.781] Completed: 185
-[02:10:49.781] Processing: 200 (54 patches)
-[02:10:53.921] Completed: 200
-[02:10:53.921] Processing: 203 (54 patches)
-[02:10:57.823] Completed: 203
-[02:10:57.823] Processing: 208 (54 patches)
-[02:11:01.693] Completed: 208
-[02:11:01.693] Processing: 229 (54 patches)
-[02:11:05.791] Completed: 229
-[02:11:05.791] Processing: 230 (54 patches)
-[02:11:09.741] Completed: 230
-[02:11:09.741] Processing: 235 (54 patches)
-[02:11:13.736] Completed: 235
-[02:11:13.736] Processing: 236 (54 patches)
-[02:11:17.802] Completed: 236
-[02:11:17.802] Processing: 248 (54 patches)
-[02:11:21.912] Completed: 248
-[02:11:21.912] Processing: 249 (54 patches)
-[02:11:26.178] Completed: 249
-[02:11:26.178] Processing: 250 (54 patches)
-[02:11:30.379] Completed: 250
-[02:11:30.380] Processing: 251 (54 patches)
-[02:11:34.513] Completed: 251
-[02:11:34.513] Processing: 252 (54 patches)
-[02:11:38.726] Completed: 252
-[02:11:38.726] Processing: 275 (54 patches)
-[02:11:42.918] Completed: 275
-[02:11:42.918] Processing: 277 (54 patches)
-[02:11:46.972] Completed: 277
-[02:11:46.973] Processing: 297 (54 patches)
-[02:11:51.238] Completed: 297
-[02:11:51.238] 
+[17:21:19.695] Namespace(cfg='../../common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[17:21:19.696] Testing with checkpoint: best_model_latest.pth
+[17:21:19.697] Saving predictions to: ./Results/Latin2/predictions
+[17:21:19.697] Starting inference on UDIADS_BIB dataset
+[17:21:19.984] Found 1620 patches for Latin2
+[17:21:19.988] Processing: 076 (54 patches)
+[17:21:20.141] 🔀 Using Test-Time Augmentation for 076
+[17:21:35.189] Completed: 076
+[17:21:35.190] Processing: 079 (54 patches)
+[17:21:35.208] 🔀 Using Test-Time Augmentation for 079
+[17:21:49.249] Completed: 079
+[17:21:49.250] Processing: 082 (54 patches)
+[17:21:49.282] 🔀 Using Test-Time Augmentation for 082
+[17:22:03.210] Completed: 082
+[17:22:03.211] Processing: 095 (54 patches)
+[17:22:03.249] 🔀 Using Test-Time Augmentation for 095
+[17:22:17.184] Completed: 095
+[17:22:17.184] Processing: 106 (54 patches)
+[17:22:17.212] 🔀 Using Test-Time Augmentation for 106
+[17:22:30.980] Completed: 106
+[17:22:30.980] Processing: 111 (54 patches)
+[17:22:30.999] 🔀 Using Test-Time Augmentation for 111
+[17:22:44.893] Completed: 111
+[17:22:44.894] Processing: 115 (54 patches)
+[17:22:44.910] 🔀 Using Test-Time Augmentation for 115
+[17:22:58.596] Completed: 115
+[17:22:58.597] Processing: 117 (54 patches)
+[17:22:58.619] 🔀 Using Test-Time Augmentation for 117
+[17:23:12.460] Completed: 117
+[17:23:12.460] Processing: 128 (54 patches)
+[17:23:12.491] 🔀 Using Test-Time Augmentation for 128
+[17:23:26.281] Completed: 128
+[17:23:26.281] Processing: 134 (54 patches)
+[17:23:26.301] 🔀 Using Test-Time Augmentation for 134
+[17:23:40.062] Completed: 134
+[17:23:40.062] Processing: 138 (54 patches)
+[17:23:40.084] 🔀 Using Test-Time Augmentation for 138
+[17:23:53.967] Completed: 138
+[17:23:53.967] Processing: 142 (54 patches)
+[17:23:53.995] 🔀 Using Test-Time Augmentation for 142
+[17:24:07.775] Completed: 142
+[17:24:07.775] Processing: 159 (54 patches)
+[17:24:07.802] 🔀 Using Test-Time Augmentation for 159
+[17:24:21.653] Completed: 159
+[17:24:21.654] Processing: 166 (54 patches)
+[17:24:21.672] 🔀 Using Test-Time Augmentation for 166
+[17:24:35.339] Completed: 166
+[17:24:35.340] Processing: 185 (54 patches)
+[17:24:35.365] 🔀 Using Test-Time Augmentation for 185
+[17:24:48.991] Completed: 185
+[17:24:48.991] Processing: 200 (54 patches)
+[17:24:49.009] 🔀 Using Test-Time Augmentation for 200
+[17:25:02.646] Completed: 200
+[17:25:02.647] Processing: 203 (54 patches)
+[17:25:02.676] 🔀 Using Test-Time Augmentation for 203
+[17:25:16.128] Completed: 203
+[17:25:16.129] Processing: 208 (54 patches)
+[17:25:16.161] 🔀 Using Test-Time Augmentation for 208
+[17:25:29.775] Completed: 208
+[17:25:29.775] Processing: 229 (54 patches)
+[17:25:29.792] 🔀 Using Test-Time Augmentation for 229
+[17:25:43.214] Completed: 229
+[17:25:43.214] Processing: 230 (54 patches)
+[17:25:43.237] 🔀 Using Test-Time Augmentation for 230
+[17:25:56.498] Completed: 230
+[17:25:56.499] Processing: 235 (54 patches)
+[17:25:56.526] 🔀 Using Test-Time Augmentation for 235
+[17:26:09.941] Completed: 235
+[17:26:09.941] Processing: 236 (54 patches)
+[17:26:09.984] 🔀 Using Test-Time Augmentation for 236
+[17:26:23.551] Completed: 236
+[17:26:23.551] Processing: 248 (54 patches)
+[17:26:23.571] 🔀 Using Test-Time Augmentation for 248
+[17:26:37.210] Completed: 248
+[17:26:37.210] Processing: 249 (54 patches)
+[17:26:37.244] 🔀 Using Test-Time Augmentation for 249
+[17:26:51.044] Completed: 249
+[17:26:51.044] Processing: 250 (54 patches)
+[17:26:51.065] 🔀 Using Test-Time Augmentation for 250
+[17:27:04.976] Completed: 250
+[17:27:04.976] Processing: 251 (54 patches)
+[17:27:05.002] 🔀 Using Test-Time Augmentation for 251
+[17:27:18.523] Completed: 251
+[17:27:18.523] Processing: 252 (54 patches)
+[17:27:18.543] 🔀 Using Test-Time Augmentation for 252
+[17:27:32.079] Completed: 252
+[17:27:32.079] Processing: 275 (54 patches)
+[17:27:32.107] 🔀 Using Test-Time Augmentation for 275
+[17:27:45.471] Completed: 275
+[17:27:45.471] Processing: 277 (54 patches)
+[17:27:45.490] 🔀 Using Test-Time Augmentation for 277
+[17:27:59.071] Completed: 277
+[17:27:59.071] Processing: 297 (54 patches)
+[17:27:59.098] 🔀 Using Test-Time Augmentation for 297
+[17:28:12.676] Completed: 297
+[17:28:12.676] 
 Per-class metrics:
-[02:11:51.238] --------------------------------------------------------------------------------
-[02:11:51.238] Background     : Precision=0.9968, Recall=0.9931, F1=0.9950, IoU=0.9900
-[02:11:51.238] Paratext       : Precision=0.8736, Recall=0.7763, F1=0.8221, IoU=0.6980
-[02:11:51.238] Decoration     : Precision=0.9235, Recall=0.9380, F1=0.9307, IoU=0.8704
-[02:11:51.238] Main Text      : Precision=0.8650, Recall=0.9583, F1=0.9093, IoU=0.8336
-[02:11:51.238] Title          : Precision=0.8835, Recall=0.8188, F1=0.8499, IoU=0.7390
-[02:11:51.239] Chapter Headings: Precision=0.8852, Recall=0.5985, F1=0.7142, IoU=0.5554
-[02:11:51.239] 
+[17:28:12.676] --------------------------------------------------------------------------------
+[17:28:12.676] Background     : Precision=0.9852, Recall=0.9886, F1=0.9869, IoU=0.9741
+[17:28:12.676] Paratext       : Precision=0.7540, Recall=0.6923, F1=0.7218, IoU=0.5647
+[17:28:12.676] Decoration     : Precision=0.8013, Recall=0.7668, F1=0.7837, IoU=0.6443
+[17:28:12.676] Main Text      : Precision=0.8198, Recall=0.8143, F1=0.8170, IoU=0.6907
+[17:28:12.676] Title          : Precision=0.8369, Recall=0.8285, F1=0.8327, IoU=0.7133
+[17:28:12.676] Chapter Headings: Precision=0.8453, Recall=0.4926, F1=0.6225, IoU=0.4519
+[17:28:12.676] 
 Mean metrics:
-[02:11:51.239] ----------------------------------------
-[02:11:51.239] Mean Precision: 0.9046
-[02:11:51.239] Mean Recall: 0.8472
-[02:11:51.239] Mean F1: 0.8702
-[02:11:51.239] Mean IoU: 0.7811
-[02:11:51.239] Inference completed on 30 images
-[02:16:37.408] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin14396', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[02:16:37.409] Testing with checkpoint: best_model_latest.pth
-[02:16:37.438] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin14396/predictions
-[02:16:37.439] Starting inference on UDIADS_BIB dataset
-[02:16:37.582] Found 1620 patches for Latin14396
-[02:16:37.584] Processing: 014 (54 patches)
-[02:16:43.476] Completed: 014
-[02:16:43.477] Processing: 032 (54 patches)
-[02:16:47.610] Completed: 032
-[02:16:47.610] Processing: 034 (54 patches)
-[02:16:51.752] Completed: 034
-[02:16:51.752] Processing: 036 (54 patches)
-[02:16:56.054] Completed: 036
-[02:16:56.055] Processing: 038 (54 patches)
-[02:17:00.466] Completed: 038
-[02:17:00.466] Processing: 047 (54 patches)
-[02:17:04.594] Completed: 047
-[02:17:04.594] Processing: 060 (54 patches)
-[02:17:08.602] Completed: 060
-[02:17:08.602] Processing: 085 (54 patches)
-[02:17:12.555] Completed: 085
-[02:17:12.555] Processing: 087 (54 patches)
-[02:17:16.835] Completed: 087
-[02:17:16.836] Processing: 104 (54 patches)
-[02:17:21.143] Completed: 104
-[02:17:21.143] Processing: 105 (54 patches)
-[02:17:25.309] Completed: 105
-[02:17:25.310] Processing: 108 (54 patches)
-[02:17:29.433] Completed: 108
-[02:17:29.433] Processing: 110 (54 patches)
-[02:17:33.415] Completed: 110
-[02:17:33.415] Processing: 136 (54 patches)
-[02:17:37.525] Completed: 136
-[02:17:37.525] Processing: 169 (54 patches)
-[02:17:41.657] Completed: 169
-[02:17:41.657] Processing: 195 (54 patches)
-[02:17:45.585] Completed: 195
-[02:17:45.585] Processing: 196 (54 patches)
-[02:17:50.004] Completed: 196
-[02:17:50.004] Processing: 198 (54 patches)
-[02:17:54.006] Completed: 198
-[02:17:54.007] Processing: 204 (54 patches)
-[02:17:57.968] Completed: 204
-[02:17:57.968] Processing: 223 (54 patches)
-[02:18:01.771] Completed: 223
-[02:18:01.772] Processing: 225 (54 patches)
-[02:18:05.621] Completed: 225
-[02:18:05.621] Processing: 227 (54 patches)
-[02:18:09.379] Completed: 227
-[02:18:09.380] Processing: 229 (54 patches)
-[02:18:13.312] Completed: 229
-[02:18:13.312] Processing: 251 (54 patches)
-[02:18:17.422] Completed: 251
-[02:18:17.422] Processing: 253 (54 patches)
-[02:18:21.465] Completed: 253
-[02:18:21.466] Processing: 255 (54 patches)
-[02:18:25.592] Completed: 255
-[02:18:25.593] Processing: 264 (54 patches)
-[02:18:29.643] Completed: 264
-[02:18:29.644] Processing: 270 (54 patches)
-[02:18:33.863] Completed: 270
-[02:18:33.864] Processing: 276 (54 patches)
-[02:18:38.176] Completed: 276
-[02:18:38.176] Processing: 325 (54 patches)
-[02:18:42.421] Completed: 325
-[02:18:42.421] 
+[17:28:12.676] ----------------------------------------
+[17:28:12.677] Mean Precision: 0.8404
+[17:28:12.677] Mean Recall: 0.7639
+[17:28:12.677] Mean F1: 0.7941
+[17:28:12.677] Mean IoU: 0.6732
+[17:28:12.677] Inference completed on 30 images
+[20:47:10.728] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./Results/a2/Latin2', yaml='swintiny', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[20:47:10.728] Testing with checkpoint: best_model_latest.pth
+[20:47:10.729] Saving predictions to: ./Results/a2/Latin2/predictions
+[20:47:10.729] Starting inference on UDIADS_BIB dataset
+[20:47:10.941] Found 1620 patches for Latin2
+[20:47:10.945] Processing: 076 (54 patches)
+[20:47:10.994] 🔀 Using Test-Time Augmentation for 076
+[20:47:19.218] Completed: 076
+[20:47:19.219] Processing: 079 (54 patches)
+[20:47:19.263] 🔀 Using Test-Time Augmentation for 079
+[20:47:26.384] Completed: 079
+[20:47:26.385] Processing: 082 (54 patches)
+[20:47:26.461] 🔀 Using Test-Time Augmentation for 082
+[20:47:33.660] Completed: 082
+[20:47:33.660] Processing: 095 (54 patches)
+[20:47:33.688] 🔀 Using Test-Time Augmentation for 095
+[20:47:40.744] Completed: 095
+[20:47:40.744] Processing: 106 (54 patches)
+[20:47:40.766] 🔀 Using Test-Time Augmentation for 106
+[20:47:47.599] Completed: 106
+[20:47:47.599] Processing: 111 (54 patches)
+[20:47:47.622] 🔀 Using Test-Time Augmentation for 111
+[20:47:54.465] Completed: 111
+[20:47:54.465] Processing: 115 (54 patches)
+[20:47:54.487] 🔀 Using Test-Time Augmentation for 115
+[20:48:01.056] Completed: 115
+[20:48:01.056] Processing: 117 (54 patches)
+[20:48:01.072] 🔀 Using Test-Time Augmentation for 117
+[20:48:07.561] Completed: 117
+[20:48:07.562] Processing: 128 (54 patches)
+[20:48:07.587] 🔀 Using Test-Time Augmentation for 128
+[20:48:14.073] Completed: 128
+[20:48:14.073] Processing: 134 (54 patches)
+[20:48:14.095] 🔀 Using Test-Time Augmentation for 134
+[20:48:20.576] Completed: 134
+[20:48:20.576] Processing: 138 (54 patches)
+[20:48:20.599] 🔀 Using Test-Time Augmentation for 138
+[20:48:27.051] Completed: 138
+[20:48:27.052] Processing: 142 (54 patches)
+[20:48:27.078] 🔀 Using Test-Time Augmentation for 142
+[20:48:33.461] Completed: 142
+[20:48:33.461] Processing: 159 (54 patches)
+[20:48:33.495] 🔀 Using Test-Time Augmentation for 159
+[20:48:39.974] Completed: 159
+[20:48:39.975] Processing: 166 (54 patches)
+[20:48:39.991] 🔀 Using Test-Time Augmentation for 166
+[20:48:46.621] Completed: 166
+[20:48:46.621] Processing: 185 (54 patches)
+[20:48:46.642] 🔀 Using Test-Time Augmentation for 185
+[20:48:53.366] Completed: 185
+[20:48:53.366] Processing: 200 (54 patches)
+[20:48:53.395] 🔀 Using Test-Time Augmentation for 200
+[20:49:00.041] Completed: 200
+[20:49:00.041] Processing: 203 (54 patches)
+[20:49:00.078] 🔀 Using Test-Time Augmentation for 203
+[20:49:06.986] Completed: 203
+[20:49:06.986] Processing: 208 (54 patches)
+[20:49:07.018] 🔀 Using Test-Time Augmentation for 208
+[20:49:13.455] Completed: 208
+[20:49:13.455] Processing: 229 (54 patches)
+[20:49:13.491] 🔀 Using Test-Time Augmentation for 229
+[20:49:19.819] Completed: 229
+[20:49:19.819] Processing: 230 (54 patches)
+[20:49:19.858] 🔀 Using Test-Time Augmentation for 230
+[20:49:26.458] Completed: 230
+[20:49:26.458] Processing: 235 (54 patches)
+[20:49:26.487] 🔀 Using Test-Time Augmentation for 235
+[20:49:32.888] Completed: 235
+[20:49:32.888] Processing: 236 (54 patches)
+[20:49:32.919] 🔀 Using Test-Time Augmentation for 236
+[20:49:39.543] Completed: 236
+[20:49:39.543] Processing: 248 (54 patches)
+[20:49:39.562] 🔀 Using Test-Time Augmentation for 248
+[20:49:45.974] Completed: 248
+[20:49:45.974] Processing: 249 (54 patches)
+[20:49:46.008] 🔀 Using Test-Time Augmentation for 249
+[20:49:52.527] Completed: 249
+[20:49:52.528] Processing: 250 (54 patches)
+[20:49:52.563] 🔀 Using Test-Time Augmentation for 250
+[20:49:59.132] Completed: 250
+[20:49:59.133] Processing: 251 (54 patches)
+[20:49:59.164] 🔀 Using Test-Time Augmentation for 251
+[20:50:05.690] Completed: 251
+[20:50:05.690] Processing: 252 (54 patches)
+[20:50:05.710] 🔀 Using Test-Time Augmentation for 252
+[20:50:12.187] Completed: 252
+[20:50:12.187] Processing: 275 (54 patches)
+[20:50:12.207] 🔀 Using Test-Time Augmentation for 275
+[20:50:18.661] Completed: 275
+[20:50:18.662] Processing: 277 (54 patches)
+[20:50:18.688] 🔀 Using Test-Time Augmentation for 277
+[20:50:25.188] Completed: 277
+[20:50:25.188] Processing: 297 (54 patches)
+[20:50:25.210] 🔀 Using Test-Time Augmentation for 297
+[20:50:31.667] Completed: 297
+[20:50:31.667] 
 Per-class metrics:
-[02:18:42.421] --------------------------------------------------------------------------------
-[02:18:42.421] Background     : Precision=0.9939, Recall=0.9933, F1=0.9936, IoU=0.9873
-[02:18:42.421] Paratext       : Precision=0.6630, Recall=0.3987, F1=0.4979, IoU=0.3315
-[02:18:42.421] Decoration     : Precision=0.9359, Recall=0.9677, F1=0.9516, IoU=0.9076
-[02:18:42.421] Main Text      : Precision=0.9150, Recall=0.9376, F1=0.9262, IoU=0.8625
-[02:18:42.421] Title          : Precision=0.8959, Recall=0.8430, F1=0.8686, IoU=0.7678
-[02:18:42.421] Chapter Headings: Precision=0.9111, Recall=0.6769, F1=0.7767, IoU=0.6350
-[02:18:42.421] 
+[20:50:31.667] --------------------------------------------------------------------------------
+[20:50:31.667] Background     : Precision=0.9737, Recall=0.9738, F1=0.9737, IoU=0.9488
+[20:50:31.667] Paratext       : Precision=0.6613, Recall=0.6648, F1=0.6631, IoU=0.4960
+[20:50:31.667] Decoration     : Precision=0.6985, Recall=0.7346, F1=0.7161, IoU=0.5577
+[20:50:31.667] Main Text      : Precision=0.5983, Recall=0.6407, F1=0.6188, IoU=0.4480
+[20:50:31.667] Title          : Precision=0.7075, Recall=0.5892, F1=0.6430, IoU=0.4738
+[20:50:31.667] Chapter Headings: Precision=0.6667, Recall=0.2361, F1=0.3488, IoU=0.2112
+[20:50:31.667] 
 Mean metrics:
-[02:18:42.421] ----------------------------------------
-[02:18:42.421] Mean Precision: 0.8858
-[02:18:42.421] Mean Recall: 0.8029
-[02:18:42.421] Mean F1: 0.8358
-[02:18:42.422] Mean IoU: 0.7486
-[02:18:42.422] Inference completed on 30 images
-[04:19:29.323] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin14396', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[04:19:29.323] Testing with checkpoint: best_model_latest.pth
-[04:19:29.324] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin14396/predictions
-[04:19:29.324] Starting inference on UDIADS_BIB dataset
-[04:19:29.471] Found 1620 patches for Latin14396
-[04:19:29.473] Processing: 014 (54 patches)
-[04:19:33.433] Completed: 014
-[04:19:33.434] Processing: 032 (54 patches)
-[04:19:36.661] Completed: 032
-[04:19:36.661] Processing: 034 (54 patches)
-[04:19:39.896] Completed: 034
-[04:19:39.896] Processing: 036 (54 patches)
-[04:19:43.184] Completed: 036
-[04:19:43.184] Processing: 038 (54 patches)
-[04:19:46.699] Completed: 038
-[04:19:46.699] Processing: 047 (54 patches)
-[04:19:49.872] Completed: 047
-[04:19:49.872] Processing: 060 (54 patches)
-[04:19:53.104] Completed: 060
-[04:19:53.104] Processing: 085 (54 patches)
-[04:19:56.297] Completed: 085
-[04:19:56.298] Processing: 087 (54 patches)
-[04:19:59.547] Completed: 087
-[04:19:59.547] Processing: 104 (54 patches)
-[04:20:02.918] Completed: 104
-[04:20:02.918] Processing: 105 (54 patches)
-[04:20:06.302] Completed: 105
-[04:20:06.302] Processing: 108 (54 patches)
-[04:20:09.611] Completed: 108
-[04:20:09.611] Processing: 110 (54 patches)
-[04:20:12.937] Completed: 110
-[04:20:12.937] Processing: 136 (54 patches)
-[04:20:16.202] Completed: 136
-[04:20:16.202] Processing: 169 (54 patches)
-[04:20:19.482] Completed: 169
-[04:20:19.482] Processing: 195 (54 patches)
-[04:20:22.726] Completed: 195
-[04:20:22.726] Processing: 196 (54 patches)
-[04:20:26.247] Completed: 196
-[04:20:26.247] Processing: 198 (54 patches)
-[04:20:29.458] Completed: 198
-[04:20:29.458] Processing: 204 (54 patches)
-[04:20:32.677] Completed: 204
-[04:20:32.677] Processing: 223 (54 patches)
-[04:20:35.913] Completed: 223
-[04:20:35.913] Processing: 225 (54 patches)
-[04:20:39.070] Completed: 225
-[04:20:39.070] Processing: 227 (54 patches)
-[04:20:42.198] Completed: 227
-[04:20:42.198] Processing: 229 (54 patches)
-[04:20:45.348] Completed: 229
-[04:20:45.348] Processing: 251 (54 patches)
-[04:20:48.458] Completed: 251
-[04:20:48.458] Processing: 253 (54 patches)
-[04:20:51.599] Completed: 253
-[04:20:51.599] Processing: 255 (54 patches)
-[04:20:54.783] Completed: 255
-[04:20:54.783] Processing: 264 (54 patches)
-[04:20:57.998] Completed: 264
-[04:20:57.998] Processing: 270 (54 patches)
-[04:21:01.268] Completed: 270
-[04:21:01.268] Processing: 276 (54 patches)
-[04:21:04.535] Completed: 276
-[04:21:04.535] Processing: 325 (54 patches)
-[04:21:07.919] Completed: 325
-[04:21:07.919] 
+[20:50:31.668] ----------------------------------------
+[20:50:31.668] Mean Precision: 0.7177
+[20:50:31.668] Mean Recall: 0.6399
+[20:50:31.668] Mean F1: 0.6606
+[20:50:31.668] Mean IoU: 0.5226
+[20:50:31.668] Inference completed on 30 images
+[01:49:41.806] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./Results/a2/Latin2', yaml='swintiny', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, multiscale=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
+[01:49:41.806] Testing with checkpoint: best_model_latest.pth
+[01:49:41.808] Saving predictions to: ./Results/a2/Latin2/predictions
+[01:49:41.808] 
+[01:49:41.808] === Starting Testing ===
+[01:49:41.808] Dataset: UDIADS_BIB
+[01:49:41.808] Model: swinunet
+[01:49:41.808] Manuscript: Latin2
+[01:49:41.808] TEST-TIME AUGMENTATION (TTA): ENABLED
+[01:49:41.808]   → TTA applies 8 augmentations (original, hflip, vflip, hflip+vflip, rot90/180/270, rot90+hflip) and averages predictions
+[01:49:41.808]   → Improves accuracy especially for rare classes but increases inference time by ~8x
+[01:49:41.808] MULTI-SCALE TESTING: ENABLED
+[01:49:41.808]   → Multi-scale testing runs inference at 3 scales (0.75x, 1.0x, 1.25x) and averages predictions
+[01:49:41.809]   → Improves accuracy for documents with varying text sizes (1-3% improvement)
+[01:49:41.809]   → Combined with TTA: ~24x slower but maximum accuracy
+[01:49:41.809] Save predictions: True
+[01:49:41.809] 
+[01:49:41.809] Starting inference on UDIADS_BIB dataset
+[01:49:42.041] Found 1620 patches for Latin2
+[01:49:42.043] Processing: 076 (54 patches)
+[01:49:42.095] Using Test-Time Augmentation for 076
+[01:49:43.616] ERROR: Testing failed: Input image size (4*168) doesn't match model (224*224).
+[01:49:43.656] Traceback (most recent call last):
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 965, in main
+    result = inference(args, model, test_save_path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 814, in inference
+    pred_full = stitch_patches(
+                ^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 619, in stitch_patches
+    probs_patch = predict_patch_multiscale(probs_patch_tta_tensor, model, use_amp=use_amp)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 546, in predict_patch_multiscale
+    output = model(scaled_tensor.to(device))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
+    logits = self.swin_unet(x)
+             ^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
+    x, x_downsample = self.forward_features(x)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
+    x = self.patch_embed(x)
+        ^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
+    assert H == self.img_size[0] and W == self.img_size[1], \
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Input image size (4*168) doesn't match model (224*224).
+
+[02:05:15.832] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[02:05:15.833] 
+[02:05:16.025] Found 1620 patches
+[02:05:16.030] Processing: 076
+[02:05:16.264] ERROR: Testing failed: Input image size (168*168) doesn't match model (224*224).
+[02:05:16.268] Traceback (most recent call last):
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 961, in main
+    result = inference(args, model, test_save_path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 838, in inference
+    pred_full = stitch_patches(
+                ^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 646, in stitch_patches
+    probs_patch = predict_patch_with_tta_and_multiscale(patch_tensor_single, model, use_amp=use_amp)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 579, in predict_patch_with_tta_and_multiscale
+    probs_tta = predict_patch_with_tta(scaled_tensor, model, use_amp=use_amp)  # Returns (C, H, W) numpy array
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 495, in predict_patch_with_tta
+    output = model(transformed.to(device))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
+    logits = self.swin_unet(x)
+             ^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
+    x, x_downsample = self.forward_features(x)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
+    x = self.patch_embed(x)
+        ^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
+    assert H == self.img_size[0] and W == self.img_size[1], \
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Input image size (168*168) doesn't match model (224*224).
+
+[02:05:25.036] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[02:05:25.037] 
+[02:05:25.272] Found 1620 patches
+[02:05:25.276] Processing: 014
+[02:05:25.992] ERROR: Testing failed: Input image size (168*168) doesn't match model (224*224).
+[02:05:25.997] Traceback (most recent call last):
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 961, in main
+    result = inference(args, model, test_save_path)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 838, in inference
+    pred_full = stitch_patches(
+                ^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 646, in stitch_patches
+    probs_patch = predict_patch_with_tta_and_multiscale(patch_tensor_single, model, use_amp=use_amp)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 579, in predict_patch_with_tta_and_multiscale
+    probs_tta = predict_patch_with_tta(scaled_tensor, model, use_amp=use_amp)  # Returns (C, H, W) numpy array
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 495, in predict_patch_with_tta
+    output = model(transformed.to(device))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
+    logits = self.swin_unet(x)
+             ^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
+    x, x_downsample = self.forward_features(x)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
+    x = self.patch_embed(x)
+        ^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
+    assert H == self.img_size[0] and W == self.img_size[1], \
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: Input image size (168*168) doesn't match model (224*224).
+
+[02:08:43.893] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[02:08:43.893] 
+[02:08:44.062] Found 1620 patches
+[02:08:44.067] Processing: 076
+[02:09:09.960] Processing: 079
+[02:09:38.424] Processing: 082
+[02:10:02.678] Processing: 095
+[02:10:26.968] Processing: 106
+[02:10:52.362] Processing: 111
+[02:11:16.654] Processing: 115
+[02:11:40.942] Processing: 117
+[02:12:05.358] Processing: 128
+[02:12:29.182] Processing: 134
+[02:12:52.989] Processing: 138
+[02:13:16.814] Processing: 142
+[02:13:41.025] Processing: 159
+[02:14:05.678] Processing: 166
+[02:14:30.303] Processing: 185
+[02:14:54.749] Processing: 200
+[02:15:18.870] Processing: 203
+[02:15:43.144] Processing: 208
+[02:16:08.176] Processing: 229
+[02:16:33.379] Processing: 230
+[02:16:57.493] Processing: 235
+| TTA: ON | Multi-scale: ON
+[02:16:34.259] 
+[02:16:34.418] Found 1620 patches
+[02:16:34.419] Processing: 076
+[02:16:58.229] Processing: 079
+[02:17:21.188] Processing: 082
+[02:17:44.027] Processing: 095
+[02:18:07.054] Processing: 106
+[02:18:30.595] Processing: 111
+[02:18:53.797] Processing: 115
+[02:19:16.930] Processing: 117
+[02:19:40.073] Processing: 128
+[02:20:03.185] Processing: 134
+[02:20:26.250] Processing: 138
+[02:20:49.567] Processing: 142
+[02:21:12.804] Processing: 159
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [02:21:35.943] Processing: 166
+                                                                                                                 [02:21:59.065] Processing: 185
+[02:22:22.196] Processing: 200
+[02:22:45.386] Processing: 203
+[02:23:08.766] Processing: 208
+[02:23:31.726] Processing: 229
+[02:23:54.731] Processing: 230
+[02:24:17.650] Processing: 235
+[02:24:40.539] Processing: 236
+[02:25:03.734] Processing: 248
+[02:25:26.643] Processing: 249
+[02:25:49.745] Processing: 250
+[02:26:12.841] Processing: 251
+[02:26:35.890] Processing: 252
+[02:26:58.982] Processing: 275
+[02:27:22.089] Processing: 277
+[02:27:45.700] Processing: 297
+[02:28:08.801] 
 Per-class metrics:
-[04:21:07.919] --------------------------------------------------------------------------------
-[04:21:07.919] Background     : Precision=0.9951, Recall=0.9957, F1=0.9954, IoU=0.9908
-[04:21:07.919] Paratext       : Precision=0.6817, Recall=0.5020, F1=0.5782, IoU=0.4067
-[04:21:07.919] Decoration     : Precision=0.9620, Recall=0.9684, F1=0.9652, IoU=0.9327
-[04:21:07.919] Main Text      : Precision=0.9397, Recall=0.9507, F1=0.9452, IoU=0.8960
-[04:21:07.919] Title          : Precision=0.9145, Recall=0.9118, F1=0.9132, IoU=0.8402
-[04:21:07.919] Chapter Headings: Precision=0.9418, Recall=0.7310, F1=0.8231, IoU=0.6994
-[04:21:07.919] 
+[02:28:08.801] --------------------------------------------------------------------------------
+[02:28:08.801] Background     : Precision=0.9917, Recall=0.9960, F1=0.9938, IoU=0.9877
+[02:28:08.801] Paratext       : Precision=0.8837, Recall=0.7383, F1=0.8045, IoU=0.6729
+[02:28:08.801] Decoration     : Precision=0.9191, Recall=0.9173, F1=0.9182, IoU=0.8487
+[02:28:08.801] Main Text      : Precision=0.9238, Recall=0.8778, F1=0.9002, IoU=0.8185
+[02:28:08.801] Title          : Precision=0.8403, Recall=0.8839, F1=0.8615, IoU=0.7567
+[02:28:08.801] Chapter Headings: Precision=0.9104, Recall=0.6700, F1=0.7719, IoU=0.6286
+[02:28:08.801] 
 Mean metrics:
-[04:21:07.919] ----------------------------------------
-[04:21:07.919] Mean Precision: 0.9058
-[04:21:07.919] Mean Recall: 0.8433
-[04:21:07.919] Mean F1: 0.8700
-[04:21:07.920] Mean IoU: 0.7943
-[04:21:07.920] Inference completed on 30 images
-[06:18:06.376] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin16746', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin16746', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[06:18:06.376] Testing with checkpoint: best_model_latest.pth
-[06:18:06.413] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Latin16746/predictions
-[06:18:06.414] Starting inference on UDIADS_BIB dataset
-[06:18:06.568] Found 1620 patches for Latin16746
-[06:18:06.570] Processing: 009 (54 patches)
-[06:18:11.187] Completed: 009
-[06:18:11.188] Processing: 020 (54 patches)
-[06:18:15.186] Completed: 020
-[06:18:15.186] Processing: 022 (54 patches)
-[06:18:19.251] Completed: 022
-[06:18:19.251] Processing: 029 (54 patches)
-[06:18:23.207] Completed: 029
-[06:18:23.207] Processing: 035 (54 patches)
-[06:18:27.162] Completed: 035
-[06:18:27.162] Processing: 048 (54 patches)
-[06:18:31.045] Completed: 048
-[06:18:31.045] Processing: 069 (54 patches)
-[06:18:35.080] Completed: 069
-[06:18:35.080] Processing: 082 (54 patches)
-[06:18:38.793] Completed: 082
-[06:18:38.793] Processing: 088 (54 patches)
-[06:18:42.796] Completed: 088
-[06:18:42.796] Processing: 089 (54 patches)
-[06:18:47.044] Completed: 089
-[06:18:47.044] Processing: 091 (54 patches)
-[06:18:51.063] Completed: 091
-[06:18:51.063] Processing: 100 (54 patches)
-[06:18:55.349] Completed: 100
-[06:18:55.349] Processing: 106 (54 patches)
-[06:18:59.433] Completed: 106
-[06:18:59.433] Processing: 117 (54 patches)
-[06:19:03.490] Completed: 117
-[06:19:03.490] Processing: 123 (54 patches)
-[06:19:07.433] Completed: 123
-[06:19:07.433] Processing: 125 (54 patches)
-[06:19:11.384] Completed: 125
-[06:19:11.384] Processing: 130 (54 patches)
-[06:19:15.622] Completed: 130
-[06:19:15.622] Processing: 133 (54 patches)
-[06:19:19.335] Completed: 133
-[06:19:19.335] Processing: 137 (54 patches)
-[06:19:23.328] Completed: 137
-[06:19:23.328] Processing: 146 (54 patches)
-[06:19:27.175] Completed: 146
-[06:19:27.175] Processing: 166 (54 patches)
-[06:19:30.960] Completed: 166
-[06:19:30.960] Processing: 184 (54 patches)
-[06:19:34.770] Completed: 184
-[06:19:34.770] Processing: 215 (54 patches)
-[06:19:38.726] Completed: 215
-[06:19:38.726] Processing: 237 (54 patches)
-[06:19:42.601] Completed: 237
-[06:19:42.601] Processing: 243 (54 patches)
-[06:19:46.284] Completed: 243
-[06:19:46.284] Processing: 255 (54 patches)
-[06:19:50.394] Completed: 255
-[06:19:50.394] Processing: 258 (54 patches)
-[06:19:54.235] Completed: 258
-[06:19:54.235] Processing: 284 (54 patches)
-[06:19:58.042] Completed: 284
-[06:19:58.043] Processing: 325 (54 patches)
-[06:20:01.930] Completed: 325
-[06:20:01.930] Processing: 357 (54 patches)
-[06:20:05.880] Completed: 357
-[06:20:05.880] 
-Per-class metrics:
-[06:20:05.880] --------------------------------------------------------------------------------
-[06:20:05.880] Background     : Precision=0.9947, Recall=0.9955, F1=0.9951, IoU=0.9902
-[06:20:05.880] Paratext       : Precision=0.8674, Recall=0.8523, F1=0.8598, IoU=0.7540
-[06:20:05.880] Decoration     : Precision=0.9861, Recall=0.9614, F1=0.9736, IoU=0.9486
-[06:20:05.880] Main Text      : Precision=0.9541, Recall=0.9629, F1=0.9585, IoU=0.9203
-[06:20:05.880] Title          : Precision=0.9052, Recall=0.8804, F1=0.8926, IoU=0.8061
-[06:20:05.880] Chapter Headings: Precision=0.9444, Recall=0.8797, F1=0.9109, IoU=0.8364
-[06:20:05.880] 
-Mean metrics:
-[06:20:05.881] ----------------------------------------
-[06:20:05.881] Mean Precision: 0.9420
-[06:20:05.881] Mean Recall: 0.9220
-[06:20:05.881] Mean F1: 0.9317
-[06:20:05.881] Mean IoU: 0.8759
-[06:20:05.881] Inference completed on 30 images
-[12:47:53.357] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341', model='swinunet', dataset='UDIADS_BIB', manuscript='Syr341', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[12:47:53.358] Testing with checkpoint: best_model_latest.pth
-[12:47:53.402] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341/predictions
-[12:47:53.402] Starting inference on UDIADS_BIB dataset
-[12:47:53.634] Found 1620 patches for Syr341
-[12:47:53.637] Processing: 031 (54 patches)
-[12:47:58.593] Completed: 031
-[12:47:58.610] Processing: 053 (54 patches)
-[12:48:02.874] Completed: 053
-[12:48:02.874] Processing: 054 (54 patches)
-[12:48:07.035] Completed: 054
-[12:48:07.035] Processing: 071 (54 patches)
-[12:48:12.026] Completed: 071
-[12:48:12.026] Processing: 073 (54 patches)
-[12:48:16.986] Completed: 073
-[12:48:16.986] Processing: 075 (54 patches)
-[12:48:21.357] Completed: 075
-[12:48:21.357] Processing: 100 (54 patches)
-[12:48:25.416] Completed: 100
-[12:48:25.416] Processing: 137 (54 patches)
-[12:48:29.599] Completed: 137
-[12:48:29.599] Processing: 150 (54 patches)
-[12:48:33.590] Completed: 150
-[12:48:33.590] Processing: 160 (54 patches)
-[12:48:37.832] Completed: 160
-[12:48:37.832] Processing: 167 (54 patches)
-[12:48:42.012] Completed: 167
-[12:48:42.012] Processing: 184 (54 patches)
-[12:48:46.155] Completed: 184
-[12:48:46.155] Processing: 190 (54 patches)
-[12:48:50.376] Completed: 190
-[12:48:50.376] Processing: 201 (54 patches)
-[12:48:54.652] Completed: 201
-[12:48:54.652] Processing: 210 (54 patches)
-[12:48:58.932] Completed: 210
-[12:48:58.932] Processing: 222 (54 patches)
-[12:49:03.064] Completed: 222
-[12:49:03.065] Processing: 224 (54 patches)
-[12:49:07.240] Completed: 224
-[12:49:07.240] Processing: 231 (54 patches)
-[12:49:11.196] Completed: 231
-[12:49:11.196] Processing: 241 (54 patches)
-[12:49:14.922] Completed: 241
-[12:49:14.923] Processing: 249 (54 patches)
-[12:49:18.702] Completed: 249
-[12:49:18.702] Processing: 252 (54 patches)
-[12:49:22.470] Completed: 252
-[12:49:22.470] Processing: 267 (54 patches)
-[12:49:26.298] Completed: 267
-[12:49:26.299] Processing: 281 (54 patches)
-[12:49:35.430] Completed: 281
-[12:49:35.431] Processing: 286 (54 patches)
-[12:49:39.234] Completed: 286
-[12:49:39.234] Processing: 290 (54 patches)
-[12:49:43.196] Completed: 290
-[12:49:43.196] Processing: 313 (54 patches)
-[12:49:47.120] Completed: 313
-[12:49:47.120] Processing: 362 (54 patches)
-[12:49:51.056] Completed: 362
-[12:49:51.056] Processing: 368 (54 patches)
-[12:49:54.987] Completed: 368
-[12:49:54.987] Processing: 376 (54 patches)
-[12:49:59.081] Completed: 376
-[12:49:59.082] Processing: 446 (54 patches)
-[12:50:03.040] Completed: 446
-[12:50:03.040] 
-Per-class metrics:
-[12:50:03.040] --------------------------------------------------------------------------------
-[12:50:03.040] Background     : Precision=0.9779, Recall=0.9828, F1=0.9804, IoU=0.9615
-[12:50:03.040] Paratext       : Precision=0.6681, Recall=0.4073, F1=0.5061, IoU=0.3388
-[12:50:03.040] Decoration     : Precision=0.9956, Recall=0.8452, F1=0.9143, IoU=0.8421
-[12:50:03.040] Main Text      : Precision=0.8775, Recall=0.8785, F1=0.8780, IoU=0.7825
-[12:50:03.040] Title          : Precision=0.7013, Recall=0.7358, F1=0.7181, IoU=0.5602
-[12:50:03.040] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[12:50:03.040] 
-Mean metrics:
-[12:50:03.040] ----------------------------------------
-[12:50:03.040] Mean Precision: 0.7034
-[12:50:03.041] Mean Recall: 0.6416
-[12:50:03.041] Mean F1: 0.6661
-[12:50:03.041] Mean IoU: 0.5809
-[12:50:03.041] Inference completed on 30 images
-[13:02:19.900] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341', model='swinunet', dataset='UDIADS_BIB', manuscript='Syr341', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[13:02:19.900] Testing with checkpoint: best_model_latest.pth
-[13:02:19.901] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341/predictions
-[13:02:19.901] Starting inference on UDIADS_BIB dataset
-[13:02:20.019] Found 1620 patches for Syr341
-[13:02:20.021] Processing: 031 (54 patches)
-[13:02:25.638] Completed: 031
-[13:02:25.639] Processing: 053 (54 patches)
-[13:02:28.872] Completed: 053
-[13:02:28.872] Processing: 054 (54 patches)
-[13:02:32.287] Completed: 054
-[13:02:32.287] Processing: 071 (54 patches)
-[13:02:35.851] Completed: 071
-[13:02:35.851] Processing: 073 (54 patches)
-[13:02:39.503] Completed: 073
-[13:02:39.504] Processing: 075 (54 patches)
-[13:02:42.794] Completed: 075
-[13:02:42.795] Processing: 100 (54 patches)
-[13:02:46.741] Completed: 100
-[13:02:46.741] Processing: 137 (54 patches)
-[13:02:50.338] Completed: 137
-[13:02:50.338] Processing: 150 (54 patches)
-[13:02:53.742] Completed: 150
-[13:02:53.742] Processing: 160 (54 patches)
-[13:02:57.047] Completed: 160
-[13:02:57.047] Processing: 167 (54 patches)
-[13:03:00.403] Completed: 167
-[13:03:00.403] Processing: 184 (54 patches)
-[13:03:03.672] Completed: 184
-[13:03:03.672] Processing: 190 (54 patches)
-[13:03:06.994] Completed: 190
-[13:03:06.994] Processing: 201 (54 patches)
-[13:03:10.302] Completed: 201
-[13:03:10.303] Processing: 210 (54 patches)
-[13:03:13.589] Completed: 210
-[13:03:13.589] Processing: 222 (54 patches)
-[13:03:16.888] Completed: 222
-[13:03:16.888] Processing: 224 (54 patches)
-[13:03:20.286] Completed: 224
-[13:03:20.286] Processing: 231 (54 patches)
-[13:03:23.437] Completed: 231
-[13:03:23.437] Processing: 241 (54 patches)
-[13:03:26.586] Completed: 241
-[13:03:26.586] Processing: 249 (54 patches)
-[13:03:29.713] Completed: 249
-[13:03:29.713] Processing: 252 (54 patches)
-[13:03:32.862] Completed: 252
-[13:03:32.862] Processing: 267 (54 patches)
-[13:03:35.982] Completed: 267
-[13:03:35.982] Processing: 281 (54 patches)
-[13:03:39.035] Completed: 281
-[13:03:39.035] Processing: 286 (54 patches)
-[13:03:42.252] Completed: 286
-[13:03:42.252] Processing: 290 (54 patches)
-[13:03:46.000] Completed: 290
-[13:03:46.000] Processing: 313 (54 patches)
-[13:03:49.484] Completed: 313
-[13:03:49.484] Processing: 362 (54 patches)
-[13:03:52.920] Completed: 362
-[13:03:52.920] Processing: 368 (54 patches)
-[13:03:56.245] Completed: 368
-[13:03:56.245] Processing: 376 (54 patches)
-[13:03:59.578] Completed: 376
-[13:03:59.578] Processing: 446 (54 patches)
-[13:04:02.925] Completed: 446
-[13:04:02.925] 
-Per-class metrics:
-[13:04:02.925] --------------------------------------------------------------------------------
-[13:04:02.925] Background     : Precision=0.9779, Recall=0.9828, F1=0.9804, IoU=0.9615
-[13:04:02.925] Paratext       : Precision=0.6681, Recall=0.4073, F1=0.5061, IoU=0.3388
-[13:04:02.925] Decoration     : Precision=0.9956, Recall=0.8452, F1=0.9143, IoU=0.8421
-[13:04:02.925] Main Text      : Precision=0.8775, Recall=0.8785, F1=0.8780, IoU=0.7825
-[13:04:02.925] Title          : Precision=0.7013, Recall=0.7358, F1=0.7181, IoU=0.5602
-[13:04:02.925] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[13:04:02.925] 
-Mean metrics:
-[13:04:02.925] ----------------------------------------
-[13:04:02.925] Mean Precision: 0.7034
-[13:04:02.925] Mean Recall: 0.6416
-[13:04:02.925] Mean F1: 0.6661
-[13:04:02.925] Mean IoU: 0.5809
-[13:04:02.925] Inference completed on 30 images
-[13:11:14.942] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341', model='swinunet', dataset='UDIADS_BIB', manuscript='Syr341', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[13:11:14.942] Testing with checkpoint: best_model_latest.pth
-[13:11:14.943] Saving predictions to: All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_MS/Syr341/predictions
-[13:11:14.943] Starting inference on UDIADS_BIB dataset
-[13:11:15.078] Found 1620 patches for Syr341
-[13:11:15.083] Processing: 031 (54 patches)
-[13:11:20.781] Completed: 031
-[13:11:20.782] Processing: 053 (54 patches)
-[13:11:24.074] Completed: 053
-[13:11:24.074] Processing: 054 (54 patches)
-[13:11:27.285] Completed: 054
-[13:11:27.286] Processing: 071 (54 patches)
-[13:11:30.682] Completed: 071
-[13:11:30.682] Processing: 073 (54 patches)
-[13:11:34.197] Completed: 073
-[13:11:34.197] Processing: 075 (54 patches)
-[13:11:37.426] Completed: 075
-[13:11:37.427] Processing: 100 (54 patches)
-[13:11:40.697] Completed: 100
-[13:11:40.697] Processing: 137 (54 patches)
-[13:11:43.985] Completed: 137
-[13:11:43.985] Processing: 150 (54 patches)
-[13:11:47.275] Completed: 150
-[13:11:47.275] Processing: 160 (54 patches)
-[13:11:50.579] Completed: 160
-[13:11:50.580] Processing: 167 (54 patches)
-[13:11:53.925] Completed: 167
-[13:11:53.925] Processing: 184 (54 patches)
-[13:11:57.311] Completed: 184
-[13:11:57.311] Processing: 190 (54 patches)
-[13:12:00.591] Completed: 190
-[13:12:00.591] Processing: 201 (54 patches)
-[13:12:04.014] Completed: 201
-[13:12:04.014] Processing: 210 (54 patches)
-[13:12:07.277] Completed: 210
-[13:12:07.278] Processing: 222 (54 patches)
-[13:12:10.599] Completed: 222
-[13:12:10.600] Processing: 224 (54 patches)
-[13:12:13.975] Completed: 224
-[13:12:13.975] Processing: 231 (54 patches)
-[13:12:17.051] Completed: 231
-[13:12:17.052] Processing: 241 (54 patches)
-[13:12:20.117] Completed: 241
-[13:12:20.118] Processing: 249 (54 patches)
-[13:12:23.264] Completed: 249
-[13:12:23.264] Processing: 252 (54 patches)
-[13:12:26.449] Completed: 252
-[13:12:26.449] Processing: 267 (54 patches)
-[13:12:29.540] Completed: 267
-[13:12:29.541] Processing: 281 (54 patches)
-[13:12:32.688] Completed: 281
-[13:12:32.688] Processing: 286 (54 patches)
-[13:12:35.782] Completed: 286
-[13:12:35.782] Processing: 290 (54 patches)
-[13:12:38.904] Completed: 290
-[13:12:38.904] Processing: 313 (54 patches)
-[13:12:42.087] Completed: 313
-[13:12:42.087] Processing: 362 (54 patches)
-[13:12:45.340] Completed: 362
-[13:12:45.341] Processing: 368 (54 patches)
-[13:12:48.608] Completed: 368
-[13:12:48.609] Processing: 376 (54 patches)
-[13:12:51.829] Completed: 376
-[13:12:51.829] Processing: 446 (54 patches)
-[13:12:55.094] Completed: 446
-[13:12:55.094] 
-Per-class metrics:
-[13:12:55.094] --------------------------------------------------------------------------------
-[13:12:55.094] Background     : Precision=0.9779, Recall=0.9828, F1=0.9804, IoU=0.9615
-[13:12:55.094] Paratext       : Precision=0.6681, Recall=0.4073, F1=0.5061, IoU=0.3388
-[13:12:55.094] Decoration     : Precision=0.9956, Recall=0.8452, F1=0.9143, IoU=0.8421
-[13:12:55.094] Main Text      : Precision=0.8775, Recall=0.8785, F1=0.8780, IoU=0.7825
-[13:12:55.094] Title          : Precision=0.7013, Recall=0.7358, F1=0.7181, IoU=0.5602
-[13:12:55.094] 
-Mean metrics:
-[13:12:55.094] ----------------------------------------
-[13:12:55.094] Mean Precision: 0.8441
-[13:12:55.094] Mean Recall: 0.7699
-[13:12:55.094] Mean F1: 0.7994
-[13:12:55.094] Mean IoU: 0.6970
-[13:12:55.094] Inference completed on 30 images
-[04:04:45.170] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin2FS', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[04:04:45.170] Testing with checkpoint: best_model_latest.pth
-[04:04:45.172] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin2FS/predictions
-[04:04:45.172] Starting inference on UDIADS_BIB dataset
-[04:04:45.344] Found 1620 patches for Latin2FS
-[04:04:45.346] Processing: 076 (54 patches)
-[04:04:49.661] Completed: 076
-[04:04:49.662] Processing: 079 (54 patches)
-[04:04:53.270] Completed: 079
-[04:04:53.270] Processing: 082 (54 patches)
-[04:04:56.581] Completed: 082
-[04:04:56.581] Processing: 095 (54 patches)
-[04:04:59.977] Completed: 095
-[04:04:59.977] Processing: 106 (54 patches)
-[04:05:03.507] Completed: 106
-[04:05:03.508] Processing: 111 (54 patches)
-[04:05:06.761] Completed: 111
-[04:05:06.762] Processing: 115 (54 patches)
-[04:05:10.053] Completed: 115
-[04:05:10.053] Processing: 117 (54 patches)
-[04:05:13.252] Completed: 117
-[04:05:13.252] Processing: 128 (54 patches)
-[04:05:16.712] Completed: 128
-[04:05:16.712] Processing: 134 (54 patches)
-[04:05:20.130] Completed: 134
-[04:05:20.130] Processing: 138 (54 patches)
-[04:05:23.260] Completed: 138
-[04:05:23.261] Processing: 142 (54 patches)
-[04:05:26.538] Completed: 142
-[04:05:26.538] Processing: 159 (54 patches)
-[04:05:29.849] Completed: 159
-[04:05:29.849] Processing: 166 (54 patches)
-[04:05:33.120] Completed: 166
-[04:05:33.120] Processing: 185 (54 patches)
-[04:05:36.418] Completed: 185
-[04:05:36.418] Processing: 200 (54 patches)
-[04:05:39.744] Completed: 200
-[04:05:39.745] Processing: 203 (54 patches)
-[04:05:43.093] Completed: 203
-[04:05:43.093] Processing: 208 (54 patches)
-[04:05:46.228] Completed: 208
-[04:05:46.228] Processing: 229 (54 patches)
-[04:05:49.457] Completed: 229
-[04:05:49.457] Processing: 230 (54 patches)
-[04:05:52.629] Completed: 230
-[04:05:52.630] Processing: 235 (54 patches)
-[04:05:55.684] Completed: 235
-[04:05:55.684] Processing: 236 (54 patches)
-[04:05:58.799] Completed: 236
-[04:05:58.800] Processing: 248 (54 patches)
-[04:06:02.056] Completed: 248
-[04:06:02.056] Processing: 249 (54 patches)
-[04:06:05.273] Completed: 249
-[04:06:05.273] Processing: 250 (54 patches)
-[04:06:08.525] Completed: 250
-[04:06:08.525] Processing: 251 (54 patches)
-[04:06:11.719] Completed: 251
-[04:06:11.719] Processing: 252 (54 patches)
-[04:06:14.965] Completed: 252
-[04:06:14.965] Processing: 275 (54 patches)
-[04:06:18.284] Completed: 275
-[04:06:18.285] Processing: 277 (54 patches)
-[04:06:21.457] Completed: 277
-[04:06:21.458] Processing: 297 (54 patches)
-[04:06:24.805] Completed: 297
-[04:06:24.806] 
-Per-class metrics:
-[04:06:24.806] --------------------------------------------------------------------------------
-[04:06:24.806] Background     : Precision=0.9936, Recall=0.9955, F1=0.9945, IoU=0.9892
-[04:06:24.806] Paratext       : Precision=0.8192, Recall=0.6773, F1=0.7416, IoU=0.5893
-[04:06:24.806] Decoration     : Precision=0.9026, Recall=0.8807, F1=0.8915, IoU=0.8043
-[04:06:24.806] Main Text      : Precision=0.8714, Recall=0.9107, F1=0.8906, IoU=0.8028
-[04:06:24.806] Title          : Precision=0.8553, Recall=0.7776, F1=0.8146, IoU=0.6872
-[04:06:24.806] Chapter Headings: Precision=0.8876, Recall=0.3517, F1=0.5038, IoU=0.3367
-[04:06:24.806] 
-Mean metrics:
-[04:06:24.806] ----------------------------------------
-[04:06:24.806] Mean Precision: 0.8883
-[04:06:24.806] Mean Recall: 0.7656
-[04:06:24.806] Mean F1: 0.8061
-[04:06:24.806] Mean IoU: 0.7016
-[04:06:24.806] Inference completed on 30 images
-[04:59:03.946] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin14396FS', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[04:59:03.946] Testing with checkpoint: best_model_latest.pth
-[04:59:03.947] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin14396FS/predictions
-[04:59:03.947] Starting inference on UDIADS_BIB dataset
-[04:59:04.073] Found 1620 patches for Latin14396FS
-[04:59:04.074] Processing: 014 (54 patches)
-[04:59:07.173] Completed: 014
-[04:59:07.173] Processing: 032 (54 patches)
-[04:59:09.861] Completed: 032
-[04:59:09.861] Processing: 034 (54 patches)
-[04:59:12.588] Completed: 034
-[04:59:12.589] Processing: 036 (54 patches)
-[04:59:15.339] Completed: 036
-[04:59:15.339] Processing: 038 (54 patches)
-[04:59:18.258] Completed: 038
-[04:59:18.258] Processing: 047 (54 patches)
-[04:59:20.967] Completed: 047
-[04:59:20.967] Processing: 060 (54 patches)
-[04:59:23.677] Completed: 060
-[04:59:23.677] Processing: 085 (54 patches)
-[04:59:26.349] Completed: 085
-[04:59:26.350] Processing: 087 (54 patches)
-[04:59:29.059] Completed: 087
-[04:59:29.059] Processing: 104 (54 patches)
-[04:59:31.781] Completed: 104
-[04:59:31.782] Processing: 105 (54 patches)
-[04:59:34.537] Completed: 105
-[04:59:34.537] Processing: 108 (54 patches)
-[04:59:37.261] Completed: 108
-[04:59:37.261] Processing: 110 (54 patches)
-[04:59:39.973] Completed: 110
-[04:59:39.974] Processing: 136 (54 patches)
-[04:59:42.702] Completed: 136
-[04:59:42.703] Processing: 169 (54 patches)
-[04:59:45.438] Completed: 169
-[04:59:45.439] Processing: 195 (54 patches)
-[04:59:48.107] Completed: 195
-[04:59:48.108] Processing: 196 (54 patches)
-[04:59:50.898] Completed: 196
-[04:59:50.898] Processing: 198 (54 patches)
-[04:59:53.512] Completed: 198
-[04:59:53.512] Processing: 204 (54 patches)
-[04:59:56.151] Completed: 204
-[04:59:56.151] Processing: 223 (54 patches)
-[04:59:58.746] Completed: 223
-[04:59:58.746] Processing: 225 (54 patches)
-[05:00:01.417] Completed: 225
-[05:00:01.417] Processing: 227 (54 patches)
-[05:00:08.487] Completed: 227
-[05:00:08.487] Processing: 229 (54 patches)
-[05:00:11.135] Completed: 229
-[05:00:11.135] Processing: 251 (54 patches)
-[05:00:13.854] Completed: 251
-[05:00:13.855] Processing: 253 (54 patches)
-[05:00:16.556] Completed: 253
-[05:00:16.557] Processing: 255 (54 patches)
-[05:00:19.261] Completed: 255
-[05:00:19.262] Processing: 264 (54 patches)
-[05:00:21.973] Completed: 264
-[05:00:21.973] Processing: 270 (54 patches)
-[05:00:24.713] Completed: 270
-[05:00:24.713] Processing: 276 (54 patches)
-[05:00:27.418] Completed: 276
-[05:00:27.419] Processing: 325 (54 patches)
-[05:00:30.187] Completed: 325
-[05:00:30.187] 
-Per-class metrics:
-[05:00:30.187] --------------------------------------------------------------------------------
-[05:00:30.187] Background     : Precision=0.9934, Recall=0.9947, F1=0.9941, IoU=0.9882
-[05:00:30.187] Paratext       : Precision=0.4476, Recall=0.2686, F1=0.3358, IoU=0.2017
-[05:00:30.187] Decoration     : Precision=0.9549, Recall=0.9319, F1=0.9433, IoU=0.8927
-[05:00:30.187] Main Text      : Precision=0.9376, Recall=0.9339, F1=0.9357, IoU=0.8793
-[05:00:30.187] Title          : Precision=0.8598, Recall=0.8978, F1=0.8784, IoU=0.7831
-[05:00:30.187] Chapter Headings: Precision=0.8793, Recall=0.8369, F1=0.8576, IoU=0.7507
-[05:00:30.187] 
-Mean metrics:
-[05:00:30.187] ----------------------------------------
-[05:00:30.187] Mean Precision: 0.8454
-[05:00:30.187] Mean Recall: 0.8106
-[05:00:30.187] Mean F1: 0.8241
-[05:00:30.187] Mean IoU: 0.7493
-[05:00:30.187] Inference completed on 30 images
-[05:26:05.650] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin16746FS', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin16746FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[05:26:05.650] Testing with checkpoint: best_model_latest.pth
-[05:26:05.651] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Latin16746FS/predictions
-[05:26:05.651] Starting inference on UDIADS_BIB dataset
-[05:26:05.757] Found 1620 patches for Latin16746FS
-[05:26:05.759] Processing: 009 (54 patches)
-[05:26:08.893] Completed: 009
-[05:26:08.893] Processing: 020 (54 patches)
-[05:26:11.585] Completed: 020
-[05:26:11.585] Processing: 022 (54 patches)
-[05:26:14.311] Completed: 022
-[05:26:14.311] Processing: 029 (54 patches)
-[05:26:17.091] Completed: 029
-[05:26:17.092] Processing: 035 (54 patches)
-[05:26:19.942] Completed: 035
-[05:26:19.942] Processing: 048 (54 patches)
-[05:26:22.598] Completed: 048
-[05:26:22.598] Processing: 069 (54 patches)
-[05:26:25.261] Completed: 069
-[05:26:25.261] Processing: 082 (54 patches)
-[05:26:27.977] Completed: 082
-[05:26:27.977] Processing: 088 (54 patches)
-[05:26:30.722] Completed: 088
-[05:26:30.722] Processing: 089 (54 patches)
-[05:26:33.430] Completed: 089
-[05:26:33.430] Processing: 091 (54 patches)
-[05:26:36.129] Completed: 091
-[05:26:36.129] Processing: 100 (54 patches)
-[05:26:38.850] Completed: 100
-[05:26:38.850] Processing: 106 (54 patches)
-[05:26:41.595] Completed: 106
-[05:26:41.595] Processing: 117 (54 patches)
-[05:26:44.329] Completed: 117
-[05:26:44.329] Processing: 123 (54 patches)
-[05:26:47.109] Completed: 123
-[05:26:47.109] Processing: 125 (54 patches)
-[05:26:49.801] Completed: 125
-[05:26:49.801] Processing: 130 (54 patches)
-[05:26:52.593] Completed: 130
-[05:26:52.594] Processing: 133 (54 patches)
-[05:26:55.181] Completed: 133
-[05:26:55.182] Processing: 137 (54 patches)
-[05:26:57.797] Completed: 137
-[05:26:57.797] Processing: 146 (54 patches)
-[05:27:00.431] Completed: 146
-[05:27:00.431] Processing: 166 (54 patches)
-[05:27:03.055] Completed: 166
-[05:27:03.055] Processing: 184 (54 patches)
-[05:27:05.664] Completed: 184
-[05:27:05.664] Processing: 215 (54 patches)
-[05:27:08.333] Completed: 215
-[05:27:08.333] Processing: 237 (54 patches)
-[05:27:10.997] Completed: 237
-[05:27:10.997] Processing: 243 (54 patches)
-[05:27:13.601] Completed: 243
-[05:27:13.601] Processing: 255 (54 patches)
-[05:27:16.245] Completed: 255
-[05:27:16.245] Processing: 258 (54 patches)
-[05:27:18.906] Completed: 258
-[05:27:18.906] Processing: 284 (54 patches)
-[05:27:21.558] Completed: 284
-[05:27:21.558] Processing: 325 (54 patches)
-[05:27:24.234] Completed: 325
-[05:27:24.234] Processing: 357 (54 patches)
-[05:27:27.030] Completed: 357
-[05:27:27.030] 
-Per-class metrics:
-[05:27:27.030] --------------------------------------------------------------------------------
-[05:27:27.030] Background     : Precision=0.9913, Recall=0.9945, F1=0.9929, IoU=0.9859
-[05:27:27.030] Paratext       : Precision=0.8168, Recall=0.7093, F1=0.7593, IoU=0.6119
-[05:27:27.030] Decoration     : Precision=0.9807, Recall=0.9390, F1=0.9594, IoU=0.9220
-[05:27:27.030] Main Text      : Precision=0.9281, Recall=0.9384, F1=0.9333, IoU=0.8749
-[05:27:27.030] Title          : Precision=0.8241, Recall=0.8081, F1=0.8160, IoU=0.6893
-[05:27:27.030] Chapter Headings: Precision=0.9096, Recall=0.6828, F1=0.7801, IoU=0.6394
-[05:27:27.030] 
-Mean metrics:
-[05:27:27.030] ----------------------------------------
-[05:27:27.030] Mean Precision: 0.9085
-[05:27:27.030] Mean Recall: 0.8454
-[05:27:27.030] Mean F1: 0.8735
-[05:27:27.030] Mean IoU: 0.7872
-[05:27:27.030] Inference completed on 30 images
-[06:01:12.323] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Syr341FS', model='swinunet', dataset='UDIADS_BIB', manuscript='Syr341FS', udiadsbib_root='../../U-DIADS-Bib-FS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=5, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[06:01:12.324] Testing with checkpoint: best_model_latest.pth
-[06:01:12.325] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/UDIADS_BIB_FS/udiadsbib_patch224_swinunet_Syr341FS/predictions
-[06:01:12.325] Starting inference on UDIADS_BIB dataset
-[06:01:12.495] Found 1620 patches for Syr341FS
-[06:01:12.496] Processing: 031 (54 patches)
-[06:01:16.882] Completed: 031
-[06:01:16.882] Processing: 053 (54 patches)
-[06:01:20.582] Completed: 053
-[06:01:20.582] Processing: 054 (54 patches)
-[06:01:24.393] Completed: 054
-[06:01:24.394] Processing: 071 (54 patches)
-[06:01:28.166] Completed: 071
-[06:01:28.166] Processing: 073 (54 patches)
-[06:01:32.482] Completed: 073
-[06:01:32.482] Processing: 075 (54 patches)
-[06:01:36.116] Completed: 075
-[06:01:36.117] Processing: 100 (54 patches)
-[06:01:39.773] Completed: 100
-[06:01:39.774] Processing: 137 (54 patches)
-[06:01:43.536] Completed: 137
-[06:01:43.536] Processing: 150 (54 patches)
-[06:01:46.937] Completed: 150
-[06:01:46.937] Processing: 160 (54 patches)
-[06:01:50.594] Completed: 160
-[06:01:50.594] Processing: 167 (54 patches)
-[06:01:54.055] Completed: 167
-[06:01:54.055] Processing: 184 (54 patches)
-[06:01:57.722] Completed: 184
-[06:01:57.722] Processing: 190 (54 patches)
-[06:02:01.122] Completed: 190
-[06:02:01.123] Processing: 201 (54 patches)
-[06:02:04.714] Completed: 201
-[06:02:04.715] Processing: 210 (54 patches)
-[06:02:08.059] Completed: 210
-[06:02:08.059] Processing: 222 (54 patches)
-[06:02:11.624] Completed: 222
-[06:02:11.625] Processing: 224 (54 patches)
-[06:02:15.112] Completed: 224
-[06:02:15.112] Processing: 231 (54 patches)
-[06:02:18.872] Completed: 231
-[06:02:18.872] Processing: 241 (54 patches)
-[06:02:22.311] Completed: 241
-[06:02:22.311] Processing: 249 (54 patches)
-[06:02:25.658] Completed: 249
-[06:02:25.658] Processing: 252 (54 patches)
-[06:02:29.195] Completed: 252
-[06:02:29.195] Processing: 267 (54 patches)
-[06:02:32.708] Completed: 267
-[06:02:32.709] Processing: 281 (54 patches)
-[06:02:36.322] Completed: 281
-[06:02:36.322] Processing: 286 (54 patches)
-[06:02:39.810] Completed: 286
-[06:02:39.810] Processing: 290 (54 patches)
-[06:02:43.281] Completed: 290
-[06:02:43.281] Processing: 313 (54 patches)
-[06:02:46.835] Completed: 313
-[06:02:46.835] Processing: 362 (54 patches)
-[06:02:50.283] Completed: 362
-[06:02:50.283] Processing: 368 (54 patches)
-[06:02:53.622] Completed: 368
-[06:02:53.623] Processing: 376 (54 patches)
-[06:02:56.920] Completed: 376
-[06:02:56.920] Processing: 446 (54 patches)
-[06:03:00.572] Completed: 446
-[06:03:00.572] 
-Per-class metrics:
-[06:03:00.572] --------------------------------------------------------------------------------
-[06:03:00.572] Background     : Precision=0.9711, Recall=0.9802, F1=0.9756, IoU=0.9525
-[06:03:00.572] Paratext       : Precision=0.3708, Recall=0.3151, F1=0.3407, IoU=0.2053
-[06:03:00.572] Decoration     : Precision=0.9678, Recall=0.6927, F1=0.8075, IoU=0.6771
-[06:03:00.572] Main Text      : Precision=0.8579, Recall=0.8539, F1=0.8559, IoU=0.7481
-[06:03:00.572] Title          : Precision=0.4998, Recall=0.5207, F1=0.5101, IoU=0.3423
-[06:03:00.572] 
-Mean metrics:
-[06:03:00.572] ----------------------------------------
-[06:03:00.572] Mean Precision: 0.7335
-[06:03:00.572] Mean Recall: 0.6725
-[06:03:00.572] Mean F1: 0.6980
-[06:03:00.572] Mean IoU: 0.5851
-[06:03:00.572] Inference completed on 30 images
-[12:41:59.389] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CB55', model='swinunet', dataset='DIVAHISDB', manuscript='CB55', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[12:41:59.389] Testing with checkpoint: best_model_latest.pth
-[12:41:59.391] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CB55/predictions
-[12:41:59.391] Starting inference on DIVAHISDB dataset
-[12:42:00.262] Found 6090 patches for CB55
-[12:42:00.269] Processing: e-codices_fmb-cb-0055_0098v_max (609 patches)
-[12:42:16.949] Resizing ground truth for e-codices_fmb-cb-0055_0098v_max
-[12:42:28.620] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:42:28.876] Completed: e-codices_fmb-cb-0055_0098v_max
-[12:42:28.876] Processing: e-codices_fmb-cb-0055_0099v_max (609 patches)
-[12:42:43.966] Resizing ground truth for e-codices_fmb-cb-0055_0099v_max
-[12:42:55.432] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:42:55.666] Completed: e-codices_fmb-cb-0055_0099v_max
-[12:42:55.666] Processing: e-codices_fmb-cb-0055_0102v_max (609 patches)
-[12:43:10.227] Resizing ground truth for e-codices_fmb-cb-0055_0102v_max
-[12:43:21.780] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:43:22.014] Completed: e-codices_fmb-cb-0055_0102v_max
-[12:43:22.014] Processing: e-codices_fmb-cb-0055_0105r_max (609 patches)
-[12:43:36.054] Resizing ground truth for e-codices_fmb-cb-0055_0105r_max
-[12:43:47.523] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:43:47.757] Completed: e-codices_fmb-cb-0055_0105r_max
-[12:43:47.757] Processing: e-codices_fmb-cb-0055_0107v_max (609 patches)
-[12:44:00.924] Resizing ground truth for e-codices_fmb-cb-0055_0107v_max
-[12:44:12.403] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:44:12.649] Completed: e-codices_fmb-cb-0055_0107v_max
-[12:44:12.649] Processing: e-codices_fmb-cb-0055_0108v_max (609 patches)
-[12:44:25.678] Resizing ground truth for e-codices_fmb-cb-0055_0108v_max
-[12:44:37.244] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:44:37.477] Completed: e-codices_fmb-cb-0055_0108v_max
-[12:44:37.477] Processing: e-codices_fmb-cb-0055_0116r_max (609 patches)
-[12:44:49.858] Resizing ground truth for e-codices_fmb-cb-0055_0116r_max
-[12:45:01.360] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:45:01.617] Completed: e-codices_fmb-cb-0055_0116r_max
-[12:45:01.617] Processing: e-codices_fmb-cb-0055_0159v_max (609 patches)
-[12:45:14.465] Resizing ground truth for e-codices_fmb-cb-0055_0159v_max
-[12:45:25.934] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:45:26.180] Completed: e-codices_fmb-cb-0055_0159v_max
-[12:45:26.180] Processing: e-codices_fmb-cb-0055_0160v_max (609 patches)
-[12:45:39.134] Resizing ground truth for e-codices_fmb-cb-0055_0160v_max
-[12:45:50.602] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:45:50.847] Completed: e-codices_fmb-cb-0055_0160v_max
-[12:45:50.847] Processing: e-codices_fmb-cb-0055_0162v_max (609 patches)
-[12:46:03.622] Resizing ground truth for e-codices_fmb-cb-0055_0162v_max
-[12:46:15.114] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
-[12:46:15.360] Completed: e-codices_fmb-cb-0055_0162v_max
-[12:46:15.361] 
-Per-class metrics:
-[12:46:15.361] --------------------------------------------------------------------------------
-[12:46:15.361] Background     : Precision=0.9890, Recall=0.9940, F1=0.9915, IoU=0.9832
-[12:46:15.361] Comment        : Precision=0.9744, Recall=0.9559, F1=0.9651, IoU=0.9325
-[12:46:15.361] Decoration     : Precision=0.9342, Recall=0.8575, F1=0.8942, IoU=0.8086
-[12:46:15.361] Main Text      : Precision=0.9613, Recall=0.9448, F1=0.9529, IoU=0.9101
-[12:46:15.361] 
-Mean metrics:
-[12:46:15.361] ----------------------------------------
-[12:46:15.361] Mean Precision: 0.9647
-[12:46:15.361] Mean Recall: 0.9380
-[12:46:15.361] Mean F1: 0.9509
-[12:46:15.361] Mean IoU: 0.9086
-[12:46:15.361] Inference completed on 10 images
-[15:54:08.217] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CSG18', model='swinunet', dataset='DIVAHISDB', manuscript='CSG18', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[15:54:08.217] Testing with checkpoint: best_model_latest.pth
-[15:54:08.254] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CSG18/predictions
-[15:54:08.254] Starting inference on DIVAHISDB dataset
-[15:54:08.619] Found 3080 patches for CSG18
-[15:54:08.622] Processing: e-codices_csg-0018_061_max (308 patches)
-[15:54:19.549] Resizing ground truth for e-codices_csg-0018_061_max
-[15:54:26.118] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:54:26.270] Completed: e-codices_csg-0018_061_max
-[15:54:26.270] Processing: e-codices_csg-0018_064_max (308 patches)
-[15:54:37.061] Resizing ground truth for e-codices_csg-0018_064_max
-[15:54:43.607] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:54:43.759] Completed: e-codices_csg-0018_064_max
-[15:54:43.759] Processing: e-codices_csg-0018_096_max (308 patches)
-[15:54:54.296] Resizing ground truth for e-codices_csg-0018_096_max
-[15:55:00.853] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:55:00.979] Completed: e-codices_csg-0018_096_max
-[15:55:00.979] Processing: e-codices_csg-0018_098_max (308 patches)
-[15:55:11.863] Resizing ground truth for e-codices_csg-0018_098_max
-[15:55:18.441] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:55:18.577] Completed: e-codices_csg-0018_098_max
-[15:55:18.577] Processing: e-codices_csg-0018_120_max (308 patches)
-[15:55:29.195] Resizing ground truth for e-codices_csg-0018_120_max
-[15:55:35.709] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:55:35.842] Completed: e-codices_csg-0018_120_max
-[15:55:35.842] Processing: e-codices_csg-0018_151_max (308 patches)
-[15:55:46.759] Resizing ground truth for e-codices_csg-0018_151_max
-[15:55:53.297] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:55:53.433] Completed: e-codices_csg-0018_151_max
-[15:55:53.433] Processing: e-codices_csg-0018_159_max (308 patches)
-[15:56:03.510] Resizing ground truth for e-codices_csg-0018_159_max
-[15:56:10.020] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:56:10.147] Completed: e-codices_csg-0018_159_max
-[15:56:10.147] Processing: e-codices_csg-0018_160_max (308 patches)
-[15:56:20.564] Resizing ground truth for e-codices_csg-0018_160_max
-[15:56:27.086] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:56:27.219] Completed: e-codices_csg-0018_160_max
-[15:56:27.219] Processing: e-codices_csg-0018_161_max (308 patches)
-[15:56:37.975] Resizing ground truth for e-codices_csg-0018_161_max
-[15:56:44.487] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:56:44.613] Completed: e-codices_csg-0018_161_max
-[15:56:44.613] Processing: e-codices_csg-0018_164_max (308 patches)
-[15:56:55.384] Resizing ground truth for e-codices_csg-0018_164_max
-[15:57:01.920] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[15:57:02.047] Completed: e-codices_csg-0018_164_max
-[15:57:02.048] 
-Per-class metrics:
-[15:57:02.048] --------------------------------------------------------------------------------
-[15:57:02.048] Background     : Precision=0.9916, Recall=0.9928, F1=0.9922, IoU=0.9845
-[15:57:02.048] Comment        : Precision=0.9469, Recall=0.9485, F1=0.9477, IoU=0.9006
-[15:57:02.048] Decoration     : Precision=0.9275, Recall=0.9293, F1=0.9284, IoU=0.8664
-[15:57:02.048] Main Text      : Precision=0.9678, Recall=0.9505, F1=0.9591, IoU=0.9213
-[15:57:02.048] 
-Mean metrics:
-[15:57:02.048] ----------------------------------------
-[15:57:02.048] Mean Precision: 0.9584
-[15:57:02.048] Mean Recall: 0.9553
-[15:57:02.048] Mean F1: 0.9568
-[15:57:02.048] Mean IoU: 0.9182
-[15:57:02.048] Inference completed on 10 images
-[18:09:16.636] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CSG863', model='swinunet', dataset='DIVAHISDB', manuscript='CSG863', udiadsbib_root='../../U-DIADS-Bib-MS', divahisdb_root='../../DivaHisDB_patched', use_patched_data=True, num_classes=4, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[18:09:16.636] Testing with checkpoint: best_model_latest.pth
-[18:09:16.660] Saving predictions to: ./All_Results_with_No_FocalLoss/swinunet/DIVAHISDB/divahisdb_patch224_swinunet_CSG863/predictions
-[18:09:16.661] Starting inference on DIVAHISDB dataset
-[18:09:17.058] Found 3080 patches for CSG863
-[18:09:17.061] Processing: e-codices_csg-0863_013_max (308 patches)
-[18:09:28.781] Resizing ground truth for e-codices_csg-0863_013_max
-[18:09:35.393] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:09:35.524] Completed: e-codices_csg-0863_013_max
-[18:09:35.524] Processing: e-codices_csg-0863_016_max (308 patches)
-[18:09:46.839] Resizing ground truth for e-codices_csg-0863_016_max
-[18:09:53.413] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:09:53.548] Completed: e-codices_csg-0863_016_max
-[18:09:53.549] Processing: e-codices_csg-0863_017_max (308 patches)
-[18:10:04.654] Resizing ground truth for e-codices_csg-0863_017_max
-[18:10:11.254] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:10:11.393] Completed: e-codices_csg-0863_017_max
-[18:10:11.393] Processing: e-codices_csg-0863_021_max (308 patches)
-[18:10:22.293] Resizing ground truth for e-codices_csg-0863_021_max
-[18:10:28.874] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:10:29.004] Completed: e-codices_csg-0863_021_max
-[18:10:29.004] Processing: e-codices_csg-0863_022_max (308 patches)
-[18:10:40.032] Resizing ground truth for e-codices_csg-0863_022_max
-[18:10:46.629] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:10:46.755] Completed: e-codices_csg-0863_022_max
-[18:10:46.755] Processing: e-codices_csg-0863_025_max (308 patches)
-[18:10:58.679] Resizing ground truth for e-codices_csg-0863_025_max
-[18:11:05.287] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:11:05.423] Completed: e-codices_csg-0863_025_max
-[18:11:05.423] Processing: e-codices_csg-0863_042_max (308 patches)
-[18:11:15.982] Resizing ground truth for e-codices_csg-0863_042_max
-[18:11:22.547] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:11:22.674] Completed: e-codices_csg-0863_042_max
-[18:11:22.674] Processing: e-codices_csg-0863_050_max (308 patches)
-[18:11:33.784] Resizing ground truth for e-codices_csg-0863_050_max
-[18:11:40.405] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:11:40.532] Completed: e-codices_csg-0863_050_max
-[18:11:40.532] Processing: e-codices_csg-0863_070_max (308 patches)
-[18:11:52.272] Resizing ground truth for e-codices_csg-0863_070_max
-[18:11:58.848] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:11:58.976] Completed: e-codices_csg-0863_070_max
-[18:11:58.976] Processing: e-codices_csg-0863_071_max (308 patches)
-[18:12:11.019] Resizing ground truth for e-codices_csg-0863_071_max
-[18:12:17.621] Resizing ground truth for metrics computation: (4992, 3328) -> (5152, 3360)
-[18:12:17.755] Completed: e-codices_csg-0863_071_max
-[18:12:17.756] 
-Per-class metrics:
-[18:12:17.756] --------------------------------------------------------------------------------
-[18:12:17.756] Background     : Precision=0.9883, Recall=0.9913, F1=0.9898, IoU=0.9798
-[18:12:17.756] Comment        : Precision=0.9312, Recall=0.9126, F1=0.9218, IoU=0.8549
-[18:12:17.756] Decoration     : Precision=0.9170, Recall=0.7986, F1=0.8537, IoU=0.7448
-[18:12:17.756] Main Text      : Precision=0.9632, Recall=0.9535, F1=0.9583, IoU=0.9200
-[18:12:17.756] 
-Mean metrics:
-[18:12:17.756] ----------------------------------------
-[18:12:17.756] Mean Precision: 0.9499
-[18:12:17.756] Mean Recall: 0.9140
-[18:12:17.756] Mean F1: 0.9309
-[18:12:17.756] Mean IoU: 0.8749
-[18:12:17.756] Inference completed on 10 images
-[17:29:32.167] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[17:29:32.167] Testing with checkpoint: best_model_latest.pth
-[17:29:32.168] Saving predictions to: ./Results/Latin2/predictions
-[17:29:32.168] Starting inference on UDIADS_BIB dataset
-[17:29:32.385] Found 1620 patches for Latin2
-[17:29:32.387] Processing: 076 (54 patches)
-[17:29:38.539] Completed: 076
-[17:29:38.539] Processing: 079 (54 patches)
-[17:29:44.131] Completed: 079
-[17:29:44.131] Processing: 082 (54 patches)
-[17:29:50.069] Completed: 082
-[17:29:50.070] Processing: 095 (54 patches)
-[17:29:55.409] Completed: 095
-[17:29:55.409] Processing: 106 (54 patches)
-[17:30:00.761] Completed: 106
-[17:30:00.762] Processing: 111 (54 patches)
-[17:30:08.557] Completed: 111
-[17:30:08.557] Processing: 115 (54 patches)
-[17:30:14.079] Completed: 115
-[17:30:14.079] Processing: 117 (54 patches)
-[17:30:19.533] Completed: 117
-[17:30:19.533] Processing: 128 (54 patches)
-[17:30:24.796] Completed: 128
-[17:30:24.796] Processing: 134 (54 patches)
-[17:30:30.008] Completed: 134
-[17:30:30.008] Processing: 138 (54 patches)
-[17:30:35.192] Completed: 138
-[17:30:35.192] Processing: 142 (54 patches)
-[17:30:40.540] Completed: 142
-[17:30:40.540] Processing: 159 (54 patches)
-[17:30:45.915] Completed: 159
-[17:30:45.916] Processing: 166 (54 patches)
-[17:30:51.257] Completed: 166
-[17:30:51.258] Processing: 185 (54 patches)
-[17:30:56.747] Completed: 185
-[17:30:56.747] Processing: 200 (54 patches)
-[17:31:02.640] Completed: 200
-[17:31:02.641] Processing: 203 (54 patches)
-[17:31:07.772] Completed: 203
-[17:31:07.772] Processing: 208 (54 patches)
-[17:31:12.930] Completed: 208
-[17:31:12.930] Processing: 229 (54 patches)
-[17:31:18.100] Completed: 229
-[17:31:18.101] Processing: 230 (54 patches)
-[17:31:23.193] Completed: 230
-[17:31:23.193] Processing: 235 (54 patches)
-[17:31:28.286] Completed: 235
-[17:31:28.286] Processing: 236 (54 patches)
-[17:31:33.602] Completed: 236
-[17:31:33.602] Processing: 248 (54 patches)
-[17:31:39.173] Completed: 248
-[17:31:39.173] Processing: 249 (54 patches)
-[17:31:44.776] Completed: 249
-[17:31:44.776] Processing: 250 (54 patches)
-[17:31:50.189] Completed: 250
-[17:31:50.190] Processing: 251 (54 patches)
-[17:31:55.687] Completed: 251
-[17:31:55.687] Processing: 252 (54 patches)
-[17:32:01.013] Completed: 252
-[17:32:01.013] Processing: 275 (54 patches)
-[17:32:06.590] Completed: 275
-[17:32:06.590] Processing: 277 (54 patches)
-[17:32:11.941] Completed: 277
-[17:32:11.941] Processing: 297 (54 patches)
-[17:32:17.179] Completed: 297
-[17:32:17.179] 
-Per-class metrics:
-[17:32:17.179] --------------------------------------------------------------------------------
-[17:32:17.179] Background     : Precision=0.9304, Recall=1.0000, F1=0.9639, IoU=0.9304
-[17:32:17.179] Paratext       : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[17:32:17.179] Decoration     : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[17:32:17.179] Main Text      : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[17:32:17.179] Title          : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[17:32:17.179] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[17:32:17.179] 
-Mean metrics:
-[17:32:17.179] ----------------------------------------
-[17:32:17.179] Mean Precision: 0.1551
-[17:32:17.179] Mean Recall: 0.1667
-[17:32:17.180] Mean F1: 0.1607
-[17:32:17.180] Mean IoU: 0.1551
-[17:32:17.180] Inference completed on 30 images
-[20:33:01.271] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin14396', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[20:33:01.271] Testing with checkpoint: best_model_latest.pth
-[20:33:01.299] Saving predictions to: ./Results/Latin14396/predictions
-[20:33:01.300] Starting inference on UDIADS_BIB dataset
-[20:33:01.481] Found 1620 patches for Latin14396
-[20:33:01.484] Processing: 014 (54 patches)
-[20:33:07.333] Completed: 014
-[20:33:07.333] Processing: 032 (54 patches)
-[20:33:12.747] Completed: 032
-[20:33:12.747] Processing: 034 (54 patches)
-[20:33:18.318] Completed: 034
-[20:33:18.318] Processing: 036 (54 patches)
-[20:33:23.941] Completed: 036
-[20:33:23.941] Processing: 038 (54 patches)
-[20:33:29.538] Completed: 038
-[20:33:29.538] Processing: 047 (54 patches)
-[20:33:34.914] Completed: 047
-[20:33:34.914] Processing: 060 (54 patches)
-[20:33:40.574] Completed: 060
-[20:33:40.574] Processing: 085 (54 patches)
-[20:33:45.934] Completed: 085
-[20:33:45.934] Processing: 087 (54 patches)
-[20:33:51.508] Completed: 087
-[20:33:51.508] Processing: 104 (54 patches)
-[20:33:57.093] Completed: 104
-[20:33:57.093] Processing: 105 (54 patches)
-[20:34:02.491] Completed: 105
-[20:34:02.492] Processing: 108 (54 patches)
-[20:34:07.742] Completed: 108
-[20:34:07.742] Processing: 110 (54 patches)
-[20:34:13.229] Completed: 110
-[20:34:13.229] Processing: 136 (54 patches)
-[20:34:18.831] Completed: 136
-[20:34:18.831] Processing: 169 (54 patches)
-[20:34:24.490] Completed: 169
-[20:34:24.491] Processing: 195 (54 patches)
-[20:34:30.000] Completed: 195
-[20:34:30.001] Processing: 196 (54 patches)
-[20:34:35.293] Completed: 196
-[20:34:35.293] Processing: 198 (54 patches)
-[20:34:40.418] Completed: 198
-[20:34:40.418] Processing: 204 (54 patches)
-[20:34:45.667] Completed: 204
-[20:34:45.667] Processing: 223 (54 patches)
-[20:34:50.941] Completed: 223
-[20:34:50.941] Processing: 225 (54 patches)
-[20:34:56.243] Completed: 225
-[20:34:56.244] Processing: 227 (54 patches)
-[20:35:01.544] Completed: 227
-[20:35:01.544] Processing: 229 (54 patches)
-[20:35:07.040] Completed: 229
-[20:35:07.040] Processing: 251 (54 patches)
-[20:35:12.432] Completed: 251
-[20:35:12.433] Processing: 253 (54 patches)
-[20:35:17.784] Completed: 253
-[20:35:17.784] Processing: 255 (54 patches)
-[20:35:23.209] Completed: 255
-[20:35:23.209] Processing: 264 (54 patches)
-[20:35:28.675] Completed: 264
-[20:35:28.675] Processing: 270 (54 patches)
-[20:35:34.308] Completed: 270
-[20:35:34.309] Processing: 276 (54 patches)
-[20:35:39.773] Completed: 276
-[20:35:39.773] Processing: 325 (54 patches)
-[20:35:45.271] Completed: 325
-[20:35:45.271] 
-Per-class metrics:
-[20:35:45.271] --------------------------------------------------------------------------------
-[20:35:45.271] Background     : Precision=0.8924, Recall=1.0000, F1=0.9431, IoU=0.8924
-[20:35:45.272] Paratext       : Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[20:35:45.272] Decoration     : Precision=0.0338, Recall=0.0000, F1=0.0001, IoU=0.0000
-[20:35:45.272] Main Text      : Precision=1.0000, Recall=0.0002, F1=0.0003, IoU=0.0002
-[20:35:45.272] Title          : Precision=0.9028, Recall=0.0002, F1=0.0004, IoU=0.0002
-[20:35:45.272] Chapter Headings: Precision=0.0000, Recall=0.0000, F1=0.0000, IoU=0.0000
-[20:35:45.272] 
-Mean metrics:
-[20:35:45.272] ----------------------------------------
-[20:35:45.272] Mean Precision: 0.4715
-[20:35:45.272] Mean Recall: 0.1667
-[20:35:45.272] Mean F1: 0.1573
-[20:35:45.272] Mean IoU: 0.1488
-[20:35:45.272] Inference completed on 30 images
-[22:03:40.800] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[22:03:40.801] Testing with checkpoint: best_model_latest.pth
-[22:03:40.802] Saving predictions to: ./Results/Latin2/predictions
-[22:03:40.802] Starting inference on UDIADS_BIB dataset
-[22:03:41.014] Found 1620 patches for Latin2
-[22:03:41.015] Processing: 076 (54 patches)
-[22:03:48.759] Completed: 076
-[22:03:48.760] Processing: 079 (54 patches)
-[22:03:54.482] Completed: 079
-[22:03:54.482] Processing: 082 (54 patches)
-[22:04:00.245] Completed: 082
-[22:04:00.245] Processing: 095 (54 patches)
-[22:04:05.683] Completed: 095
-[22:04:05.683] Processing: 106 (54 patches)
-[22:04:11.127] Completed: 106
-[22:04:11.128] Processing: 111 (54 patches)
-[22:04:16.561] Completed: 111
-[22:04:16.562] Processing: 115 (54 patches)
-[22:04:21.945] Completed: 115
-[22:04:21.945] Processing: 117 (54 patches)
-[22:04:27.507] Completed: 117
-[22:04:27.507] Processing: 128 (54 patches)
-[22:04:33.032] Completed: 128
-[22:04:33.032] Processing: 134 (54 patches)
-[22:04:38.692] Completed: 134
-[22:04:38.692] Processing: 138 (54 patches)
-[22:04:44.008] Completed: 138
-[22:04:44.008] Processing: 142 (54 patches)
-[22:04:49.450] Completed: 142
-[22:04:49.450] Processing: 159 (54 patches)
-[22:04:55.008] Completed: 159
-[22:04:55.008] Processing: 166 (54 patches)
-[22:05:00.723] Completed: 166
-[22:05:00.723] Processing: 185 (54 patches)
-[22:05:06.095] Completed: 185
-[22:05:06.095] Processing: 200 (54 patches)
-[22:05:11.586] Completed: 200
-[22:05:11.586] Processing: 203 (54 patches)
-[22:05:16.685] Completed: 203
-[22:05:16.685] Processing: 208 (54 patches)
-[22:05:21.904] Completed: 208
-[22:05:21.905] Processing: 229 (54 patches)
-[22:05:27.039] Completed: 229
-[22:05:27.039] Processing: 230 (54 patches)
-[22:05:32.079] Completed: 230
-[22:05:32.079] Processing: 235 (54 patches)
-[22:05:37.216] Completed: 235
-[22:05:37.217] Processing: 236 (54 patches)
-[22:05:42.444] Completed: 236
-[22:05:42.444] Processing: 248 (54 patches)
-[22:05:47.677] Completed: 248
-[22:05:47.677] Processing: 249 (54 patches)
-[22:05:53.096] Completed: 249
-[22:05:53.096] Processing: 250 (54 patches)
-[22:05:58.488] Completed: 250
-[22:05:58.488] Processing: 251 (54 patches)
-[22:06:03.704] Completed: 251
-[22:06:03.704] Processing: 252 (54 patches)
-[22:06:09.132] Completed: 252
-[22:06:09.132] Processing: 275 (54 patches)
-[22:06:14.568] Completed: 275
-[22:06:14.568] Processing: 277 (54 patches)
-[22:06:20.142] Completed: 277
-[22:06:20.142] Processing: 297 (54 patches)
-[22:06:25.568] Completed: 297
-[22:06:25.569] 
-Per-class metrics:
-[22:06:25.569] --------------------------------------------------------------------------------
-[22:06:25.569] Background     : Precision=0.9946, Recall=0.9958, F1=0.9952, IoU=0.9904
-[22:06:25.569] Paratext       : Precision=0.8960, Recall=0.7248, F1=0.8014, IoU=0.6685
-[22:06:25.569] Decoration     : Precision=0.9361, Recall=0.8842, F1=0.9094, IoU=0.8339
-[22:06:25.569] Main Text      : Precision=0.8950, Recall=0.9094, F1=0.9021, IoU=0.8217
-[22:06:25.569] Title          : Precision=0.9084, Recall=0.7844, F1=0.8418, IoU=0.7269
-[22:06:25.569] Chapter Headings: Precision=0.6850, Recall=0.5758, F1=0.6257, IoU=0.4552
-[22:06:25.569] 
-Mean metrics:
-[22:06:25.569] ----------------------------------------
-[22:06:25.569] Mean Precision: 0.8858
-[22:06:25.569] Mean Recall: 0.8124
-[22:06:25.569] Mean F1: 0.8459
-[22:06:25.569] Mean IoU: 0.7494
-[22:06:25.569] Inference completed on 30 images
-[22:06:45.827] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin14396', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin14396', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[22:06:45.827] Testing with checkpoint: best_model_latest.pth
-[22:06:45.828] Saving predictions to: ./Results/Latin14396/predictions
-[22:06:45.828] Starting inference on UDIADS_BIB dataset
-[22:06:45.994] Found 1620 patches for Latin14396
-[22:06:45.996] Processing: 014 (54 patches)
-[22:06:51.502] Completed: 014
-[22:06:51.502] Processing: 032 (54 patches)
-[22:06:56.642] Completed: 032
-[22:06:56.643] Processing: 034 (54 patches)
-[22:07:02.080] Completed: 034
-[22:07:02.081] Processing: 036 (54 patches)
-[22:07:07.163] Completed: 036
-[22:07:07.163] Processing: 038 (54 patches)
-[22:07:12.101] Completed: 038
-[22:07:12.101] Processing: 047 (54 patches)
-[22:07:17.137] Completed: 047
-[22:07:17.137] Processing: 060 (54 patches)
-[22:07:22.250] Completed: 060
-[22:07:22.250] Processing: 085 (54 patches)
-[22:07:27.062] Completed: 085
-[22:07:27.062] Processing: 087 (54 patches)
-[22:07:31.852] Completed: 087
-[22:07:31.852] Processing: 104 (54 patches)
-[22:07:36.637] Completed: 104
-[22:07:36.637] Processing: 105 (54 patches)
-[22:07:41.374] Completed: 105
-[22:07:41.375] Processing: 108 (54 patches)
-[22:07:46.085] Completed: 108
-[22:07:46.086] Processing: 110 (54 patches)
-[22:07:51.259] Completed: 110
-[22:07:51.260] Processing: 136 (54 patches)
-[22:07:56.159] Completed: 136
-[22:07:56.160] Processing: 169 (54 patches)
-[22:08:00.962] Completed: 169
-[22:08:00.962] Processing: 195 (54 patches)
-[22:08:06.140] Completed: 195
-[22:08:06.140] Processing: 196 (54 patches)
-[22:08:11.136] Completed: 196
-[22:08:11.136] Processing: 198 (54 patches)
-[22:08:16.076] Completed: 198
-[22:08:16.076] Processing: 204 (54 patches)
-[22:08:21.107] Completed: 204
-[22:08:21.107] Processing: 223 (54 patches)
-[22:08:26.055] Completed: 223
-[22:08:26.055] Processing: 225 (54 patches)
-[22:08:31.097] Completed: 225
-[22:08:31.097] Processing: 227 (54 patches)
-[22:08:36.175] Completed: 227
-[22:08:36.175] Processing: 229 (54 patches)
-[22:08:41.075] Completed: 229
-[22:08:41.075] Processing: 251 (54 patches)
-[22:08:46.159] Completed: 251
-[22:08:46.159] Processing: 253 (54 patches)
-[22:08:51.071] Completed: 253
-[22:08:51.071] Processing: 255 (54 patches)
-[22:08:56.027] Completed: 255
-[22:08:56.027] Processing: 264 (54 patches)
-[22:09:06.873] Namespace(cfg='/home/hpc/iwi5/iwi5250h/Transformer_Models/common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin16746', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin16746', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[22:09:06.873] Testing with checkpoint: best_model_latest.pth
-[22:09:06.921] Saving predictions to: ./Results/Latin16746/predictions
-[22:09:06.921] Starting inference on UDIADS_BIB dataset
-[22:09:07.135] Found 1620 patches for Latin16746
-[22:09:07.136] Processing: 009 (54 patches)
-[22:09:13.234] Completed: 009
-[22:09:13.235] Processing: 020 (54 patches)
-[22:09:18.936] Completed: 020
-[22:09:18.936] Processing: 022 (54 patches)
-                                                                                                                  [22:09:24.734] Completed: 022
-[22:09:24.735] Processing: 029 (54 patches)
-[22:09:30.130] Completed: 029
-[22:09:30.130] Processing: 035 (54 patches)
-[22:09:35.595] Completed: 035
-[22:09:35.595] Processing: 048 (54 patches)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    [22:09:41.116] Completed: 048
-[22:09:41.116] Processing: 069 (54 patches)
-[22:09:46.642] Completed: 069
-[22:09:46.643] Processing: 082 (54 patches)
-[22:09:52.024] Completed: 082
-[22:09:52.024] Processing: 088 (54 patches)
-[22:09:57.348] Completed: 088
-[22:09:57.348] Processing: 089 (54 patches)
-[22:10:02.679] Completed: 089
-[22:10:02.679] Processing: 091 (54 patches)
-                                                                                                                                                    [22:10:08.225] Completed: 091
-[22:10:08.225] Processing: 100 (54 patches)
-[22:10:13.584] Completed: 100
-[22:10:13.584] Processing: 106 (54 patches)
-[22:10:18.993] Completed: 106
-[22:10:18.993] Processing: 117 (54 patches)
-[22:10:38.265] Completed: 117
-[22:10:38.265] Processing: 123 (54 patches)
-[22:10:43.591] Completed: 123
-[22:10:43.591] Processing: 125 (54 patches)
-[22:10:49.085] Completed: 125
-[22:10:49.085] Processing: 130 (54 patches)
-[22:10:54.198] Completed: 130
-[22:10:54.198] Processing: 133 (54 patches)
-[22:10:59.441] Completed: 133
-[22:10:59.441] Processing: 137 (54 patches)
-                                                                                                                                                    [22:11:04.861] Completed: 137
-[22:11:04.861] Processing: 146 (54 patches)
-[22:11:10.097] Completed: 146
-[22:11:10.097] Processing: 166 (54 patches)
-[22:11:15.493] Completed: 166
-[22:11:15.493] Processing: 184 (54 patches)
-[22:11:20.899] Completed: 184
-[22:11:20.899] Processing: 215 (54 patches)
-[22:11:26.422] Completed: 215
-[22:11:26.422] Processing: 237 (54 patches)
-[22:11:31.823] Completed: 237
-[22:11:31.823] Processing: 243 (54 patches)
-                                                                          [22:11:37.347] Completed: 243
-[22:11:37.347] Processing: 255 (54 patches)
-[22:11:42.727] Completed: 255
-[22:11:42.727] Processing: 258 (54 patches)
-[22:11:48.060] Completed: 258
-[22:11:48.060] Processing: 284 (54 patches)
-[22:11:53.451] Completed: 284
-[22:11:53.451] Processing: 325 (54 patches)
-[22:11:58.542] Completed: 325
-[22:11:58.542] Processing: 357 (54 patches)
-[22:12:03.615] Completed: 357
-[22:12:03.615] 
-Per-class metrics:
-[22:12:03.615] --------------------------------------------------------------------------------
-[22:12:03.615] Background     : Precision=0.9940, Recall=0.9960, F1=0.9950, IoU=0.9900
-[22:12:03.615] Paratext       : Precision=0.8705, Recall=0.7286, F1=0.7933, IoU=0.6574
-[22:12:03.615] Decoration     : Precision=0.9882, Recall=0.9517, F1=0.9696, IoU=0.9410
-[22:12:03.615] Main Text      : Precision=0.9032, Recall=0.9607, F1=0.9311, IoU=0.8711
-[22:12:03.615] Title          : Precision=0.7893, Recall=0.9068, F1=0.8440, IoU=0.7301
-[22:12:03.615] Chapter Headings: Precision=0.9578, Recall=0.2741, F1=0.4262, IoU=0.2708
-[22:12:03.615] 
-Mean metrics:
-[22:12:03.615] ----------------------------------------
-[22:12:03.615] Mean Precision: 0.9172
-[22:12:03.615] Mean Recall: 0.8030
-[22:12:03.615] Mean F1: 0.8265
-[22:12:03.615] Mean IoU: 0.7434
-[22:12:03.615] Inference completed on 30 images
+[02:28:08.801] ----------------------------------------
+[02:28:08.801] Mean Precision: 0.9115
+[02:28:08.801] Mean Recall: 0.8472
+[02:28:08.801] Mean F1: 0.8750
+[02:28:08.801] Mean IoU: 0.7855

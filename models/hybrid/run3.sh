@@ -25,38 +25,46 @@ export PYTHONPATH="${HOME}/.local/lib/python3.12/site-packages:${PYTHONPATH}"
 # ============================================================================
 # HYBRID2 BASELINE TRAINING SCRIPT WITH DEEP SUPERVISION
 # ============================================================================
-# Model: Hybrid2 Baseline (Swin Transformer Encoder + Simple CNN Decoder)
+# Model: Hybrid2 Baseline (Swin Transformer Encoder + EfficientNet-B4 Decoder)
 # Dataset: U-DIADS-Bib-MS_patched (Full-Size patched dataset)
 # Manuscripts: Latin2, Latin14396, Latin16746, Syr341
 #   
 # Hybrid2 Baseline consists of:
 #
 # ENCODER:
-#   ✓ Swin Transformer Encoder (4 stages)
-#     - Stage 1: 96 dim, 3 heads, 2 blocks, resolution: H/4 × W/4
-#     - Stage 2: 192 dim, 6 heads, 2 blocks, resolution: H/8 × W/8
-#     - Stage 3: 384 dim, 12 heads, 2 blocks, resolution: H/16 × W/16
-#     - Stage 4: 768 dim, 24 heads, 2 blocks, resolution: H/32 × W/32
-#     - Patch Embedding: 4×4 patches, 3 → 96 channels
+#   ✓ Swin Transformer Encoder (SimMIM config: 4 stages)
+#     - Stage 1: 128 dim, 4 heads, 2 blocks, resolution: H/4 × W/4
+#     - Stage 2: 256 dim, 8 heads, 2 blocks, resolution: H/8 × W/8
+#     - Stage 3: 512 dim, 16 heads, 18 blocks, resolution: H/16 × W/16
+#     - Stage 4: 1024 dim, 32 heads, 2 blocks, resolution: H/32 × W/32
+#     - Patch Embedding: 4×4 patches, 3 → 128 channels
 #     - Patch Merging: 2×2 downsampling between stages
 #     - Window Attention: 7×7 windows with relative position bias
+#     - Pretrained: SimMIM checkpoint (simmim_finetune__swin_base__img224_window7__100ep.pth)
 #
 # BOTTLENECK:
-#   ✓ 2 Swin Transformer Blocks (768 dim, 24 heads)
+#   ✓ 2 Swin Transformer Blocks (1024 dim, 32 heads)
 #     - Resolution: H/32 × W/32 (7×7 for 224×224 input)
 #     - Window size: 7×7
 #     - Drop path rate: 0.1
-#     - Processes Stage 4 tokens directly (no dimension reduction)
-#     - Output projected from 768 dim to decoder input dim
+#     - Processes Multi-Scale Aggregation output or Stage 4 tokens (1024 dim)
+#     - Output projected from 1024 dim to decoder input dim (32 channels)
 #
 # DECODER:
-#   ✓ Simple CNN Decoder (default when --use_baseline is used)
-#     - EfficientNet-inspired channel configuration (b4 variant by default)
+#   ✓ EfficientNet-B4 Decoder (Real MBConv blocks, not simple CNN)
 #     - Decoder channels: [256, 128, 64, 32] (b4 variant)
-#     - Upsampling: Bilinear interpolation + Conv layers
+#     - Upsampling: Bilinear interpolation + MBConv blocks
 #     - Normalization: GroupNorm (default, better for small batches)
-#     - Activation: ReLU
-#     - Can be replaced with EfficientNet-B4 or ResNet50 via --decoder flag
+#     - Activation: ReLU (within MBConv blocks)
+#     - Uses actual Mobile Inverted Bottleneck Convolution (MBConv) blocks
+#     - Can be replaced with Simple or ResNet50 via --decoder flag
+#
+# MULTI-SCALE AGGREGATION:
+#   ✓ Multi-Scale Aggregation (--use_multiscale_agg)
+#     - Aggregates features from all 4 encoder stages (f1, f2, f3, f4)
+#     - Projects all stages to common channel dimension and fuses them
+#     - Output feeds the bottleneck (replaces direct Stage 4 input)
+#     - Provides richer multi-scale context to the bottleneck
 #
 # SKIP CONNECTIONS:
 #   ✓ Smart Skip Connections (--use_smart_skip)
@@ -90,8 +98,8 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "Decoder: EfficientNet-B4 Decoder (Real MBConv blocks)"
     echo ""
     echo "Components Enabled:"
-    echo "  ✓ Swin Encoder (4 stages: 96→192→384→768 dim)"
-    echo "  ✓ Bottleneck: 2 Swin Transformer blocks (768 dim, 24 heads)"
+    echo "  ✓ Swin Encoder (SimMIM config: 128 dim, depths [2,2,18,2], heads [4,8,16,32])"
+    echo "  ✓ Bottleneck: 2 Swin Transformer blocks (1024 dim, 32 heads)"
     echo "  ✓ EfficientNet-B4 Decoder (Real MBConv blocks, channels: [256, 128, 64, 32])"
     echo "  ✓ Smart Skip Connections (Attention-based Features)"
     echo "  ✓ Multi-Scale Aggregation"
@@ -100,6 +108,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "  ✓ GroupNorm (default normalization)"
     echo "  ✓ Balanced Sampler (oversampling rare classes)"
     echo "  ✓ Class-Aware Augmentation"
+    echo "  ✓ SimMIM Pretrained Weights (from config)"
     echo ""
     echo "Components Disabled:"
     echo "  ✗ CBAM Attention"
@@ -110,6 +119,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     python3 train.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
+        --yaml simmim \
         --use_smart_skip \
         --use_multiscale_agg \
         --use_deep_supervision \
@@ -120,7 +130,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 16 \
+        --batch_size 12 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 150 \
@@ -136,6 +146,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     python3 test.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
+        --yaml simmim \
         --use_smart_skip \
         --use_multiscale_agg \
         --use_deep_supervision \

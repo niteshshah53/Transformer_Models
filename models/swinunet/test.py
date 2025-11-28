@@ -1,21 +1,3 @@
-"""
-Testing Script for Historical Document Segmentation Models
-
-This script evaluates trained models on historical document test datasets by:
-- Loading trained model checkpoints
-- Running inference on test images using patch-based approach
-- Computing segmentation metrics (IoU, Precision, Recall, F1)
-- Saving prediction visualizations
-
-Supported datasets: U-DIADS-Bib, DIVAHISDB
-
-Usage:
-    # For SwinUnet:
-    python test.py --cfg config.yaml --output_dir ./models/ --manuscript Latin2 --is_savenii
-    
-Author: Clean Code Version
-"""
-
 import argparse
 import logging
 import os
@@ -35,7 +17,7 @@ from matplotlib.colors import ListedColormap
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
-from configs.config import get_config
+from configs.config import get_config  # pyright: ignore[reportMissingImports]
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
@@ -97,6 +79,10 @@ Examples:
                        help='Save prediction results during inference')
     parser.add_argument('--test_save_dir', type=str, default='../predictions',
                        help='Directory to save prediction results')
+    parser.add_argument('--use_tta', action='store_true', default=False,
+                       help='Enable test-time augmentation (TTA) for improved accuracy (slower inference)')
+    parser.add_argument('--multiscale', action='store_true', default=False,
+                       help='Enable multi-scale testing (0.75x, 1.0x, 1.25x) for improved accuracy on varying text sizes (slower inference)')
     
     # System configuration
     parser.add_argument('--deterministic', type=int, default=1,
@@ -154,7 +140,7 @@ def validate_arguments(args):
             print("Detected Syriaque341 manuscript: using 5 classes (no Chapter Headings)")
         else:
             args.num_classes = 6
-            print(f"Using 6 classes for manuscript: {args.manuscript}")
+            pass  # num_classes is set, no need to print
         
         if not os.path.exists(args.udiadsbib_root):
             raise ValueError(f"U-DIADS-Bib dataset path not found: {args.udiadsbib_root}")
@@ -165,23 +151,14 @@ def validate_arguments(args):
 
 
 def get_model(args, config):
-    """
-    Create and load the SwinUnet model.
-    
-    Args:
-        args: Command line arguments
-        config: Model configuration
-        
-    Returns:
-        torch.nn.Module: Initialized model
-    """
+    """Create and load the SwinUnet model."""
     from vision_transformer import SwinUnet as ViT_seg
     model = ViT_seg(config, img_size=args.img_size, num_classes=args.num_classes).cuda()
     
     # Load pretrained weights if available
     try:
         model.load_from(config)
-        print("Pretrained weights loaded successfully")
+        pass  # Pretrained weights loaded, no need to print
     except FileNotFoundError as e:
         print(f"Warning: Pretrained checkpoint not found: {e}")
         print("Continuing without pretrained weights (random initialization)")
@@ -193,17 +170,15 @@ def get_model(args, config):
 
 
 def setup_logging(log_folder, snapshot_name):
-    """Set up logging configuration."""
+    """Add file handler to existing logger (basicConfig already called in main())."""
     os.makedirs(log_folder, exist_ok=True)
     log_file = os.path.join(log_folder, f"{snapshot_name}.txt")
     
-    logging.basicConfig(
-        filename=log_file,
-        level=logging.INFO,
-        format='[%(asctime)s.%(msecs)03d] %(message)s',
-        datefmt='%H:%M:%S'
-    )
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
+    # Add file handler to existing logger (basicConfig already called in main())
+    file_handler = logging.FileHandler(log_file)
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter('[%(asctime)s.%(msecs)03d] %(message)s', datefmt='%H:%M:%S'))
+    logging.getLogger().addHandler(file_handler)
 
 
 def setup_reproducible_testing(args):
@@ -222,16 +197,7 @@ def setup_reproducible_testing(args):
 
 
 def load_model_checkpoint(model, args):
-    """
-    Load trained model checkpoint.
-    
-    Args:
-        model: Model to load weights into
-        args: Command line arguments
-        
-    Returns:
-        str: Name of loaded checkpoint file
-    """
+    """Load trained model checkpoint with support for full checkpoint format."""
     checkpoint_path = os.path.join(args.output_dir, 'best_model_latest.pth')
     
     if not os.path.exists(checkpoint_path):
@@ -242,25 +208,76 @@ def load_model_checkpoint(model, args):
         else:
             raise FileNotFoundError(f"No checkpoint found in {args.output_dir}")
     
-    msg = model.load_state_dict(torch.load(checkpoint_path))
-    print(f"Model checkpoint loaded: {msg}")
+    # Load checkpoint with appropriate strictness
+    checkpoint = torch.load(checkpoint_path, map_location='cpu')
+    
+    # Extract model_state from checkpoint (checkpoint may be a dict with 'model_state' key or direct state_dict)
+    if isinstance(checkpoint, dict) and 'model_state' in checkpoint:
+        model_state_dict = checkpoint['model_state']
+    else:
+        # If checkpoint is already a state_dict, use it directly (backward compatibility)
+        model_state_dict = checkpoint
+    
+    # Validate num_classes before loading
+    checkpoint_num_classes = None
+    output_layer_key = 'swin_unet.output.weight'
+    if output_layer_key in model_state_dict:
+        # Output layer shape: (num_classes, embed_dim, 1, 1)
+        checkpoint_num_classes = model_state_dict[output_layer_key].shape[0]
+    elif 'model_state' in checkpoint and isinstance(checkpoint['model_state'], dict):
+        # Try alternative key format
+        if output_layer_key in checkpoint['model_state']:
+            checkpoint_num_classes = checkpoint['model_state'][output_layer_key].shape[0]
+    
+    if checkpoint_num_classes is not None:
+        if checkpoint_num_classes != args.num_classes:
+            logging.warning("="*80)
+            logging.warning(f"WARNING: Number of classes mismatch detected!")
+            logging.warning(f"  Checkpoint was trained with: {checkpoint_num_classes} classes")
+            logging.warning(f"  Test arguments specify: {args.num_classes} classes")
+            logging.warning(f"  This will cause incorrect predictions!")
+            logging.warning(f"  Please use --num_classes {checkpoint_num_classes} or retrain with {args.num_classes} classes")
+            logging.warning("="*80)
+        else:
+            pass  # Verification passed, no need to print
+    else:
+        logging.warning(f"Could not determine num_classes from checkpoint (output layer key '{output_layer_key}' not found)")
+        logging.warning("  Proceeding without validation - please verify num_classes manually")
+    
+    # Load model state with strict=False to handle minor differences
+    msg = model.load_state_dict(model_state_dict, strict=False)
+    
+    # Print loading results
+    if msg.missing_keys:
+        logging.warning(f"  Missing keys (will use initialized values): {len(msg.missing_keys)}")
+        if len(msg.missing_keys) <= 10:
+            for key in msg.missing_keys:
+                logging.warning(f"     - {key}")
+        else:
+            for key in msg.missing_keys[:5]:
+                logging.warning(f"     - {key}")
+            logging.warning(f"     ... and {len(msg.missing_keys) - 5} more")
+    
+    if msg.unexpected_keys:
+        logging.warning(f"  Unexpected keys (ignored): {len(msg.unexpected_keys)}")
+        if len(msg.unexpected_keys) <= 10:
+            for key in msg.unexpected_keys:
+                logging.warning(f"     - {key}")
+        else:
+            for key in msg.unexpected_keys[:5]:
+                logging.warning(f"     - {key}")
+            logging.warning(f"     ... and {len(msg.unexpected_keys) - 5} more")
+    
+    if not msg.missing_keys and not msg.unexpected_keys:
+        pass  # All keys matched, no need to print 
     
     return os.path.basename(checkpoint_path)
 
 
 def get_dataset_info(dataset_type, manuscript=None):
-    """
-    Get dataset-specific information.
-    
-    Args:
-        dataset_type (str): Type of dataset
-        manuscript (str): Manuscript name for class-specific logic
-        
-    Returns:
-        tuple: (class_colors, class_names, rgb_to_class_function)
-    """
+    """Get dataset-specific information (class colors, names, and RGB-to-class mapping)."""
     if dataset_type.upper() == "UDIADS_BIB":
-        from datasets.dataset_udiadsbib import rgb_to_class
+        from datasets.dataset_udiadsbib_2 import rgb_to_class  # pyright: ignore[reportMissingImports]
         
         class_colors = [
             (0, 0, 0),         # 0: Background (black)
@@ -289,7 +306,7 @@ def get_dataset_info(dataset_type, manuscript=None):
         
     elif dataset_type.upper() == "DIVAHISDB":
         try:
-            from datasets.dataset_divahisdb import rgb_to_class
+            from datasets.dataset_divahisdb import rgb_to_class  # pyright: ignore[reportMissingImports]
         except ImportError:
             print("Warning: DIVAHISDB dataset class not available")
             rgb_to_class = None
@@ -310,15 +327,7 @@ def get_dataset_info(dataset_type, manuscript=None):
 
 
 def get_dataset_paths(args):
-    """
-    Get dataset-specific file paths.
-    
-    Args:
-        args: Command line arguments
-        
-    Returns:
-        tuple: (patch_dir, mask_dir, original_img_dir, original_mask_dir)
-    """
+    """Get dataset-specific file paths for patches, masks, and original images."""
     manuscript_name = args.manuscript
     
     if args.dataset.upper() == "UDIADS_BIB":
@@ -353,15 +362,7 @@ def get_dataset_paths(args):
 
 
 def process_patch_groups(patch_files):
-    """
-    Group patch files by their original image names.
-    
-    Args:
-        patch_files (list): List of patch file paths
-        
-    Returns:
-        tuple: (patch_groups, patch_positions) dictionaries
-    """
+    """Group patch files by their original image names and extract patch positions."""
     patch_groups = {}
     patch_positions = {}
     
@@ -382,19 +383,7 @@ def process_patch_groups(patch_files):
 
 
 def estimate_image_dimensions(original_name, original_img_dir, patches, patch_positions, patch_size=224):
-    """
-    Estimate original image dimensions from patch information.
-    
-    Args:
-        original_name (str): Name of original image
-        original_img_dir (str): Directory containing original images
-        patches (list): List of patch paths
-        patch_positions (dict): Mapping of patch paths to positions
-        patch_size (int): Size of each patch
-        
-    Returns:
-        tuple: (width, height, patches_per_row)
-    """
+    """Estimate original image dimensions from patch information."""
     # Try to find original image for exact dimensions
     for ext in ['.jpg', '.png', '.tif', '.tiff']:
         orig_path = os.path.join(original_img_dir, f"{original_name}{ext}")
@@ -421,64 +410,282 @@ def estimate_image_dimensions(original_name, original_img_dir, patches, patch_po
     return max_x, max_y, patches_per_row
 
 
-def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patch_size, model):
+def verify_rotation_transforms():
     """
-    Stitch together patch predictions into full image.
+    Verify that forward+reverse rotation transforms produce the original image.
+    PyTorch's TF.rotate uses counter-clockwise rotation for positive angles.
+    So: forward=-90 (clockwise) + reverse=+90 (counter-clockwise) = identity.
+    """
+    import torchvision.transforms.functional as TF
+    import torch
     
-    Args:
-        patches (list): List of patch file paths
-        patch_positions (dict): Mapping of patch paths to positions
-        max_x, max_y (int): Maximum image dimensions
-        patches_per_row (int): Number of patches per row
-        patch_size (int): Size of each patch
-        model: Neural network model
-        
-    Returns:
-        numpy.ndarray: Stitched prediction map
+    # Create a test tensor with distinct pattern
+    test_tensor = torch.zeros(1, 3, 10, 10)
+    test_tensor[0, 0, 2:8, 2:8] = 1.0  # Red square in center
+    test_tensor[0, 1, 0:3, 0:3] = 1.0  # Green square in top-left
+    
+    # Test rotation pairs
+    test_cases = [
+        ('rot90', lambda x: TF.rotate(x, angle=-90), lambda x: TF.rotate(x, angle=90)),
+        ('rot180', lambda x: TF.rotate(x, angle=-180), lambda x: TF.rotate(x, angle=180)),
+        ('rot270', lambda x: TF.rotate(x, angle=-270), lambda x: TF.rotate(x, angle=270)),
+    ]
+    
+    for name, forward, reverse in test_cases:
+        transformed = forward(test_tensor.squeeze(0))
+        restored = reverse(transformed).unsqueeze(0)
+        diff = torch.abs(test_tensor - restored).max().item()
+        # Allow small differences due to interpolation artifacts (especially at edges)
+        # For 90/180/270 degree rotations, exact pixel-perfect restoration may not be possible
+        # due to interpolation, but the overall structure should be preserved
+        if diff > 0.01:  # More lenient threshold for interpolation artifacts
+            print(f"WARNING: {name} transform verification failed! Max diff: {diff:.6f}")
+            print(f"  This may indicate incorrect rotation direction. Check TF.rotate documentation.")
+            return False
+    
+    return True
+
+
+def predict_patch_with_tta(patch_tensor, model, use_amp=True):
+    """
+    Predict patch with 8-augmentation TTA ensemble for improved rare class stability.
+    
+    Rotation convention: PyTorch's TF.rotate uses counter-clockwise rotation for positive angles.
+    - Forward: angle=-90 (clockwise 90°) -> Reverse: angle=+90 (counter-clockwise 90°) = identity
+    - Forward: angle=-180 (clockwise 180°) -> Reverse: angle=+180 (counter-clockwise 180°) = identity
+    - Forward: angle=-270 (clockwise 270°) -> Reverse: angle=+270 (counter-clockwise 270°) = identity
+    
+    Note: The transforms are verified on first call to ensure forward+reverse = identity.
     """
     import torchvision.transforms.functional as TF
     
-    pred_full = np.zeros((max_y, max_x), dtype=np.int32)
-    count_map = np.zeros((max_y, max_x), dtype=np.int32)
+    # Verify rotation transforms on first call (lazy verification)
+    if not hasattr(predict_patch_with_tta, '_verified'):
+        if not verify_rotation_transforms():
+            import warnings
+            warnings.warn("Rotation transform verification failed! TTA results may be incorrect.")
+        predict_patch_with_tta._verified = True
     
-    for patch_path in patches:
-        patch_id = patch_positions[patch_path]
-        
-        # Calculate patch position
-        x = (patch_id % patches_per_row) * patch_size
-        y = (patch_id // patches_per_row) * patch_size
-        
-        # Load and process patch
-        patch = Image.open(patch_path).convert("RGB")
-        patch_tensor = TF.to_tensor(patch)
-        
-        # Apply ImageNet normalization (same as training)
-        # This matches the normalization applied in dataset_udiadsbib.py for swinunet
-        patch_tensor = TF.normalize(
-            patch_tensor,
-            mean=[0.485, 0.456, 0.406],  # ImageNet mean
-            std=[0.229, 0.224, 0.225]     # ImageNet std
-        )
-        patch_tensor = patch_tensor.unsqueeze(0).cuda()
+    device = patch_tensor.device
+    augmented_outputs = []
+    
+    # 8 augmentations: original, hflip, vflip, hflip+vflip, rot90, rot180, rot270, rot90+hflip
+    # Rotation convention: TF.rotate uses counter-clockwise for positive angles
+    # Forward=-90 (clockwise) + Reverse=+90 (counter-clockwise) = identity
+    transforms = [
+        ('original', lambda x: x, lambda x: x),
+        ('hflip', TF.hflip, TF.hflip),
+        ('vflip', TF.vflip, TF.vflip),
+        ('hflip_vflip', lambda x: TF.vflip(TF.hflip(x)), lambda x: TF.hflip(TF.vflip(x))),
+        ('rot90', lambda x: TF.rotate(x, angle=-90), lambda x: TF.rotate(x, angle=90)),
+        ('rot180', lambda x: TF.rotate(x, angle=-180), lambda x: TF.rotate(x, angle=180)),
+        ('rot270', lambda x: TF.rotate(x, angle=-270), lambda x: TF.rotate(x, angle=270)),
+        ('rot90_hflip', lambda x: TF.hflip(TF.rotate(x, angle=-90)), lambda x: TF.rotate(TF.hflip(x), angle=90))
+    ]
+    
+    for name, forward_transform, reverse_transform in transforms:
+        if name == 'original':
+            transformed = patch_tensor
+        else:
+            transformed = forward_transform(patch_tensor.squeeze(0)).unsqueeze(0)
         
         with torch.no_grad():
-            output = model(patch_tensor)
-            pred_patch = torch.argmax(output, dim=1).cpu().numpy()[0]
-        
-        # Add to prediction map with boundary checking
-        if y + patch_size <= pred_full.shape[0] and x + patch_size <= pred_full.shape[1]:
-            pred_full[y:y+patch_size, x:x+patch_size] += pred_patch
-            count_map[y:y+patch_size, x:x+patch_size] += 1
-        else:
-            # Handle edge cases
-            valid_h = min(patch_size, pred_full.shape[0] - y)
-            valid_w = min(patch_size, pred_full.shape[1] - x)
-            if valid_h > 0 and valid_w > 0:
-                pred_full[y:y+valid_h, x:x+valid_w] += pred_patch[:valid_h, :valid_w]
-                count_map[y:y+valid_h, x:x+valid_w] += 1
+            if use_amp and device.type == 'cuda':
+                with torch.cuda.amp.autocast():
+                    output = model(transformed.to(device))
+            else:
+                output = model(transformed.to(device))
+            
+            probs = torch.softmax(output, dim=1)
+            
+            if name != 'original':
+                probs = reverse_transform(probs.squeeze(0)).unsqueeze(0)
+            
+            augmented_outputs.append(probs)
     
-    # Normalize by count map
-    pred_full = np.round(pred_full / np.maximum(count_map, 1)).astype(np.uint8)
+    averaged_probs = torch.stack(augmented_outputs).mean(dim=0)
+    return averaged_probs.squeeze(0).cpu().numpy()
+
+
+def predict_patch_multiscale(patch_tensor, model, scales=[0.75, 1.0, 1.25], use_amp=True):
+    """
+    Predict patch with multi-scale testing by averaging predictions across different scales.
+    
+    Args:
+        patch_tensor: Input patch tensor (1, C, H, W)
+        model: Model for inference
+        scales: List of scales to test (default: [0.75, 1.0, 1.25])
+        use_amp: Whether to use mixed precision
+    
+    Returns:
+        numpy.ndarray: Averaged probability map (H, W, C)
+    """
+    import torchvision.transforms.functional as TF
+    
+    device = patch_tensor.device
+    scale_outputs = []
+    original_size = patch_tensor.shape[-2:]  # (H, W)
+    
+    for scale in scales:
+        if scale == 1.0:
+            # Use original scale
+            scaled_tensor = patch_tensor
+        else:
+            # Resize to scaled size
+            new_h = int(original_size[0] * scale)
+            new_w = int(original_size[1] * scale)
+            scaled_tensor = TF.resize(patch_tensor.squeeze(0), size=(new_h, new_w), interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+        
+        # Run inference
+        with torch.no_grad():
+            if use_amp and device.type == 'cuda':
+                with torch.cuda.amp.autocast():
+                    output = model(scaled_tensor.to(device))
+            else:
+                output = model(scaled_tensor.to(device))
+            
+            probs = torch.softmax(output, dim=1)
+            
+            # Resize probabilities back to original size if scaled
+            if scale != 1.0:
+                probs = TF.resize(probs.squeeze(0), size=original_size, interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+            
+            scale_outputs.append(probs.squeeze(0).cpu().numpy())
+    
+    # Average probabilities across scales
+    # scale_outputs are (C, H, W) arrays, stack them and average
+    averaged_probs = np.stack(scale_outputs).mean(axis=0)  # Result: (C, H, W)
+    return averaged_probs.transpose(1, 2, 0)  # Convert from (C, H, W) to (H, W, C)
+
+
+def predict_patch_with_tta_and_multiscale(patch_tensor, model, scales=[0.75, 1.0, 1.25], use_amp=True):
+    """Predict patch with both TTA and multi-scale: apply TTA at each scale, then average across scales."""
+    import torchvision.transforms.functional as TF
+    
+    device = patch_tensor.device
+    scale_outputs = []
+    original_size = patch_tensor.shape[-2:]  # (H, W) - should be (224, 224)
+    model_input_size = (224, 224)  # Model always requires 224x224 input
+    
+    for scale in scales:
+        if scale == 1.0:
+            # Use original patch directly (already 224x224)
+            model_input_tensor = patch_tensor
+            scaled_size = original_size
+        else:
+            # Scale the patch (e.g., 0.75x → 168x168, 1.25x → 280x280)
+            scaled_h = int(original_size[0] * scale)
+            scaled_w = int(original_size[1] * scale)
+            scaled_size = (scaled_h, scaled_w)
+            scaled_tensor = TF.resize(patch_tensor.squeeze(0), size=scaled_size, interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+            # Resize scaled tensor to model input size (224x224) - model requires fixed input size
+            model_input_tensor = TF.resize(scaled_tensor.squeeze(0), size=model_input_size, interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+        
+        # Apply TTA to the model input tensor (always 224x224)
+        probs_tta = predict_patch_with_tta(model_input_tensor, model, use_amp=use_amp)  # Returns (C, H, W) numpy array, shape (C, 224, 224)
+        
+        # Resize probabilities to match the scaled size, then back to original size
+        if scale != 1.0:
+            # First resize to scaled size (e.g., 168x168 for 0.75x)
+            probs_tta_tensor = torch.from_numpy(probs_tta).unsqueeze(0).to(device)  # (1, C, 224, 224)
+            probs_scaled = TF.resize(probs_tta_tensor.squeeze(0), size=scaled_size, interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+            # Then resize back to original size (224x224)
+            probs_tta_tensor = TF.resize(probs_scaled.squeeze(0), size=original_size, interpolation=TF.InterpolationMode.BILINEAR).unsqueeze(0)
+            probs_tta = probs_tta_tensor.squeeze(0).cpu().numpy()  # (C, 224, 224)
+        
+        scale_outputs.append(probs_tta)
+    
+    # Average probabilities across scales
+    averaged_probs = np.stack(scale_outputs).mean(axis=0)  # Result: (C, H, W)
+    return averaged_probs.transpose(1, 2, 0)  # Convert from (C, H, W) to (H, W, C)
+
+
+def stitch_patches(patches, patch_positions, max_x, max_y, patches_per_row, patch_size, model, num_classes, use_tta=False, use_multiscale=False, batch_size=24):
+    """Stitch together patch predictions by accumulating probabilities (not class indices) for correct overlap handling with batch processing."""
+    import torchvision.transforms.functional as TF
+    
+    prob_full = np.zeros((max_y, max_x, num_classes), dtype=np.float32)
+    count_map = np.zeros((max_y, max_x), dtype=np.int32)
+    
+    use_amp = torch.cuda.is_available()
+    
+    # Prepare patch data (paths and positions) for batch processing
+    patch_data = []
+    for patch_path in patches:
+        patch_id = patch_positions[patch_path]
+        x = (patch_id % patches_per_row) * patch_size
+        y = (patch_id // patches_per_row) * patch_size
+        patch_data.append((patch_path, x, y))
+    
+    # Process patches in batches
+    num_patches = len(patch_data)
+    for batch_start in range(0, num_patches, batch_size):
+        batch_end = min(batch_start + batch_size, num_patches)
+        batch_patches = patch_data[batch_start:batch_end]
+        
+        # Load and preprocess batch
+        batch_tensors = []
+        batch_positions = []
+        
+        for patch_path, x, y in batch_patches:
+            patch = Image.open(patch_path).convert("RGB")
+            patch_tensor = TF.to_tensor(patch)
+            # Apply ImageNet normalization for SwinUnet model (same as training dataset)
+            # Note: test.py loads patches directly (not through dataset), so normalization must be applied here
+            # to match the normalized data the model was trained on
+            patch_tensor = TF.normalize(
+                patch_tensor,
+                mean=[0.485, 0.456, 0.406],  # ImageNet mean
+                std=[0.229, 0.224, 0.225]     # ImageNet std
+            )
+            batch_tensors.append(patch_tensor)
+            batch_positions.append((x, y))
+        
+        # Stack into batch tensor
+        batch_tensor = torch.stack(batch_tensors).cuda()
+        
+        # Run batch inference
+        if use_tta or use_multiscale:
+            # TTA and/or multi-scale: process each patch individually (requires individual processing)
+            batch_probs = []
+            for i in range(batch_tensor.shape[0]):
+                patch_tensor_single = batch_tensor[i:i+1]
+                if use_tta and use_multiscale:
+                    # Combine TTA + multi-scale: apply TTA at each scale, then average across scales
+                    probs_patch = predict_patch_with_tta_and_multiscale(patch_tensor_single, model, use_amp=use_amp)
+                elif use_tta:
+                    probs_patch = predict_patch_with_tta(patch_tensor_single, model, use_amp=use_amp)
+                else:  # use_multiscale only
+                    probs_patch = predict_patch_multiscale(patch_tensor_single, model, use_amp=use_amp)
+                batch_probs.append(probs_patch)
+        else:
+            # Standard batch inference
+            with torch.no_grad():
+                if use_amp:
+                    with torch.cuda.amp.autocast():
+                        output = model(batch_tensor)
+                else:
+                    output = model(batch_tensor)
+                batch_probs_np = torch.softmax(output, dim=1).cpu().numpy()
+                # Convert from (B, C, H, W) to list of (H, W, C) arrays
+                batch_probs = [batch_probs_np[i].transpose(1, 2, 0) for i in range(batch_probs_np.shape[0])]
+        
+        # Accumulate probabilities for each patch in batch
+        for i, (x, y) in enumerate(batch_positions):
+            probs_patch = batch_probs[i]
+            
+            if y + patch_size <= prob_full.shape[0] and x + patch_size <= prob_full.shape[1]:
+                prob_full[y:y+patch_size, x:x+patch_size, :] += probs_patch
+                count_map[y:y+patch_size, x:x+patch_size] += 1
+            else:
+                valid_h = min(patch_size, prob_full.shape[0] - y)
+                valid_w = min(patch_size, prob_full.shape[1] - x)
+                if valid_h > 0 and valid_w > 0:
+                    prob_full[y:y+valid_h, x:x+valid_w, :] += probs_patch[:valid_h, :valid_w, :]
+                    count_map[y:y+valid_h, x:x+valid_w] += 1
+    
+    prob_full = prob_full / np.maximum(count_map[:, :, np.newaxis], 1)
+    pred_full = np.argmax(prob_full, axis=2).astype(np.uint8)
     return pred_full
 
 
@@ -498,7 +705,7 @@ def save_prediction_results(pred_full, original_name, class_colors, result_dir):
 
 def save_comparison_visualization(pred_full, gt_class, original_name, original_img_dir, 
                                 test_save_path, class_colors, class_names):
-    """Save side-by-side comparison visualization."""
+    """Save side-by-side comparison visualization of original image, prediction, and ground truth."""
     compare_dir = os.path.join(test_save_path, 'compare')
     os.makedirs(compare_dir, exist_ok=True)
     
@@ -506,14 +713,11 @@ def save_comparison_visualization(pred_full, gt_class, original_name, original_i
     cmap = ListedColormap(class_colors)
     n_classes = len(class_colors)
     
-    # Resize ground truth if dimensions don't match
     if gt_class.shape != pred_full.shape:
-        logging.warning(f"Resizing ground truth for {original_name}")
-        gt_class_resized = np.zeros_like(pred_full)
-        min_h = min(gt_class.shape[0], pred_full.shape[0])
-        min_w = min(gt_class.shape[1], pred_full.shape[1])
-        gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
-        gt_class = gt_class_resized
+        logging.warning(f"Resizing ground truth for {original_name}: {gt_class.shape} -> {pred_full.shape}")
+        gt_class_pil = Image.fromarray(gt_class.astype(np.uint8), mode='L')
+        gt_class_pil = gt_class_pil.resize((pred_full.shape[1], pred_full.shape[0]), Image.NEAREST)
+        gt_class = np.array(gt_class_pil).astype(gt_class.dtype)
     
     # Create visualization
     fig, axs = plt.subplots(1, 3, figsize=(15, 5))
@@ -552,15 +756,7 @@ def save_comparison_visualization(pred_full, gt_class, original_name, original_i
 
 
 def compute_segmentation_metrics(pred_full, gt_class, n_classes, TP, FP, FN):
-    """
-    Compute segmentation metrics for each class.
-    
-    Args:
-        pred_full: Prediction array
-        gt_class: Ground truth array
-        n_classes: Number of classes
-        TP, FP, FN: Arrays to accumulate metrics
-    """
+    """Compute segmentation metrics (TP, FP, FN) for each class and accumulate in provided arrays."""
     for cls in range(n_classes):
         pred_c = (pred_full == cls)
         gt_c = (gt_class == cls)
@@ -599,18 +795,8 @@ def print_final_metrics(TP, FP, FN, class_names, num_processed_images):
 
 
 def inference(args, model, test_save_path=None):
-    """
-    Run inference on historical document dataset.
-    
-    Args:
-        args: Command line arguments
-        model: Trained neural network model
-        test_save_path: Path to save test results
-        
-    Returns:
-        str: Status message
-    """
-    logging.info(f"Starting inference on {args.dataset} dataset")
+    """Run inference on historical document dataset and compute segmentation metrics."""
+    pass  # Starting inference, no need to print
     
     # Get dataset-specific information
     class_colors, class_names, rgb_to_class_func = get_dataset_info(args.dataset, args.manuscript)
@@ -633,7 +819,7 @@ def inference(args, model, test_save_path=None):
         logging.info(f"No patch files found in {patch_dir}")
         return "Testing Finished!"
     
-    logging.info(f"Found {len(patch_files)} patches for {args.manuscript}")
+    logging.info(f"Found {len(patch_files)} patches")
     
     # Initialize metrics
     TP = np.zeros(n_classes, dtype=np.float64)
@@ -650,17 +836,19 @@ def inference(args, model, test_save_path=None):
     num_processed_images = 0
     
     for original_name, patches in patch_groups.items():
-        logging.info(f"Processing: {original_name} ({len(patches)} patches)")
+        logging.info(f"Processing: {original_name}")
         
         # Estimate image dimensions
         max_x, max_y, patches_per_row = estimate_image_dimensions(
             original_name, original_img_dir, patches, patch_positions, patch_size
         )
         
-        # Stitch patches together
+        # Stitch patches together (with TTA if enabled)
         pred_full = stitch_patches(
             patches, patch_positions, max_x, max_y, 
-            patches_per_row, patch_size, model
+            patches_per_row, patch_size, model, n_classes, 
+            use_tta=args.use_tta, use_multiscale=args.multiscale,
+            batch_size=args.batch_size
         )
         
         # Save prediction results
@@ -695,28 +883,28 @@ def inference(args, model, test_save_path=None):
             # Ensure ground truth has same dimensions as prediction
             if gt_class.shape != pred_full.shape:
                 logging.warning(f"Resizing ground truth for metrics computation: {gt_class.shape} -> {pred_full.shape}")
-                gt_class_resized = np.zeros_like(pred_full)
-                min_h = min(gt_class.shape[0], pred_full.shape[0])
-                min_w = min(gt_class.shape[1], pred_full.shape[1])
-                gt_class_resized[:min_h, :min_w] = gt_class[:min_h, :min_w]
-                gt_class = gt_class_resized
+                gt_class_pil = Image.fromarray(gt_class.astype(np.uint8), mode='L')
+                gt_class_pil = gt_class_pil.resize((pred_full.shape[1], pred_full.shape[0]), Image.NEAREST)
+                gt_class = np.array(gt_class_pil).astype(gt_class.dtype)
             
             compute_segmentation_metrics(pred_full, gt_class, n_classes, TP, FP, FN)
             num_processed_images += 1
         
-        logging.info(f"Completed: {original_name}")
-    
     # Print final metrics
     print_final_metrics(TP, FP, FN, class_names, num_processed_images)
-    logging.info(f"Inference completed on {num_processed_images} images")
     
     return "Testing Finished!"
 
 
 def main():
     """Main testing function."""
-    print("=== Historical Document Segmentation Testing ===")
-    print()
+    # Set up basic logging first (before any logging calls)
+    # This ensures all output goes to both console and file in order
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(message)s',
+        handlers=[logging.StreamHandler(sys.stdout)]
+    )
     
     # Parse and validate arguments
     args = parse_arguments()
@@ -744,7 +932,7 @@ def main():
     try:
         validate_arguments(args)
     except ValueError as e:
-        print(f"ERROR: {e}")
+        logging.error(f"ERROR: {e}")
         sys.exit(1)
     
     # Set up reproducible testing
@@ -757,48 +945,35 @@ def main():
     # Load trained model checkpoint
     try:
         checkpoint_name = load_model_checkpoint(model, args)
-        print(f"Loaded checkpoint: {checkpoint_name}")
     except Exception as e:
-        print(f"ERROR: Failed to load model checkpoint: {e}")
+        logging.error(f"ERROR: Failed to load model checkpoint: {e}")
         sys.exit(1)
     
-    # Set up logging
+    # Set up file logging (adds file handler to existing logger)
     log_folder = './test_log/test_log_'
     setup_logging(log_folder, checkpoint_name)
-    
-    logging.info(str(args))
-    logging.info(f"Testing with checkpoint: {checkpoint_name}")
     
     # Set up test save directory
     if args.is_savenii:
         test_save_path = os.path.join(args.output_dir, "predictions")
         os.makedirs(test_save_path, exist_ok=True)
-        logging.info(f"Saving predictions to: {test_save_path}")
     else:
         test_save_path = None
-        logging.info("Not saving prediction files")
     
-    # Run inference
-    print()
-    print("=== Starting Testing ===")
-    print(f"Dataset: {args.dataset}")
-    print(f"Model: {args.model}")
-    print(f"Manuscript: {args.manuscript}")
-    print(f"Save predictions: {args.is_savenii}")
-    print()
+    # Print concise testing configuration
+    tta_status = "TTA: ON" if args.use_tta else "TTA: OFF"
+    multiscale_status = "Multi-scale: ON" if args.multiscale else "Multi-scale: OFF"
+    logging.info(f"Testing: {args.manuscript} | {tta_status} | {multiscale_status}")
+    logging.info("")
     
     try:
         result = inference(args, model, test_save_path)
-        print()
-        print("=== TESTING COMPLETED SUCCESSFULLY ===")
-        print(f"Results saved to: {test_save_path if test_save_path else 'No files saved'}")
-        print("="*50)
         return result
         
     except Exception as e:
-        print(f"ERROR: Testing failed: {e}")
+        logging.error(f"ERROR: Testing failed: {e}")
         import traceback
-        traceback.print_exc()
+        logging.error(traceback.format_exc())
         sys.exit(1)
 
 

@@ -61,25 +61,37 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
                            use_deep_supervision=False, use_cbam=False, 
                            use_smart_skip=False, use_cross_attn=False,
                            use_multiscale_agg=False, use_groupnorm=True,
-                           use_pos_embed=True):
+                           use_pos_embed=True,
+                           encoder_embed_dim=96,
+                           encoder_depths=[2, 2, 2, 2],
+                           encoder_num_heads=[3, 6, 12, 24],
+                           encoder_window_size=7,
+                           encoder_drop_path_rate=0.1):
     """
     Create Hybrid2 model with configurable decoder and enhancements.
     
+    Hybrid model always uses SwinUnet encoder, so encoder parameters come from config.
+    
     Args:
         decoder: Decoder type - 'simple', 'EfficientNet-B4', or 'ResNet50'
+        encoder_embed_dim: Embedding dimension for Swin encoder (from config, default: 96)
+        encoder_depths: Depths for each Swin encoder stage (from config, default: [2,2,2,2])
+        encoder_num_heads: Number of heads for each Swin encoder stage (from config, default: [3,6,12,24])
+        encoder_window_size: Window size for Swin encoder (from config, default: 7)
+        encoder_drop_path_rate: Drop path rate for Swin encoder (from config, default: 0.1)
         All other flags control enhancements (same as before)
     """
     encoder = SwinEncoder(
         img_size=img_size,
         patch_size=4,
         in_chans=3,
-        embed_dim=96,
-        depths=[2, 2, 2, 2],
-        num_heads=[3, 6, 12, 24],
-        window_size=7,
+        embed_dim=encoder_embed_dim,  # From config
+        depths=encoder_depths,          # From config
+        num_heads=encoder_num_heads,   # From config
+        window_size=encoder_window_size, # From config
         mlp_ratio=4.0,
         qkv_bias=True,
-        drop_path_rate=0.1,
+        drop_path_rate=encoder_drop_path_rate, # From config
         norm_layer=nn.LayerNorm,
         ape=False,
         patch_norm=True

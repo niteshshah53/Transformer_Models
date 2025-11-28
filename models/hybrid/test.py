@@ -39,6 +39,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
 
+# Import config system
+from configs.config import get_config
+
 
 def parse_arguments():
     """Parse command line arguments for testing script."""
@@ -59,7 +62,10 @@ Examples:
     
     # Core arguments
     parser.add_argument('--cfg', type=str, required=False, metavar="FILE",
-                       help='Path to model configuration file (optional for Hybrid)')
+                       help='Path to model configuration file (optional when using --yaml)')
+    parser.add_argument('--yaml', type=str, default='swintiny',
+                       choices=['swintiny', 'simmim'],
+                       help="Choose which preset YAML to use from common/configs. Default: 'swintiny'. Options: 'swintiny' or 'simmim'. If provided, --cfg is optional and will be overridden.")
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Directory containing trained model checkpoints')
     
@@ -166,6 +172,32 @@ def validate_arguments(args):
         print(f"Warning: suspicious argv tokens detected: {bad_tokens}")
         print("Did you accidentally paste a continuation fragment?")
     
+    # Map the --yaml shortcut to an actual config file path FIRST
+    # This must be done BEFORE checking if config exists
+    base_config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/configs'))
+    
+    if args.yaml == 'swintiny':
+        default_cfg = os.path.join(base_config_dir, 'swin_tiny_patch4_window7_224_lite.yaml')
+    elif args.yaml == 'simmim':
+        default_cfg = os.path.join(base_config_dir, 'simmim_swin_base_patch4_window7_224.yaml')
+    else:
+        default_cfg = None
+    
+    # If user passed explicit --cfg, prefer that; otherwise use shorthand mapping
+    if not args.cfg:
+        if default_cfg and os.path.exists(default_cfg):
+            args.cfg = default_cfg
+        else:
+            # If the chosen config file is missing, raise a helpful error
+            raise FileNotFoundError(f"Config for --yaml {args.yaml} not found at {default_cfg}. Make sure the file exists.")
+    
+    # Check if config file exists (required for hybrid model)
+    if not args.cfg:
+        raise ValueError("Config file is required. Use --cfg <path> or --yaml <swintiny|simmim>")
+    
+    if not os.path.exists(args.cfg):
+        raise FileNotFoundError(f"Config file not found: {args.cfg}")
+    
     # Validate required paths
     if not os.path.exists(args.output_dir):
         raise ValueError(f"Output directory not found: {args.output_dir}")
@@ -209,12 +241,15 @@ def validate_arguments(args):
         raise ValueError(f"Enhancement flags {used_enhancement_flags} require --use_baseline flag. Usage: --use_baseline {' '.join([f'--{flag}' for flag in used_enhancement_flags])}")
 
 
-def get_model(args):
+def get_model(args, config):
     """
     Create and load the Hybrid2 model.
     
+    Hybrid model always uses SwinUnet encoder, so it uses config file for encoder parameters.
+    
     Args:
         args: Command line arguments containing model parameters
+        config: Configuration object with model settings (required for encoder architecture)
         
     Returns:
         torch.nn.Module: Initialized Hybrid2 model ready for testing
@@ -237,14 +272,36 @@ def get_model(args):
     if getattr(args, 'use_batchnorm', False):
         use_groupnorm_value = False
     
+    # Extract encoder parameters from config (Hybrid model uses SwinUnet encoder)
+    if config is not None:
+        embed_dim = config.MODEL.SWIN.EMBED_DIM if hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'EMBED_DIM') else 96
+        depths = config.MODEL.SWIN.DEPTHS if hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'DEPTHS') else [2, 2, 2, 2]
+        num_heads = config.MODEL.SWIN.NUM_HEADS if hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'NUM_HEADS') else [3, 6, 12, 24]
+        window_size = config.MODEL.SWIN.WINDOW_SIZE if hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'WINDOW_SIZE') else 7
+        drop_path_rate = config.MODEL.DROP_PATH_RATE if hasattr(config.MODEL, 'DROP_PATH_RATE') else 0.1
+        img_size = config.DATA.IMG_SIZE if hasattr(config, 'DATA') and hasattr(config.DATA, 'IMG_SIZE') else args.img_size
+    else:
+        # Fallback to defaults if no config (should not happen, but handle gracefully)
+        print("⚠️  Warning: No config provided, using default encoder parameters")
+        embed_dim = 96
+        depths = [2, 2, 2, 2]
+        num_heads = [3, 6, 12, 24]
+        window_size = 7
+        drop_path_rate = 0.1
+        img_size = args.img_size
+    
     print("=" * 80)
     print(f"🚀 Loading Hybrid2 with {decoder_type} Decoder for Testing")
+    print(f"   Encoder: SwinUnet (from config)")
+    if config is not None:
+        print(f"   Config: {config.MODEL.NAME if hasattr(config.MODEL, 'NAME') else 'Unknown'}")
+        print(f"   Encoder params: embed_dim={embed_dim}, depths={depths}, num_heads={num_heads}")
     print("=" * 80)
     
     from hybrid2.model import create_hybrid2_baseline
     model = create_hybrid2_baseline(
         num_classes=args.num_classes,
-        img_size=args.img_size,
+        img_size=img_size,
         decoder=decoder_type,
         efficientnet_variant=getattr(args, 'efficientnet_variant', 'b4'),
         use_deep_supervision=getattr(args, 'use_deep_supervision', False),
@@ -253,7 +310,13 @@ def get_model(args):
         use_cross_attn=getattr(args, 'use_cross_attn', False),
         use_multiscale_agg=getattr(args, 'use_multiscale_agg', False),
         use_groupnorm=use_groupnorm_value,
-        use_pos_embed=getattr(args, 'use_pos_embed', True)
+        use_pos_embed=getattr(args, 'use_pos_embed', True),
+        # Pass encoder config parameters from YAML
+        encoder_embed_dim=embed_dim,
+        encoder_depths=depths,
+        encoder_num_heads=num_heads,
+        encoder_window_size=window_size,
+        encoder_drop_path_rate=drop_path_rate
     ).cuda()
     
     return model
@@ -366,7 +429,7 @@ def get_dataset_info(dataset_type, manuscript=None):
         tuple: (class_colors, class_names, rgb_to_class_function)
     """
     if dataset_type.upper() == "UDIADS_BIB":
-        from datasets.dataset_udiadsbib import rgb_to_class
+        from datasets.dataset_udiadsbib_2 import rgb_to_class
         
         class_colors = [
             (0, 0, 0),         # 0: Background (black)
@@ -1196,15 +1259,21 @@ def main():
     
     try:
         validate_arguments(args)
-    except ValueError as e:
+    except (ValueError, FileNotFoundError) as e:
         print(f"ERROR: {e}")
         sys.exit(1)
     
     # Set up reproducible testing
     setup_reproducible_testing(args)
     
+    # Load configuration (required for hybrid model to match encoder architecture)
+    print("Loading configuration for Hybrid2 (SwinUnet encoder)...")
+    print(f"  Config file: {args.cfg}")
+    config = get_config(args)
+    print(f"  Config name: {config.MODEL.NAME if hasattr(config.MODEL, 'NAME') else 'Unknown'}")
+    
     # Print configuration
-    print(f"Model: Hybrid2")  # Hardcoded instead of args.model
+    print(f"Model: Hybrid2 (SwinUnet Encoder + {getattr(args, 'decoder', 'simple')} Decoder)")
     print(f"Dataset: {args.dataset}")
     print(f"Manuscript: {args.manuscript}")
     print(f"Test-Time Augmentation: {'Enabled' if args.use_tta else 'Disabled'}")
@@ -1213,8 +1282,8 @@ def main():
         print("  - DenseCRF with spatial and color pairwise potentials")
     print()
     
-    # Create model (no config needed for Hybrid)
-    model = get_model(args)
+    # Create model (now requires config for encoder architecture)
+    model = get_model(args, config)
     
     # Load trained model checkpoint
     try:
