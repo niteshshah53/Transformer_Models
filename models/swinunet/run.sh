@@ -1,12 +1,13 @@
 #!/bin/bash -l
-#SBATCH --job-name=cb55
+#SBATCH --job-name=S_diva
 #SBATCH --output=./Results/diva/simmim_window6_divahisdb_%j.out
 #SBATCH --error=./Results/diva/simmim_window6_divahisdb_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:v100:1
+#SBATCH --partition=v100
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
