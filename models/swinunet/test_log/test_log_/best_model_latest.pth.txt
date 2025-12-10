@@ -1,470 +1,480 @@
-[17:21:19.695] Namespace(cfg='../../common/configs/simmim_swin_base_patch4_window7_224.yaml', output_dir='./Results/Latin2', yaml='simmim', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[17:21:19.696] Testing with checkpoint: best_model_latest.pth
-[17:21:19.697] Saving predictions to: ./Results/Latin2/predictions
-[17:21:19.697] Starting inference on UDIADS_BIB dataset
-[17:21:19.984] Found 1620 patches for Latin2
-[17:21:19.988] Processing: 076 (54 patches)
-[17:21:20.141] 🔀 Using Test-Time Augmentation for 076
-[17:21:35.189] Completed: 076
-[17:21:35.190] Processing: 079 (54 patches)
-[17:21:35.208] 🔀 Using Test-Time Augmentation for 079
-[17:21:49.249] Completed: 079
-[17:21:49.250] Processing: 082 (54 patches)
-[17:21:49.282] 🔀 Using Test-Time Augmentation for 082
-[17:22:03.210] Completed: 082
-[17:22:03.211] Processing: 095 (54 patches)
-[17:22:03.249] 🔀 Using Test-Time Augmentation for 095
-[17:22:17.184] Completed: 095
-[17:22:17.184] Processing: 106 (54 patches)
-[17:22:17.212] 🔀 Using Test-Time Augmentation for 106
-[17:22:30.980] Completed: 106
-[17:22:30.980] Processing: 111 (54 patches)
-[17:22:30.999] 🔀 Using Test-Time Augmentation for 111
-[17:22:44.893] Completed: 111
-[17:22:44.894] Processing: 115 (54 patches)
-[17:22:44.910] 🔀 Using Test-Time Augmentation for 115
-[17:22:58.596] Completed: 115
-[17:22:58.597] Processing: 117 (54 patches)
-[17:22:58.619] 🔀 Using Test-Time Augmentation for 117
-[17:23:12.460] Completed: 117
-[17:23:12.460] Processing: 128 (54 patches)
-[17:23:12.491] 🔀 Using Test-Time Augmentation for 128
-[17:23:26.281] Completed: 128
-[17:23:26.281] Processing: 134 (54 patches)
-[17:23:26.301] 🔀 Using Test-Time Augmentation for 134
-[17:23:40.062] Completed: 134
-[17:23:40.062] Processing: 138 (54 patches)
-[17:23:40.084] 🔀 Using Test-Time Augmentation for 138
-[17:23:53.967] Completed: 138
-[17:23:53.967] Processing: 142 (54 patches)
-[17:23:53.995] 🔀 Using Test-Time Augmentation for 142
-[17:24:07.775] Completed: 142
-[17:24:07.775] Processing: 159 (54 patches)
-[17:24:07.802] 🔀 Using Test-Time Augmentation for 159
-[17:24:21.653] Completed: 159
-[17:24:21.654] Processing: 166 (54 patches)
-[17:24:21.672] 🔀 Using Test-Time Augmentation for 166
-[17:24:35.339] Completed: 166
-[17:24:35.340] Processing: 185 (54 patches)
-[17:24:35.365] 🔀 Using Test-Time Augmentation for 185
-[17:24:48.991] Completed: 185
-[17:24:48.991] Processing: 200 (54 patches)
-[17:24:49.009] 🔀 Using Test-Time Augmentation for 200
-[17:25:02.646] Completed: 200
-[17:25:02.647] Processing: 203 (54 patches)
-[17:25:02.676] 🔀 Using Test-Time Augmentation for 203
-[17:25:16.128] Completed: 203
-[17:25:16.129] Processing: 208 (54 patches)
-[17:25:16.161] 🔀 Using Test-Time Augmentation for 208
-[17:25:29.775] Completed: 208
-[17:25:29.775] Processing: 229 (54 patches)
-[17:25:29.792] 🔀 Using Test-Time Augmentation for 229
-[17:25:43.214] Completed: 229
-[17:25:43.214] Processing: 230 (54 patches)
-[17:25:43.237] 🔀 Using Test-Time Augmentation for 230
-[17:25:56.498] Completed: 230
-[17:25:56.499] Processing: 235 (54 patches)
-[17:25:56.526] 🔀 Using Test-Time Augmentation for 235
-[17:26:09.941] Completed: 235
-[17:26:09.941] Processing: 236 (54 patches)
-[17:26:09.984] 🔀 Using Test-Time Augmentation for 236
-[17:26:23.551] Completed: 236
-[17:26:23.551] Processing: 248 (54 patches)
-[17:26:23.571] 🔀 Using Test-Time Augmentation for 248
-[17:26:37.210] Completed: 248
-[17:26:37.210] Processing: 249 (54 patches)
-[17:26:37.244] 🔀 Using Test-Time Augmentation for 249
-[17:26:51.044] Completed: 249
-[17:26:51.044] Processing: 250 (54 patches)
-[17:26:51.065] 🔀 Using Test-Time Augmentation for 250
-[17:27:04.976] Completed: 250
-[17:27:04.976] Processing: 251 (54 patches)
-[17:27:05.002] 🔀 Using Test-Time Augmentation for 251
-[17:27:18.523] Completed: 251
-[17:27:18.523] Processing: 252 (54 patches)
-[17:27:18.543] 🔀 Using Test-Time Augmentation for 252
-[17:27:32.079] Completed: 252
-[17:27:32.079] Processing: 275 (54 patches)
-[17:27:32.107] 🔀 Using Test-Time Augmentation for 275
-[17:27:45.471] Completed: 275
-[17:27:45.471] Processing: 277 (54 patches)
-[17:27:45.490] 🔀 Using Test-Time Augmentation for 277
-[17:27:59.071] Completed: 277
-[17:27:59.071] Processing: 297 (54 patches)
-[17:27:59.098] 🔀 Using Test-Time Augmentation for 297
-[17:28:12.676] Completed: 297
-[17:28:12.676] 
+[06:41:14.454] Testing: Latin14396 | TTA: OFF | Multi-scale: OFF
+[06:41:14.455] 
+[06:41:15.409] Found 7800 patches
+[06:41:15.418] Processing: 014
+[06:41:24.971] Processing: 032
+[06:41:33.995] Processing: 034
+[06:41:43.004] Processing: 036
+[06:41:51.675] Processing: 038
+[06:42:00.332] Processing: 047
+[06:42:08.476] Processing: 060
+[06:42:16.940] Processing: 085
+[06:42:25.273] Processing: 087
+[06:42:33.930] Processing: 104
+[06:42:42.400] Processing: 105
+[06:42:50.815] Processing: 108
+[06:42:59.246] Processing: 110
+[06:43:07.887] Processing: 136
+[06:43:16.574] Processing: 169
+[06:43:24.995] Processing: 195
+[06:43:32.989] Processing: 196
+[06:43:40.869] Processing: 198
+[06:43:49.889] Processing: 204
+[06:43:57.947] Processing: 223
+[06:44:05.986] Processing: 225
+[06:44:14.567] Processing: 227
+[06:44:23.442] Processing: 229
+[06:44:35.789] Processing: 251
+[06:44:43.994] Processing: 253
+[06:44:52.013] Processing: 255
+[06:44:59.998] Processing: 264
+[06:45:08.765] Processing: 270
+[06:45:17.152] Processing: 276
+[06:45:25.453] Processing: 325
+[06:45:33.886] 
+[06:45:33.886] 
+================================================================================
+[06:45:33.886] TESTING RESULTS
+[06:45:33.886] ================================================================================
+[06:45:33.886] Processed Images: 30
+[06:45:33.886] 
+[06:45:33.886] Per-Class Metrics:
+[06:45:33.886] --------------------------------------------------------------------------------
+[06:45:33.886] Class                Precision    Recall       F1-Score     IoU         
+[06:45:33.886] --------------------------------------------------------------------------------
+[06:45:33.887] Background           0.8920       0.8674       0.8795       0.7850      
+[06:45:33.887] Paratext             0.0010       0.0009       0.0009       0.0005      
+[06:45:33.887] Decoration           0.0504       0.0612       0.0553       0.0284      
+[06:45:33.887] Main Text            0.0783       0.0928       0.0849       0.0444      
+[06:45:33.887] Title                0.0220       0.0246       0.0232       0.0117      
+[06:45:33.887] Chapter Headings     0.0439       0.0864       0.0582       0.0300      
+[06:45:33.887] --------------------------------------------------------------------------------
+[06:45:33.887] MEAN                 0.1813       0.1889       0.1837       0.1500      
+[06:45:33.887] ================================================================================
+[09:08:25.769] Testing: Latin16746 | TTA: OFF | Multi-scale: OFF
+[09:08:25.769] 
+[09:08:26.811] Found 7800 patches
+[09:08:26.820] Processing: 009
+[09:08:36.405] Processing: 020
+[09:08:45.309] Processing: 022
+[09:08:53.336] Processing: 029
+[09:09:01.109] Processing: 035
+[09:09:09.167] Processing: 048
+[09:09:17.135] Processing: 069
+[09:09:25.045] Processing: 082
+[09:09:32.479] Processing: 088
+[09:09:40.079] Processing: 089
+[09:09:47.336] Processing: 091
+[09:09:55.106] Processing: 100
+[09:10:02.360] Processing: 106
+[09:10:09.499] Processing: 117
+[09:10:17.280] Processing: 123
+[09:10:24.820] Processing: 125
+[09:10:31.576] Processing: 130
+[09:10:38.369] Processing: 133
+[09:10:45.262] Processing: 137
+[09:10:52.643] Processing: 146
+[09:10:59.688] Processing: 166
+[09:11:07.327] Processing: 184
+[09:11:15.308] Processing: 215
+[09:11:23.259] Processing: 237
+[09:11:31.167] Processing: 243
+[09:11:38.875] Processing: 255
+[09:11:46.840] Processing: 258
+[09:11:54.208] Processing: 284
+[09:12:01.901] Processing: 325
+[09:12:09.509] Processing: 357
+[09:12:16.441] 
+[09:12:16.442] 
+================================================================================
+[09:12:16.442] TESTING RESULTS
+[09:12:16.442] ================================================================================
+[09:12:16.442] Processed Images: 30
+[09:12:16.442] 
+[09:12:16.442] Per-Class Metrics:
+[09:12:16.442] --------------------------------------------------------------------------------
+[09:12:16.442] Class                Precision    Recall       F1-Score     IoU         
+[09:12:16.442] --------------------------------------------------------------------------------
+[09:12:16.442] Background           0.8805       0.8734       0.8769       0.7808      
+[09:12:16.442] Paratext             0.0039       0.0060       0.0047       0.0024      
+[09:12:16.442] Decoration           0.2275       0.2443       0.2356       0.1335      
+[09:12:16.442] Main Text            0.0840       0.0870       0.0855       0.0447      
+[09:12:16.442] Title                0.0000       0.0000       0.0000       0.0000      
+[09:12:16.442] Chapter Headings     0.0351       0.0354       0.0352       0.0179      
+[09:12:16.442] --------------------------------------------------------------------------------
+[09:12:16.442] MEAN                 0.2052       0.2077       0.2063       0.1632      
+[09:12:16.442] ================================================================================
+[11:32:18.168] Testing: Syr341 | TTA: OFF | Multi-scale: OFF
+[11:32:18.168] 
+[11:32:19.141] Found 7800 patches
+[11:32:19.150] Processing: 031
+[11:32:51.549] Processing: 073
+[11:33:28.339] Processing: 160
+[11:34:05.692] Processing: 210
+[11:34:44.350] Processing: 249
+[11:35:20.888] Processing: 290
+[11:35:59.731] Processing: 446
+[11:36:06.712] 
+[11:36:06.712] 
+================================================================================
+[11:36:06.713] TESTING RESULTS
+[11:36:06.713] ================================================================================
+[11:36:06.713] Processed Images: 30
+[11:36:06.713] 
+[11:36:06.713] Per-Class Metrics:
+[11:36:06.713] --------------------------------------------------------------------------------
+[11:36:06.713] Class                Precision    Recall       F1-Score     IoU         
+[11:36:06.713] --------------------------------------------------------------------------------
+[11:36:06.713] Background           0.8546       0.8387       0.8466       0.7340      
+[11:36:06.713] Paratext             0.0171       0.0230       0.0196       0.0099      
+[11:36:06.713] Decoration           0.3320       0.2105       0.2577       0.1479      
+[11:36:06.713] Main Text            0.1225       0.1468       0.1335       0.0716      
+[11:36:06.713] Title                0.0020       0.0036       0.0026       0.0013      
+[11:36:06.713] --------------------------------------------------------------------------------
+[11:36:06.713] MEAN                 0.2657       0.2445       0.2520       0.1929      
+[11:36:06.713] ================================================================================
+[11:51:22.736] Testing: Latin2 | TTA: OFF | Multi-scale: OFF
+[11:51:22.736] 
+[11:51:23.966] Found 7800 patches
+[11:51:23.975] Processing: 076
+[11:51:57.366] Processing: 106
+[11:52:40.210] Processing: 134
+[11:53:22.757] Processing: 185
+[11:54:02.418] Processing: 230
+[11:54:41.182] Processing: 250
+[11:55:19.492] Processing: 297
+[11:55:26.653] 
+[11:55:26.653] 
+================================================================================
+[11:55:26.653] TESTING RESULTS
+[11:55:26.653] ================================================================================
+[11:55:26.653] Processed Images: 30
+[11:55:26.653] 
+[11:55:26.653] Per-Class Metrics:
+[11:55:26.653] --------------------------------------------------------------------------------
+[11:55:26.653] Class                Precision    Recall       F1-Score     IoU         
+[11:55:26.653] --------------------------------------------------------------------------------
+[11:55:26.653] Background           0.9299       0.9214       0.9256       0.8615      
+[11:55:26.653] Paratext             0.0011       0.0015       0.0013       0.0006      
+[11:55:26.653] Decoration           0.0327       0.0334       0.0330       0.0168      
+[11:55:26.653] Main Text            0.0517       0.0601       0.0556       0.0286      
+[11:55:26.654] Title                0.0068       0.0118       0.0086       0.0043      
+[11:55:26.654] Chapter Headings     0.0307       0.0164       0.0213       0.0108      
+[11:55:26.654] --------------------------------------------------------------------------------
+[11:55:26.654] MEAN                 0.1755       0.1741       0.1742       0.1538      
+[11:55:26.654] ================================================================================
+[14:37:40.238] Testing: Latin2 | TTA: OFF | Multi-scale: OFF
+[14:37:40.238] 
+[14:37:40.414] Found 1620 patches
+[14:37:40.416] Processing: 076
+[14:37:44.694] Processing: 079
+[14:37:48.749] Processing: 082
+[14:37:52.637] Processing: 095
+[14:37:56.552] Processing: 106
+[14:38:00.100] Processing: 111
+[14:38:03.831] Processing: 115
+[14:38:07.405] Processing: 117
+[14:38:11.191] Processing: 128
+[14:38:14.963] Processing: 134
+[14:38:18.653] Processing: 138
+[14:38:22.473] Processing: 142
+[14:38:26.160] Processing: 159
+[14:38:29.813] Processing: 166
+[14:38:33.905] Processing: 185
+[14:38:46.622] Processing: 200
+[14:38:50.626] Processing: 203
+[14:38:54.201] Processing: 208
+[14:38:57.819] Processing: 229
+[14:39:01.381] Processing: 230
+[14:39:04.854] Processing: 235
+[14:39:08.480] Processing: 236
+[14:39:12.185] Processing: 248
+[14:39:15.883] Processing: 249
+[14:39:19.854] Processing: 250
+[14:39:23.575] Processing: 251
+[14:39:27.322] Processing: 252
+[14:39:31.271] Processing: 275
+[14:39:34.741] Processing: 277
+[14:39:38.303] Processing: 297
+[14:39:41.797] 
 Per-class metrics:
-[17:28:12.676] --------------------------------------------------------------------------------
-[17:28:12.676] Background     : Precision=0.9852, Recall=0.9886, F1=0.9869, IoU=0.9741
-[17:28:12.676] Paratext       : Precision=0.7540, Recall=0.6923, F1=0.7218, IoU=0.5647
-[17:28:12.676] Decoration     : Precision=0.8013, Recall=0.7668, F1=0.7837, IoU=0.6443
-[17:28:12.676] Main Text      : Precision=0.8198, Recall=0.8143, F1=0.8170, IoU=0.6907
-[17:28:12.676] Title          : Precision=0.8369, Recall=0.8285, F1=0.8327, IoU=0.7133
-[17:28:12.676] Chapter Headings: Precision=0.8453, Recall=0.4926, F1=0.6225, IoU=0.4519
-[17:28:12.676] 
+[14:39:41.797] --------------------------------------------------------------------------------
+[14:39:41.797] Background     : Precision=0.9863, Recall=0.9926, F1=0.9894, IoU=0.9791
+[14:39:41.797] Paratext       : Precision=0.6108, Recall=0.6340, F1=0.6222, IoU=0.4515
+[14:39:41.797] Decoration     : Precision=0.7477, Recall=0.7711, F1=0.7592, IoU=0.6119
+[14:39:41.797] Main Text      : Precision=0.8317, Recall=0.7254, F1=0.7749, IoU=0.6325
+[14:39:41.797] Title          : Precision=0.6013, Recall=0.8651, F1=0.7094, IoU=0.5497
+[14:39:41.797] Chapter Headings: Precision=0.2069, Recall=0.1612, F1=0.1812, IoU=0.0996
+[14:39:41.797] 
 Mean metrics:
-[17:28:12.676] ----------------------------------------
-[17:28:12.677] Mean Precision: 0.8404
-[17:28:12.677] Mean Recall: 0.7639
-[17:28:12.677] Mean F1: 0.7941
-[17:28:12.677] Mean IoU: 0.6732
-[17:28:12.677] Inference completed on 30 images
-[20:47:10.728] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./Results/a2/Latin2', yaml='swintiny', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[20:47:10.728] Testing with checkpoint: best_model_latest.pth
-[20:47:10.729] Saving predictions to: ./Results/a2/Latin2/predictions
-[20:47:10.729] Starting inference on UDIADS_BIB dataset
-[20:47:10.941] Found 1620 patches for Latin2
-[20:47:10.945] Processing: 076 (54 patches)
-[20:47:10.994] 🔀 Using Test-Time Augmentation for 076
-[20:47:19.218] Completed: 076
-[20:47:19.219] Processing: 079 (54 patches)
-[20:47:19.263] 🔀 Using Test-Time Augmentation for 079
-[20:47:26.384] Completed: 079
-[20:47:26.385] Processing: 082 (54 patches)
-[20:47:26.461] 🔀 Using Test-Time Augmentation for 082
-[20:47:33.660] Completed: 082
-[20:47:33.660] Processing: 095 (54 patches)
-[20:47:33.688] 🔀 Using Test-Time Augmentation for 095
-[20:47:40.744] Completed: 095
-[20:47:40.744] Processing: 106 (54 patches)
-[20:47:40.766] 🔀 Using Test-Time Augmentation for 106
-[20:47:47.599] Completed: 106
-[20:47:47.599] Processing: 111 (54 patches)
-[20:47:47.622] 🔀 Using Test-Time Augmentation for 111
-[20:47:54.465] Completed: 111
-[20:47:54.465] Processing: 115 (54 patches)
-[20:47:54.487] 🔀 Using Test-Time Augmentation for 115
-[20:48:01.056] Completed: 115
-[20:48:01.056] Processing: 117 (54 patches)
-[20:48:01.072] 🔀 Using Test-Time Augmentation for 117
-[20:48:07.561] Completed: 117
-[20:48:07.562] Processing: 128 (54 patches)
-[20:48:07.587] 🔀 Using Test-Time Augmentation for 128
-[20:48:14.073] Completed: 128
-[20:48:14.073] Processing: 134 (54 patches)
-[20:48:14.095] 🔀 Using Test-Time Augmentation for 134
-[20:48:20.576] Completed: 134
-[20:48:20.576] Processing: 138 (54 patches)
-[20:48:20.599] 🔀 Using Test-Time Augmentation for 138
-[20:48:27.051] Completed: 138
-[20:48:27.052] Processing: 142 (54 patches)
-[20:48:27.078] 🔀 Using Test-Time Augmentation for 142
-[20:48:33.461] Completed: 142
-[20:48:33.461] Processing: 159 (54 patches)
-[20:48:33.495] 🔀 Using Test-Time Augmentation for 159
-[20:48:39.974] Completed: 159
-[20:48:39.975] Processing: 166 (54 patches)
-[20:48:39.991] 🔀 Using Test-Time Augmentation for 166
-[20:48:46.621] Completed: 166
-[20:48:46.621] Processing: 185 (54 patches)
-[20:48:46.642] 🔀 Using Test-Time Augmentation for 185
-[20:48:53.366] Completed: 185
-[20:48:53.366] Processing: 200 (54 patches)
-[20:48:53.395] 🔀 Using Test-Time Augmentation for 200
-[20:49:00.041] Completed: 200
-[20:49:00.041] Processing: 203 (54 patches)
-[20:49:00.078] 🔀 Using Test-Time Augmentation for 203
-[20:49:06.986] Completed: 203
-[20:49:06.986] Processing: 208 (54 patches)
-[20:49:07.018] 🔀 Using Test-Time Augmentation for 208
-[20:49:13.455] Completed: 208
-[20:49:13.455] Processing: 229 (54 patches)
-[20:49:13.491] 🔀 Using Test-Time Augmentation for 229
-[20:49:19.819] Completed: 229
-[20:49:19.819] Processing: 230 (54 patches)
-[20:49:19.858] 🔀 Using Test-Time Augmentation for 230
-[20:49:26.458] Completed: 230
-[20:49:26.458] Processing: 235 (54 patches)
-[20:49:26.487] 🔀 Using Test-Time Augmentation for 235
-[20:49:32.888] Completed: 235
-[20:49:32.888] Processing: 236 (54 patches)
-[20:49:32.919] 🔀 Using Test-Time Augmentation for 236
-[20:49:39.543] Completed: 236
-[20:49:39.543] Processing: 248 (54 patches)
-[20:49:39.562] 🔀 Using Test-Time Augmentation for 248
-[20:49:45.974] Completed: 248
-[20:49:45.974] Processing: 249 (54 patches)
-[20:49:46.008] 🔀 Using Test-Time Augmentation for 249
-[20:49:52.527] Completed: 249
-[20:49:52.528] Processing: 250 (54 patches)
-[20:49:52.563] 🔀 Using Test-Time Augmentation for 250
-[20:49:59.132] Completed: 250
-[20:49:59.133] Processing: 251 (54 patches)
-[20:49:59.164] 🔀 Using Test-Time Augmentation for 251
-[20:50:05.690] Completed: 251
-[20:50:05.690] Processing: 252 (54 patches)
-[20:50:05.710] 🔀 Using Test-Time Augmentation for 252
-[20:50:12.187] Completed: 252
-[20:50:12.187] Processing: 275 (54 patches)
-[20:50:12.207] 🔀 Using Test-Time Augmentation for 275
-[20:50:18.661] Completed: 275
-[20:50:18.662] Processing: 277 (54 patches)
-[20:50:18.688] 🔀 Using Test-Time Augmentation for 277
-[20:50:25.188] Completed: 277
-[20:50:25.188] Processing: 297 (54 patches)
-[20:50:25.210] 🔀 Using Test-Time Augmentation for 297
-[20:50:31.667] Completed: 297
-[20:50:31.667] 
+[14:39:41.797] ----------------------------------------
+[14:39:41.797] Mean Precision: 0.6641
+[14:39:41.797] Mean Recall: 0.6916
+[14:39:41.797] Mean F1: 0.6727
+[14:39:41.797] Mean IoU: 0.5541
+[15:07:20.134] Testing: Latin2 | TTA: OFF | Multi-scale: OFF
+[15:07:20.135] 
+[15:07:20.368] Found 1620 patches
+[15:07:20.372] Processing: 076
+[15:07:24.410] Processing: 079
+[15:07:28.046] Processing: 082
+[15:07:31.292] Processing: 095
+[15:07:35.047] Processing: 106
+[15:07:38.459] Processing: 111
+[15:07:42.002] Processing: 115
+[15:07:45.486] Processing: 117
+[15:07:48.970] Processing: 128
+[15:07:52.347] Processing: 134
+[15:07:55.805] Processing: 138
+[15:07:59.159] Processing: 142
+[15:08:02.936] Processing: 159
+[15:08:06.431] Processing: 166
+[15:08:10.164] Processing: 185
+[15:08:13.478] Processing: 200
+[15:08:16.690] Processing: 203
+[15:08:19.879] Processing: 208
+[15:08:23.210] Processing: 229
+[15:08:26.314] Processing: 230
+[15:08:29.383] Processing: 235
+[15:08:32.435] Processing: 236
+[15:08:35.676] Processing: 248
+[15:08:39.080] Processing: 249
+[15:08:42.529] Processing: 250
+[15:08:46.090] Processing: 251
+[15:08:49.735] Processing: 252
+[15:08:53.281] Processing: 275
+[15:08:57.494] Processing: 277
+[15:09:00.985] Processing: 297
+[15:09:04.423] 
 Per-class metrics:
-[20:50:31.667] --------------------------------------------------------------------------------
-[20:50:31.667] Background     : Precision=0.9737, Recall=0.9738, F1=0.9737, IoU=0.9488
-[20:50:31.667] Paratext       : Precision=0.6613, Recall=0.6648, F1=0.6631, IoU=0.4960
-[20:50:31.667] Decoration     : Precision=0.6985, Recall=0.7346, F1=0.7161, IoU=0.5577
-[20:50:31.667] Main Text      : Precision=0.5983, Recall=0.6407, F1=0.6188, IoU=0.4480
-[20:50:31.667] Title          : Precision=0.7075, Recall=0.5892, F1=0.6430, IoU=0.4738
-[20:50:31.667] Chapter Headings: Precision=0.6667, Recall=0.2361, F1=0.3488, IoU=0.2112
-[20:50:31.667] 
+[15:09:04.423] --------------------------------------------------------------------------------
+[15:09:04.423] Background     : Precision=0.9930, Recall=0.9936, F1=0.9933, IoU=0.9867
+[15:09:04.424] Paratext       : Precision=0.8160, Recall=0.6677, F1=0.7344, IoU=0.5803
+[15:09:04.424] Decoration     : Precision=0.8385, Recall=0.8460, F1=0.8422, IoU=0.7275
+[15:09:04.424] Main Text      : Precision=0.8640, Recall=0.8725, F1=0.8682, IoU=0.7671
+[15:09:04.424] Title          : Precision=0.7848, Recall=0.8374, F1=0.8103, IoU=0.6811
+[15:09:04.424] Chapter Headings: Precision=0.5289, Recall=0.4133, F1=0.4640, IoU=0.3021
+[15:09:04.424] 
 Mean metrics:
-[20:50:31.668] ----------------------------------------
-[20:50:31.668] Mean Precision: 0.7177
-[20:50:31.668] Mean Recall: 0.6399
-[20:50:31.668] Mean F1: 0.6606
-[20:50:31.668] Mean IoU: 0.5226
-[20:50:31.668] Inference completed on 30 images
-[01:49:41.806] Namespace(cfg='../../common/configs/swin_tiny_patch4_window7_224_lite.yaml', output_dir='./Results/a2/Latin2', yaml='swintiny', model='swinunet', dataset='UDIADS_BIB', manuscript='Latin2', udiadsbib_root='../../U-DIADS-Bib-MS_patched', divahisdb_root='../../DivaHisDB', use_patched_data=True, num_classes=6, img_size=224, batch_size=24, is_savenii=True, test_save_dir='../predictions', use_tta=True, multiscale=True, deterministic=1, seed=1234, opts=None, zip=False, cache_mode='part', resume=None, accumulation_steps=None, use_checkpoint=False, amp_opt_level='O1', tag=None, eval=False, throughput=False)
-[01:49:41.806] Testing with checkpoint: best_model_latest.pth
-[01:49:41.808] Saving predictions to: ./Results/a2/Latin2/predictions
-[01:49:41.808] 
-[01:49:41.808] === Starting Testing ===
-[01:49:41.808] Dataset: UDIADS_BIB
-[01:49:41.808] Model: swinunet
-[01:49:41.808] Manuscript: Latin2
-[01:49:41.808] TEST-TIME AUGMENTATION (TTA): ENABLED
-[01:49:41.808]   → TTA applies 8 augmentations (original, hflip, vflip, hflip+vflip, rot90/180/270, rot90+hflip) and averages predictions
-[01:49:41.808]   → Improves accuracy especially for rare classes but increases inference time by ~8x
-[01:49:41.808] MULTI-SCALE TESTING: ENABLED
-[01:49:41.808]   → Multi-scale testing runs inference at 3 scales (0.75x, 1.0x, 1.25x) and averages predictions
-[01:49:41.809]   → Improves accuracy for documents with varying text sizes (1-3% improvement)
-[01:49:41.809]   → Combined with TTA: ~24x slower but maximum accuracy
-[01:49:41.809] Save predictions: True
-[01:49:41.809] 
-[01:49:41.809] Starting inference on UDIADS_BIB dataset
-[01:49:42.041] Found 1620 patches for Latin2
-[01:49:42.043] Processing: 076 (54 patches)
-[01:49:42.095] Using Test-Time Augmentation for 076
-[01:49:43.616] ERROR: Testing failed: Input image size (4*168) doesn't match model (224*224).
-[01:49:43.656] Traceback (most recent call last):
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 965, in main
-    result = inference(args, model, test_save_path)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 814, in inference
-    pred_full = stitch_patches(
-                ^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 619, in stitch_patches
-    probs_patch = predict_patch_multiscale(probs_patch_tta_tensor, model, use_amp=use_amp)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 546, in predict_patch_multiscale
-    output = model(scaled_tensor.to(device))
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
-    logits = self.swin_unet(x)
-             ^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
-    x, x_downsample = self.forward_features(x)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
-    x = self.patch_embed(x)
-        ^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
-    assert H == self.img_size[0] and W == self.img_size[1], \
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: Input image size (4*168) doesn't match model (224*224).
-
-[02:05:15.832] Testing: Latin2 | TTA: ON | Multi-scale: ON
-[02:05:15.833] 
-[02:05:16.025] Found 1620 patches
-[02:05:16.030] Processing: 076
-[02:05:16.264] ERROR: Testing failed: Input image size (168*168) doesn't match model (224*224).
-[02:05:16.268] Traceback (most recent call last):
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 961, in main
-    result = inference(args, model, test_save_path)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 838, in inference
-    pred_full = stitch_patches(
-                ^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 646, in stitch_patches
-    probs_patch = predict_patch_with_tta_and_multiscale(patch_tensor_single, model, use_amp=use_amp)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 579, in predict_patch_with_tta_and_multiscale
-    probs_tta = predict_patch_with_tta(scaled_tensor, model, use_amp=use_amp)  # Returns (C, H, W) numpy array
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 495, in predict_patch_with_tta
-    output = model(transformed.to(device))
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
-    logits = self.swin_unet(x)
-             ^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
-    x, x_downsample = self.forward_features(x)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
-    x = self.patch_embed(x)
-        ^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
-    assert H == self.img_size[0] and W == self.img_size[1], \
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: Input image size (168*168) doesn't match model (224*224).
-
-[02:05:25.036] Testing: Latin14396 | TTA: ON | Multi-scale: ON
-[02:05:25.037] 
-[02:05:25.272] Found 1620 patches
-[02:05:25.276] Processing: 014
-[02:05:25.992] ERROR: Testing failed: Input image size (168*168) doesn't match model (224*224).
-[02:05:25.997] Traceback (most recent call last):
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 961, in main
-    result = inference(args, model, test_save_path)
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 838, in inference
-    pred_full = stitch_patches(
-                ^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 646, in stitch_patches
-    probs_patch = predict_patch_with_tta_and_multiscale(patch_tensor_single, model, use_amp=use_amp)
-                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 579, in predict_patch_with_tta_and_multiscale
-    probs_tta = predict_patch_with_tta(scaled_tensor, model, use_amp=use_amp)  # Returns (C, H, W) numpy array
-                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/test.py", line 495, in predict_patch_with_tta
-    output = model(transformed.to(device))
-             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/vision_transformer.py", line 50, in forward
-    logits = self.swin_unet(x)
-             ^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 770, in forward
-    x, x_downsample = self.forward_features(x)
-                      ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 728, in forward_features
-    x = self.patch_embed(x)
-        ^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1773, in _wrapped_call_impl
-    return self._call_impl(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/.local/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1784, in _call_impl
-    return forward_call(*args, **kwargs)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/hpc/iwi5/iwi5250h/Transformer_Models/models/swinunet/swin_transformer_unet_skip_expand_decoder_sys.py", line 567, in forward
-    assert H == self.img_size[0] and W == self.img_size[1], \
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-AssertionError: Input image size (168*168) doesn't match model (224*224).
-
-[02:08:43.893] Testing: Latin2 | TTA: ON | Multi-scale: ON
-[02:08:43.893] 
-[02:08:44.062] Found 1620 patches
-[02:08:44.067] Processing: 076
-[02:09:09.960] Processing: 079
-[02:09:38.424] Processing: 082
-[02:10:02.678] Processing: 095
-[02:10:26.968] Processing: 106
-[02:10:52.362] Processing: 111
-[02:11:16.654] Processing: 115
-[02:11:40.942] Processing: 117
-[02:12:05.358] Processing: 128
-[02:12:29.182] Processing: 134
-[02:12:52.989] Processing: 138
-[02:13:16.814] Processing: 142
-[02:13:41.025] Processing: 159
-[02:14:05.678] Processing: 166
-[02:14:30.303] Processing: 185
-[02:14:54.749] Processing: 200
-[02:15:18.870] Processing: 203
-[02:15:43.144] Processing: 208
-[02:16:08.176] Processing: 229
-[02:16:33.379] Processing: 230
-[02:16:57.493] Processing: 235
-| TTA: ON | Multi-scale: ON
-[02:16:34.259] 
-[02:16:34.418] Found 1620 patches
-[02:16:34.419] Processing: 076
-[02:16:58.229] Processing: 079
-[02:17:21.188] Processing: 082
-[02:17:44.027] Processing: 095
-[02:18:07.054] Processing: 106
-[02:18:30.595] Processing: 111
-[02:18:53.797] Processing: 115
-[02:19:16.930] Processing: 117
-[02:19:40.073] Processing: 128
-[02:20:03.185] Processing: 134
-[02:20:26.250] Processing: 138
-[02:20:49.567] Processing: 142
-[02:21:12.804] Processing: 159
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              [02:21:35.943] Processing: 166
-                                                                                                                 [02:21:59.065] Processing: 185
-[02:22:22.196] Processing: 200
-[02:22:45.386] Processing: 203
-[02:23:08.766] Processing: 208
-[02:23:31.726] Processing: 229
-[02:23:54.731] Processing: 230
-[02:24:17.650] Processing: 235
-[02:24:40.539] Processing: 236
-[02:25:03.734] Processing: 248
-[02:25:26.643] Processing: 249
-[02:25:49.745] Processing: 250
-[02:26:12.841] Processing: 251
-[02:26:35.890] Processing: 252
-[02:26:58.982] Processing: 275
-[02:27:22.089] Processing: 277
-[02:27:45.700] Processing: 297
-[02:28:08.801] 
+[15:09:04.424] ----------------------------------------
+[15:09:04.424] Mean Precision: 0.8042
+[15:09:04.424] Mean Recall: 0.7717
+[15:09:04.424] Mean F1: 0.7854
+[15:09:04.424] Mean IoU: 0.6741
+[19:03:56.730] Testing: Latin2 | TTA: OFF | Multi-scale: OFF
+[19:03:56.731] 
+[19:03:56.957] Found 1620 patches
+[19:03:56.959] Processing: 076
+[19:04:01.303] Processing: 079
+[19:04:05.188] Processing: 082
+[19:04:09.076] Processing: 095
+[19:04:13.897] Processing: 106
+[19:04:17.782] Processing: 111
+[19:04:21.584] Processing: 115
+[19:04:25.520] Processing: 117
+[19:04:29.232] Processing: 128
+[19:04:32.907] Processing: 134
+[19:04:36.659] Processing: 138
+[19:04:40.319] Processing: 142
+[19:04:43.881] Processing: 159
+[19:04:47.814] Processing: 166
+[19:04:51.565] Processing: 185
+[19:04:55.117] Processing: 200
+[19:04:58.666] Processing: 203
+[19:05:02.008] Processing: 208
+[19:05:05.516] Processing: 229
+[19:05:09.039] Processing: 230
+[19:05:12.677] Processing: 235
+[19:05:16.076] Processing: 236
+[19:05:20.254] Processing: 248
+[19:05:24.153] Processing: 249
+[19:05:27.957] Processing: 250
+[19:05:31.804] Processing: 251
+[19:05:35.759] Processing: 252
+[19:05:39.838] Processing: 275
+[19:05:43.365] Processing: 277
+[19:05:47.028] Processing: 297
+[19:05:50.569] 
 Per-class metrics:
-[02:28:08.801] --------------------------------------------------------------------------------
-[02:28:08.801] Background     : Precision=0.9917, Recall=0.9960, F1=0.9938, IoU=0.9877
-[02:28:08.801] Paratext       : Precision=0.8837, Recall=0.7383, F1=0.8045, IoU=0.6729
-[02:28:08.801] Decoration     : Precision=0.9191, Recall=0.9173, F1=0.9182, IoU=0.8487
-[02:28:08.801] Main Text      : Precision=0.9238, Recall=0.8778, F1=0.9002, IoU=0.8185
-[02:28:08.801] Title          : Precision=0.8403, Recall=0.8839, F1=0.8615, IoU=0.7567
-[02:28:08.801] Chapter Headings: Precision=0.9104, Recall=0.6700, F1=0.7719, IoU=0.6286
-[02:28:08.801] 
+[19:05:50.569] --------------------------------------------------------------------------------
+[19:05:50.569] Background     : Precision=0.9944, Recall=0.9952, F1=0.9948, IoU=0.9897
+[19:05:50.569] Paratext       : Precision=0.8300, Recall=0.7550, F1=0.7907, IoU=0.6539
+[19:05:50.569] Decoration     : Precision=0.9040, Recall=0.8858, F1=0.8948, IoU=0.8096
+[19:05:50.569] Main Text      : Precision=0.8806, Recall=0.9192, F1=0.8995, IoU=0.8173
+[19:05:50.569] Title          : Precision=0.8764, Recall=0.7957, F1=0.8341, IoU=0.7154
+[19:05:50.569] Chapter Headings: Precision=0.7902, Recall=0.4499, F1=0.5734, IoU=0.4019
+[19:05:50.569] 
 Mean metrics:
-[02:28:08.801] ----------------------------------------
-[02:28:08.801] Mean Precision: 0.9115
-[02:28:08.801] Mean Recall: 0.8472
-[02:28:08.801] Mean F1: 0.8750
-[02:28:08.801] Mean IoU: 0.7855
+[19:05:50.569] ----------------------------------------
+[19:05:50.569] Mean Precision: 0.8793
+[19:05:50.570] Mean Recall: 0.8001
+[19:05:50.570] Mean F1: 0.8312
+[19:05:50.570] Mean IoU: 0.7313
+[23:02:45.824] Testing: Latin14396 | TTA: OFF | Multi-scale: OFF
+[23:02:45.825] 
+[23:02:46.120] Found 1620 patches
+[23:02:46.122] Processing: 014
+[23:02:50.863] Processing: 032
+[23:02:55.007] Processing: 034
+[23:02:58.806] Processing: 036
+[23:03:02.709] Processing: 038
+[23:03:06.433] Processing: 047
+[23:03:10.206] Processing: 060
+[23:03:14.008] Processing: 085
+[23:03:17.798] Processing: 087
+[23:03:21.527] Processing: 104
+[23:03:25.395] Processing: 105
+[23:03:29.378] Processing: 108
+[23:03:33.173] Processing: 110
+[23:03:36.973] Processing: 136
+[23:03:40.726] Processing: 169
+[23:03:44.178] Processing: 195
+[23:03:47.525] Processing: 196
+[23:03:51.028] Processing: 198
+[23:03:54.433] Processing: 204
+[23:03:57.943] Processing: 223
+[23:04:01.395] Processing: 225
+[23:04:05.007] Processing: 227
+[23:04:08.650] Processing: 229
+[23:04:12.305] Processing: 251
+[23:04:16.056] Processing: 253
+[23:04:19.869] Processing: 255
+[23:04:23.526] Processing: 264
+[23:04:27.129] Processing: 270
+[23:04:30.521] Processing: 276
+[23:04:34.075] Processing: 325
+[23:04:37.546] 
+Per-class metrics:
+[23:04:37.547] --------------------------------------------------------------------------------
+[23:04:37.547] Background     : Precision=0.9935, Recall=0.9958, F1=0.9946, IoU=0.9893
+[23:04:37.547] Paratext       : Precision=0.6679, Recall=0.4539, F1=0.5405, IoU=0.3703
+[23:04:37.547] Decoration     : Precision=0.9537, Recall=0.9531, F1=0.9534, IoU=0.9110
+[23:04:37.547] Main Text      : Precision=0.9569, Recall=0.9283, F1=0.9424, IoU=0.8911
+[23:04:37.547] Title          : Precision=0.8308, Recall=0.9039, F1=0.8658, IoU=0.7634
+[23:04:37.547] Chapter Headings: Precision=0.8380, Recall=0.8429, F1=0.8404, IoU=0.7248
+[23:04:37.547] 
+Mean metrics:
+[23:04:37.547] ----------------------------------------
+[23:04:37.547] Mean Precision: 0.8735
+[23:04:37.547] Mean Recall: 0.8463
+[23:04:37.547] Mean F1: 0.8562
+[23:04:37.547] Mean IoU: 0.7750
+[03:12:52.841] Testing: Latin16746 | TTA: OFF | Multi-scale: OFF
+[03:12:52.842] 
+[03:12:53.028] Found 1620 patches
+[03:12:53.031] Processing: 009
+[03:12:57.147] Processing: 020
+[03:13:01.381] Processing: 022
+[03:13:05.770] Processing: 029
+[03:13:09.908] Processing: 035
+[03:13:13.785] Processing: 048
+[03:13:17.936] Processing: 069
+[03:13:21.452] Processing: 082
+[03:13:25.047] Processing: 088
+[03:13:28.632] Processing: 089
+[03:13:32.132] Processing: 091
+[03:13:35.704] Processing: 100
+[03:13:39.285] Processing: 106
+[03:13:42.934] Processing: 117
+[03:13:46.617] Processing: 123
+[03:13:49.933] Processing: 125
+[03:13:53.415] Processing: 130
+[03:13:56.771] Processing: 133
+[03:14:00.162] Processing: 137
+[03:14:03.925] Processing: 146
+[03:14:07.390] Processing: 166
+[03:14:10.952] Processing: 184
+[03:14:14.318] Processing: 215
+[03:14:17.736] Processing: 237
+[03:14:21.158] Processing: 243
+[03:14:24.616] Processing: 255
+[03:14:28.077] Processing: 258
+[03:14:32.221] Processing: 284
+[03:14:35.721] Processing: 325
+[03:14:39.439] Processing: 357
+[03:14:43.104] 
+Per-class metrics:
+[03:14:43.104] --------------------------------------------------------------------------------
+[03:14:43.105] Background     : Precision=0.9920, Recall=0.9954, F1=0.9937, IoU=0.9875
+[03:14:43.105] Paratext       : Precision=0.7960, Recall=0.8567, F1=0.8253, IoU=0.7025
+[03:14:43.105] Decoration     : Precision=0.9797, Recall=0.9418, F1=0.9603, IoU=0.9237
+[03:14:43.105] Main Text      : Precision=0.9637, Recall=0.9327, F1=0.9479, IoU=0.9010
+[03:14:43.105] Title          : Precision=0.7567, Recall=0.8593, F1=0.8047, IoU=0.6733
+[03:14:43.105] Chapter Headings: Precision=0.8361, Recall=0.9021, F1=0.8678, IoU=0.7665
+[03:14:43.105] 
+Mean metrics:
+[03:14:43.105] ----------------------------------------
+[03:14:43.105] Mean Precision: 0.8874
+[03:14:43.105] Mean Recall: 0.9147
+[03:14:43.105] Mean F1: 0.9000
+[03:14:43.105] Mean IoU: 0.8258
+[07:21:30.744] Testing: Syr341 | TTA: OFF | Multi-scale: OFF
+[07:21:30.744] 
+[07:21:30.899] Found 1620 patches
+[07:21:30.901] Processing: 031
+[07:21:35.211] Processing: 053
+[07:21:39.554] Processing: 054
+[07:21:43.478] Processing: 071
+[07:21:47.415] Processing: 073
+[07:21:51.349] Processing: 075
+[07:21:55.305] Processing: 100
+[07:21:59.155] Processing: 137
+[07:22:03.026] Processing: 150
+[07:22:06.798] Processing: 160
+[07:22:10.598] Processing: 167
+[07:22:14.438] Processing: 184
+[07:22:18.146] Processing: 190
+[07:22:21.945] Processing: 201
+[07:22:25.851] Processing: 210
+[07:22:29.407] Processing: 222
+[07:22:33.010] Processing: 224
+[07:22:36.688] Processing: 231
+[07:22:40.318] Processing: 241
+[07:22:43.959] Processing: 249
+[07:22:47.502] Processing: 252
+[07:22:51.029] Processing: 267
+[07:22:54.612] Processing: 281
+[07:22:59.784] Processing: 286
+[07:23:04.010] Processing: 290
+[07:23:07.892] Processing: 313
+[07:23:11.745] Processing: 362
+[07:23:15.506] Processing: 368
+[07:23:19.003] Processing: 376
+[07:23:22.592] Processing: 446
+[07:23:26.225] 
+Per-class metrics:
+[07:23:26.225] --------------------------------------------------------------------------------
+[07:23:26.225] Background     : Precision=0.9742, Recall=0.9833, F1=0.9787, IoU=0.9584
+[07:23:26.225] Paratext       : Precision=0.5642, Recall=0.7748, F1=0.6529, IoU=0.4847
+[07:23:26.225] Decoration     : Precision=0.9872, Recall=0.8173, F1=0.8942, IoU=0.8087
+[07:23:26.226] Main Text      : Precision=0.8838, Recall=0.8522, F1=0.8677, IoU=0.7664
+[07:23:26.226] Title          : Precision=0.4822, Recall=0.6538, F1=0.5550, IoU=0.3841
+[07:23:26.226] 
+Mean metrics:
+[07:23:26.226] ----------------------------------------
+[07:23:26.226] Mean Precision: 0.7783
+[07:23:26.226] Mean Recall: 0.8163
+[07:23:26.226] Mean F1: 0.7897
+[07:23:26.226] Mean IoU: 0.6804
+[09:25:23.879] Testing: CB55 | TTA: ON | Multi-scale: ON
+[09:25:23.932] 
+[09:25:25.960] Found 6090 patches
+[09:25:25.968] Processing: e-codices_fmb-cb-0055_0098v_max
+[09:36:05.327] Resizing ground truth for e-codices_fmb-cb-0055_0098v_max: (6496, 4872) -> (6496, 4928)
+[09:36:20.164] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:36:20.760] Processing: e-codices_fmb-cb-0055_0099v_max
+[09:46:48.449] Resizing ground truth for e-codices_fmb-cb-0055_0099v_max: (6496, 4872) -> (6496, 4928)
+[09:47:03.429] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:47:03.967] Processing: e-codices_fmb-cb-0055_0102v_max
+[09:57:31.230] Resizing ground truth for e-codices_fmb-cb-0055_0102v_max: (6496, 4872) -> (6496, 4928)
+[09:57:45.899] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[09:57:46.433] Processing: e-codices_fmb-cb-0055_0105r_max
+[10:08:12.730] Resizing ground truth for e-codices_fmb-cb-0055_0105r_max: (6496, 4872) -> (6496, 4928)
+[10:08:27.488] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[10:08:28.037] Processing: e-codices_fmb-cb-0055_0107v_max
+[10:18:57.217] Resizing ground truth for e-codices_fmb-cb-0055_0107v_max: (6496, 4872) -> (6496, 4928)
+[10:19:11.889] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[10:19:12.455] Processing: e-codices_fmb-cb-0055_0108v_max
+[10:29:39.882] Resizing ground truth for e-codices_fmb-cb-0055_0108v_max: (6496, 4872) -> (6496, 4928)
+[10:29:54.555] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
+[10:29:55.095] Processing: e-codices_fmb-cb-0055_0116r_max

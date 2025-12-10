@@ -101,7 +101,13 @@ last_model.pth
 # Data directories
 DivaHisDB/
 DivaHisDB_patched/
+DivaHisDB_patched_192/
 U-DIADS-Bib-FS/
 U-DIADS-Bib-FS_patched/
+U-DIADS-Bib-FS_patched_192/
 U-DIADS-Bib-MS/
 U-DIADS-Bib-MS_patched/
+U-DIADS-Bib-MS_patched_192/
+
+*.bat
+

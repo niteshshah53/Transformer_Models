@@ -1,0 +1,42 @@
+MODEL:
+  TYPE: network
+  NAME: network_cnn_transformer
+  DROP_PATH_RATE: 0.1
+  # SimMIM Swin-Base checkpoint (enables automatic decoder overrides)
+  PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_network_divahisdb.pth"
+  SWIN:
+    # These are defaults; they are overridden when a SimMIM checkpoint is detected:
+    # - DECODER_DEPTHS → [2, 18, 2, 2]
+    # - EMBED_DIM      → 128
+    # - NUM_HEADS      → [4, 8, 16, 32]
+    # - WINDOW_SIZE    stays 7 (interpolated from SimMIM’s 6)
+    DECODER_DEPTHS: [2, 2, 2, 1]
+    EMBED_DIM: 96
+    NUM_HEADS: [3, 6, 12, 24]
+    WINDOW_SIZE: 7
+    MLP_RATIO: 4.0
+    QKV_BIAS: True
+    QK_SCALE: None
+    PATCH_NORM: True
+
+  ENCODER:
+    TYPE: efficientnet          # or 'resnet50'
+    EFFICIENTNET_MODEL: tf_efficientnet_b4_ns
+    PRETRAINED: True
+
+DATA:
+  IMG_SIZE: 224
+
+TRAIN:
+  EPOCHS: 300
+  WARMUP_EPOCHS: 10
+  BASE_LR: 1e-4
+  WARMUP_LR: 5e-7
+  MIN_LR: 5e-6
+  WEIGHT_DECAY: 0.05
+  LAYER_DECAY: 1.0
+
+PRINT_FREQ: 10
+SAVE_FREQ: 1
+TAG: network_cnn_transformer
+

@@ -258,11 +258,11 @@ def get_model(args, config):
     decoder_type = getattr(args, 'decoder', 'simple')
     
     # Simplified logic (matching train.py):
-    # - If --use_baseline is used without --decoder → decoder='simple' (default)
-    # - If --use_baseline is used with --decoder → use specified decoder
-    # - If --decoder is used without --use_baseline → error (caught in validate_arguments)
+    # - If --use_baseline is used without --decoder -> decoder='simple' (default)
+    # - If --use_baseline is used with --decoder -> use specified decoder
+    # - If --decoder is used without --use_baseline -> error (caught in validate_arguments)
     if not use_baseline:
-        # No use_baseline flag → error (should be caught in validate, but handle gracefully)
+        # No use_baseline flag -> error (should be caught in validate, but handle gracefully)
         print("ERROR: --use_baseline flag is required")
         print("Usage: --use_baseline [--decoder simple|EfficientNet-B4|ResNet50]")
         raise ValueError("--use_baseline flag is required")
@@ -282,7 +282,7 @@ def get_model(args, config):
         img_size = config.DATA.IMG_SIZE if hasattr(config, 'DATA') and hasattr(config.DATA, 'IMG_SIZE') else args.img_size
     else:
         # Fallback to defaults if no config (should not happen, but handle gracefully)
-        print("⚠️  Warning: No config provided, using default encoder parameters")
+        print("WARNING: No config provided, using default encoder parameters")
         embed_dim = 96
         depths = [2, 2, 2, 2]
         num_heads = [3, 6, 12, 24]
@@ -291,7 +291,7 @@ def get_model(args, config):
         img_size = args.img_size
     
     print("=" * 80)
-    print(f"🚀 Loading Hybrid2 with {decoder_type} Decoder for Testing")
+    print(f"Loading Hybrid2 with {decoder_type} Decoder for Testing")
     print(f"   Encoder: SwinUnet (from config)")
     if config is not None:
         print(f"   Config: {config.MODEL.NAME if hasattr(config.MODEL, 'NAME') else 'Unknown'}")
@@ -390,7 +390,7 @@ def load_model_checkpoint(model, args):
     
     # Print loading results
     if msg.missing_keys:
-        print(f"  ⚠️  Missing keys (will use initialized values): {len(msg.missing_keys)}")
+        print(f"  WARNING: Missing keys (will use initialized values): {len(msg.missing_keys)}")
         if len(msg.missing_keys) <= 10:
             for key in msg.missing_keys:
                 print(f"     - {key}")
@@ -400,7 +400,7 @@ def load_model_checkpoint(model, args):
             print(f"     ... and {len(msg.missing_keys) - 5} more")
     
     if msg.unexpected_keys:
-        print(f"  ⚠️  Unexpected keys (ignored): {len(msg.unexpected_keys)}")
+        print(f"  WARNING: Unexpected keys (ignored): {len(msg.unexpected_keys)}")
         if len(msg.unexpected_keys) <= 10:
             for key in msg.unexpected_keys:
                 print(f"     - {key}")
@@ -410,9 +410,9 @@ def load_model_checkpoint(model, args):
             print(f"     ... and {len(msg.unexpected_keys) - 5} more")
     
     if not msg.missing_keys and not msg.unexpected_keys:
-        print(f"  ✅ Model checkpoint loaded successfully (exact match)")
+        print("  Model checkpoint loaded successfully (exact match)")
     else:
-        print(f"  ✅ Model checkpoint loaded successfully (with warnings)")
+        print("  Model checkpoint loaded successfully (with warnings)")
     
     return os.path.basename(checkpoint_path)
 
@@ -1030,12 +1030,12 @@ def calculate_and_display_average_metrics(args):
                     all_metrics.append(data)
                     found_manuscripts.append(manuscript)
                     metrics_files.append(metrics_file)
-                    print(f"  ✓ Found metrics for {manuscript}")
+                    print(f"  Found metrics for {manuscript}")
             except Exception as e:
                 logging.warning(f"Failed to load metrics for {manuscript}: {e}")
-                print(f"  ✗ Metrics file not found: {metrics_file}")
+                print(f"  Metrics file not found: {metrics_file}")
         else:
-            print(f"  ✗ Metrics file not found: {metrics_file}")
+            print(f"  Metrics file not found: {metrics_file}")
     
     if len(found_manuscripts) > 0:
         avg_precision = sum(m['mean_precision'] for m in all_metrics) / len(all_metrics)

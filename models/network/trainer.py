@@ -240,10 +240,26 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
     Uses continuous rarity scores with square-root inverse frequency to prevent
     overly aggressive oversampling that can cause noisy gradients.
     
+    Optimized to use dataset's decode_bitmask_mask if available (DivaHisDB).
+    
     Returns None if dataset is invalid.
     """
     if not hasattr(train_dataset, 'mask_paths') or len(train_dataset.mask_paths) == 0:
         return None
+
+    import time
+    start_time = time.time()
+    total_samples = len(train_dataset.mask_paths)
+    print(f"Creating balanced sampler for {total_samples} samples...")
+    
+    # Check if dataset has optimized decode function (DivaHisDB)
+    use_optimized_decode = hasattr(train_dataset, '__class__') and 'DivaHisDB' in train_dataset.__class__.__name__
+    if use_optimized_decode:
+        try:
+            from datasets.dataset_divahisdb import decode_bitmask_mask
+            print("  Using optimized DivaHisDB mask decoder")
+        except ImportError:
+            use_optimized_decode = False
 
     # Build color map for dataset classes (same mapping as compute_class_weights)
     if num_classes == 6:
@@ -273,23 +289,52 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
     else:
         return None
 
-    # compute per-class pixel counts
+    # SINGLE PASS: compute both class counts and sample weights in one loop
+    # This eliminates the need to load each mask twice (50% faster)
     class_counts = np.zeros(num_classes, dtype=np.int64)
+    sample_class_presence = []  # Store which classes are present in each sample
+    
     mapping = {k: v for k, v in COLOR_MAP.items()}
-    map_int = { (r << 16) | (g << 8) | b: cls for (r, g, b), cls in mapping.items() }
-
-    for mask_path in train_dataset.mask_paths:
+    
+    print("  Computing class statistics (optimized single-pass)...")
+    for idx, mask_path in enumerate(train_dataset.mask_paths):
+        if (idx + 1) % 500 == 0 or idx == 0:
+            progress_pct = (idx + 1) / total_samples * 100
+            print(f"    Processing {idx + 1}/{total_samples} masks... ({progress_pct:.1f}%)", end='\r')
+        
+        # Load and decode mask ONCE (not twice)
         mask = np.array(Image.open(mask_path).convert('RGB'))
-        rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
-        flat = rgb_int.ravel()
-        label_flat = np.full(flat.shape, -1, dtype=np.int32)
-        for rgb_val, cls in map_int.items():
-            if np.any(flat == rgb_val):
-                label_flat[flat == rgb_val] = int(cls)
-        valid = label_flat >= 0
-        if np.any(valid):
-            counts = np.bincount(label_flat[valid].astype(np.int64), minlength=num_classes)
-            class_counts += counts
+        
+        if use_optimized_decode:
+            # Use optimized DivaHisDB decoder
+            mask_class = decode_bitmask_mask(mask)
+            present_classes = np.unique(mask_class)
+            counts = np.bincount(mask_class.ravel(), minlength=num_classes)
+        else:
+            # Original RGB-based decoding (for UDIADS_BIB)
+            map_int = { (r << 16) | (g << 8) | b: cls for (r, g, b), cls in mapping.items() }
+            rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
+            flat = rgb_int.ravel()
+            label_flat = np.full(flat.shape, -1, dtype=np.int32)
+            for rgb_val, cls in map_int.items():
+                if np.any(flat == rgb_val):
+                    label_flat[flat == rgb_val] = int(cls)
+            valid = label_flat >= 0
+            if np.any(valid):
+                present_classes = np.unique(label_flat[valid])
+                counts = np.bincount(label_flat[valid].astype(np.int64), minlength=num_classes)
+            else:
+                present_classes = np.array([])
+                counts = np.zeros(num_classes, dtype=np.int64)
+        
+        # Update global class counts
+        class_counts += counts
+        
+        # Store present classes for this sample (excluding invalid classes)
+        present = set(present_classes[present_classes >= 0].tolist()) if len(present_classes) > 0 else set()
+        sample_class_presence.append(present)
+    
+    print(f"    Processed {total_samples}/{total_samples} masks (100.0%)     ")
 
     total = class_counts.sum()
     if total == 0:
@@ -297,27 +342,17 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
 
     # Compute class frequencies
     class_freq = class_counts.astype(np.float64) / float(total)
+    print(f"  Class frequencies: {dict(enumerate(class_freq))}")
 
-    # Compute continuous rarity scores for all samples
-    # Use square-root inverse frequency to prevent overly aggressive oversampling
+    # Compute sample weights from cached presence data (no mask reloading needed)
+    print("  Computing sample weights from cached data...")
     sample_weights = []
-    for mask_path in train_dataset.mask_paths:
-        mask = np.array(Image.open(mask_path).convert('RGB'))
-        rgb_int = (mask[:, :, 0].astype(np.uint32) << 16) | (mask[:, :, 1].astype(np.uint32) << 8) | mask[:, :, 2].astype(np.uint32)
-        present = set()
-        for rgb_val, cls in map_int.items():
-            if np.any(rgb_int == rgb_val):
-                present.add(cls)
-        
+    for present in sample_class_presence:
         if len(present) == 0:
-            # No valid classes found, use uniform weight
             sample_weights.append(1.0)
         else:
             # Compute rarity score: sum of square-root inverse frequency for present classes
-            # Square-root provides smoother interpolation than linear inverse frequency
-            w = 0.0
-            for cls in present:
-                w += (1.0 / (class_freq[cls] + eps)) ** 0.5
+            w = sum((1.0 / (class_freq[cls] + eps)) ** 0.5 for cls in present)
             sample_weights.append(float(w))
 
     # Normalize weights to mean=1 for stable sampling probabilities
@@ -328,7 +363,9 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
     weights_tensor = torch.DoubleTensor(sw)
     from torch.utils.data import WeightedRandomSampler
     sampler = WeightedRandomSampler(weights=weights_tensor, num_samples=len(weights_tensor), replacement=True)
-    print(f"Balanced sampler created (continuous rarity-based oversampling).")
+    
+    elapsed = time.time() - start_time
+    print(f"✓ Balanced sampler created in {elapsed:.1f}s (continuous rarity-based oversampling)")
     return sampler
 
 
@@ -657,6 +694,7 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
     scaler: GradScaler instance for AMP (required if use_amp=True)
     """
     import math
+    import time
     
     model.train()
     
@@ -666,9 +704,20 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
     skipped_grad_nan = 0
     scheduler_warning_printed = False
     
-    optimizer.zero_grad()
+    # Progress tracking
+    start_time = time.time()
+    print_interval = max(1, num_batches // 20)  # Print ~20 times per epoch
+    log_batch_progress = getattr(args, 'log_batch_progress', False) if args is not None else False
     
     for batch_idx, batch in enumerate(train_loader):
+        # Show progress (every 5% of epoch or at the end)
+        if log_batch_progress and (batch_idx % print_interval == 0 or batch_idx == num_batches - 1):
+            elapsed = time.time() - start_time
+            batches_done = batch_idx + 1
+            if batches_done > 0:
+                eta = (elapsed / batches_done) * (num_batches - batches_done)
+                progress_pct = batches_done / num_batches * 100
+                print(f"  Batch {batches_done}/{num_batches} ({progress_pct:.1f}%) - ETA: {eta:.0f}s", end='\r')
         # Get data
         if isinstance(batch, dict):
             images = batch['image']
@@ -698,74 +747,99 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
         # Check for NaN/Inf loss
         if torch.isnan(loss) or torch.isinf(loss):
             skipped_loss_nan += 1
-            continue
-        
-        # Backward pass with AMP support
-        if use_amp and scaler is not None:
-            scaler.scale(loss).backward()
-        else:
-            loss.backward()
-        
-        # Check for NaN/Inf gradients before clipping
-        has_nan_grad = False
-        for param in model.parameters():
-            if param.grad is not None:
-                if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
-                    has_nan_grad = True
-                    break
-        
-        if has_nan_grad:
-            skipped_grad_nan += 1
             optimizer.zero_grad()
             continue
         
-        # Gradient clipping: Component-specific (following Vision Transformer best practices)
-        # Note: ViT and Swin Transformer papers don't use gradient clipping, but if needed,
-        # use component-specific clipping since transformers and CNNs have different gradient scales
-        # Encoder (EfficientNet): smaller gradients, use higher max_norm
-        # Decoder (Swin Transformer): larger gradients, use lower max_norm
-        
-        # Check if advanced components are enabled (gcff, SE-MSFE, or MSFA+MCT bottleneck)
-        # If so, use uniform gradient clipping with max_norm=1.0 for better stability
-        use_gradient_clipping = getattr(args, 'use_gradient_clipping', False) if args is not None else False
-        
+        # Backward pass with AMP support (matching SwinUnet order)
+        optimizer.zero_grad()
         if use_amp and scaler is not None:
+            scaler.scale(loss).backward()
+            
             # Unscale gradients before clipping (required for AMP)
             scaler.unscale_(optimizer)
-        
-        if use_gradient_clipping:
-            # Uniform gradient clipping for advanced components (max_norm=1.0)
-            # This helps reduce skipped batches due to NaN/Inf gradients
-            all_params = [p for p in model.parameters() if p.grad is not None]
-            if all_params:
-                torch.nn.utils.clip_grad_norm_(all_params, max_norm=1.0)
-        else:
-            # Component-specific gradient clipping (default behavior)
-            encoder_params = []
-            decoder_params = []
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    lname = name.lower()
-                    if 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname:
-                        encoder_params.append(param)
-                    else:
-                        decoder_params.append(param)
             
-            # Clip encoder and decoder separately with different norms
-            # Encoder: max_norm=5.0 (EfficientNet has smaller gradients)
-            # Decoder: max_norm=1.0 (Swin Transformer has larger gradients)
-            if encoder_params:
-                torch.nn.utils.clip_grad_norm_(encoder_params, max_norm=5.0)
-            if decoder_params:
-                torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=1.0)
-        
-        # Optimizer step with AMP support
-        if use_amp and scaler is not None:
+            # Gradient clipping BEFORE checking for NaN (like SwinUnet)
+            # This can fix some gradient issues that appear as NaN/Inf when scaled
+            use_gradient_clipping = getattr(args, 'use_gradient_clipping', False) if args is not None else False
+            
+            if use_gradient_clipping:
+                # Uniform gradient clipping for advanced components (max_norm=1.0)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            else:
+                # Component-specific gradient clipping (default behavior)
+                encoder_params = []
+                decoder_params = []
+                for name, param in model.named_parameters():
+                    if param.grad is not None:
+                        lname = name.lower()
+                        if 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname:
+                            encoder_params.append(param)
+                        else:
+                            decoder_params.append(param)
+                
+                # Clip encoder and decoder separately with different norms
+                # Encoder: max_norm=5.0 (EfficientNet has smaller gradients)
+                # Decoder: max_norm=1.0 (Swin Transformer has larger gradients)
+                if encoder_params:
+                    torch.nn.utils.clip_grad_norm_(encoder_params, max_norm=5.0)
+                if decoder_params:
+                    torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=1.0)
+            
+            # Check for NaN/Inf gradients AFTER clipping (like SwinUnet)
+            has_nan_grad = False
+            for param in model.parameters():
+                if param.grad is not None:
+                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                        has_nan_grad = True
+                        break
+            
+            if has_nan_grad:
+                skipped_grad_nan += 1
+                scaler.update()  # Update scaler even when skipping (like SwinUnet)
+                continue
+            
+            # Optimizer step with AMP
             scaler.step(optimizer)
             scaler.update()
         else:
+            loss.backward()
+            
+            # Gradient clipping BEFORE checking for NaN (like SwinUnet)
+            use_gradient_clipping = getattr(args, 'use_gradient_clipping', False) if args is not None else False
+            
+            if use_gradient_clipping:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            else:
+                # Component-specific gradient clipping
+                encoder_params = []
+                decoder_params = []
+                for name, param in model.named_parameters():
+                    if param.grad is not None:
+                        lname = name.lower()
+                        if 'encoder' in lname or 'adapter' in lname or 'streaming_proj' in lname or 'feature_adapters' in lname:
+                            encoder_params.append(param)
+                        else:
+                            decoder_params.append(param)
+                
+                if encoder_params:
+                    torch.nn.utils.clip_grad_norm_(encoder_params, max_norm=5.0)
+                if decoder_params:
+                    torch.nn.utils.clip_grad_norm_(decoder_params, max_norm=1.0)
+            
+            # Check for NaN/Inf gradients AFTER clipping (like SwinUnet)
+            has_nan_grad = False
+            for param in model.parameters():
+                if param.grad is not None:
+                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                        has_nan_grad = True
+                        break
+            
+            if has_nan_grad:
+                skipped_grad_nan += 1
+                optimizer.zero_grad()
+                continue
+            
             optimizer.step()
-        optimizer.zero_grad()
         
         # Scheduler step per batch (OneCycleLR expects step every batch)
         if scheduler_type == 'OneCycleLR':
@@ -781,6 +855,29 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss,
             if isinstance(value, (int, float)):
                 epoch_losses[key] += value
             # Skip string values (e.g., aux_{i}_res) - they're for logging only
+        
+        # Memory cleanup: delete intermediate tensors to prevent memory leaks
+        # Only delete if they're tensors (not already converted to scalars)
+        if isinstance(predictions, torch.Tensor):
+            del predictions
+        if isinstance(loss, torch.Tensor):
+            del loss
+        del loss_dict
+        
+        # Very aggressive cache clearing: every 10 batches to prevent accumulation
+        # Attention mechanisms (smart_skips) create large intermediate tensors
+        # After 100 epochs, memory fragmentation requires frequent cleanup
+        if torch.cuda.is_available() and (batch_idx + 1) % 10 == 0:
+            torch.cuda.empty_cache()
+    
+    # Clear progress line
+    print(" " * 80, end='\r')  # Clear progress line
+    
+    # Aggressive final memory cleanup at end of epoch
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()  # Force garbage collection at end of each epoch
     
     # Print summary only if batches were skipped
     if skipped_loss_nan > 0 or skipped_grad_nan > 0:
@@ -851,7 +948,23 @@ def validate_model(model, val_loader, ce_loss, focal_loss, dice_loss, max_batche
                     epoch_losses[key] += value
                 # Skip string values (e.g., aux_{i}_res) - they're for logging only
             
+            # Memory cleanup: delete intermediate tensors to prevent memory leaks
+            if isinstance(predictions, torch.Tensor):
+                del predictions
+            del loss_dict
+            
+            # Very aggressive cache clearing: every 10 batches
+            # Validation also uses attention mechanisms, needs frequent cleanup
+            if torch.cuda.is_available() and (batch_idx + 1) % 10 == 0:
+                torch.cuda.empty_cache()
+            
             num_batches += 1
+    
+    # Aggressive final memory cleanup at end of validation
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        import gc
+        gc.collect()  # Force garbage collection
     
     # Average losses
     if num_batches > 0:
@@ -1249,6 +1362,25 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             )
             
             train_loss = train_losses.get('total', float('inf'))
+            
+            # Aggressive memory cleanup every epoch to prevent memory leaks after 100+ epochs
+            # After 100 epochs, memory fragmentation can cause OOM even with cleanup
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+                # More frequent cleanup after epoch 100 (when OOM typically occurs)
+                if (epoch + 1) >= 100:
+                    import gc
+                    gc.collect()
+                    # Force synchronization to ensure cleanup
+                    torch.cuda.synchronize()
+            
+            # Periodic deep cleanup every 10 epochs
+            if (epoch + 1) % 10 == 0:
+                if torch.cuda.is_available():
+                    import gc
+                    gc.collect()
+                    # Flush TensorBoard writer to prevent accumulation
+                    writer.flush()
             
             if should_validate:
                 # Validate

@@ -1,12 +1,13 @@
 #!/bin/bash -l
-#SBATCH --job-name=baseline_ds_smart
-#SBATCH --output=./Result/a1/baseline_ds_smart_%j.out
-#SBATCH --error=./Result/a1/baseline_ds_smart_%j.out
+#SBATCH --job-name=d_d
+#SBATCH --output=./Result/simmim/network_divahisdb_%j.out
+#SBATCH --error=./Result/simmim/network_divahisdb_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=22:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --time=24:00:00
+#SBATCH --gres=gpu:v100:1
+#SBATCH --partition=v100
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -39,7 +40,7 @@ export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 #   ✓ GroupNorm: enabled
 #   ✓ Loss functions: CB Loss (Class-Balanced) + Focal (γ=2.0) + Dice
 #   ✓ Differential LR: Encoder (0.05x), Bottleneck (1.0x), Decoder (1.0x)
-#   ✓ Balanced Sampler: ENABLED (oversamples rare classes)
+#   ✓ Balanced Sampler: DISABLED (oversamples rare classes)
 #   ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)
 #   ✓ Class-Balanced Loss: ENABLED (beta=0.9999, best for extreme imbalance >100:1)
 #
@@ -82,7 +83,7 @@ echo "    - Multi-resolution loss computation (MSAGHNet-style)"
 echo "    - Ground truth downsampled to match resolutions"
 echo "  ✓ Adapter mode: streaming (integrated)"
 echo "  ✓ GroupNorm: enabled"
-echo "  ✓ Balanced Sampler: ENABLED (oversamples rare classes)"
+echo "  ✓ Balanced Sampler: DISABLED (oversamples rare classes)"
 echo "  ✓ Class-Aware Augmentation: ENABLED (stronger augmentation for rare classes)"
 echo "  ✓ Loss: CB Loss (Class-Balanced, beta=0.9999) + Focal (γ=2.0) + Dice"
 echo "  ✗ SE-MSFE: disabled"
@@ -110,10 +111,11 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "╚════════════════════════════════════════════════════════════════════════╝"
     echo ""
     echo "Configuration: BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
-    echo "Output Directory: ./Result/a1/${MANUSCRIPT}"
+    echo "Output Directory: ./Result/simmim/${MANUSCRIPT}"
     echo ""
     
     python3 train.py \
+        --cfg "../../common/configs/network_cnn_transformer.yaml" \
         --dataset UDIADS_BIB \
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
@@ -122,7 +124,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --batch_size 16 \
         --max_epochs 300 \
         --base_lr 0.0001 \
-        --patience 150 \
+        --patience 70 \
         --encoder_lr_factor 0.05 \
         --use_cb_loss \
         --cb_beta 0.9999 \
@@ -132,10 +134,9 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --deep_supervision \
         --use_groupnorm \
         --focal_gamma 2.0 \
-        --use_balanced_sampler \
         --use_class_aware_aug \
         --use_amp \
-        --output_dir "./Result/a1/${MANUSCRIPT}"
+        --output_dir "./Result/simmim/${MANUSCRIPT}"
     
     TRAIN_EXIT_CODE=$?
     
@@ -161,6 +162,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         # Use batch_size=1 for testing to avoid OOM with TTA (4 augmentations per patch = 4x memory)
         # TTA processes 4 augmentations at once, so batch_size=1 means 4 patches in memory simultaneously
         python3 test.py \
+            --cfg "../../common/configs/network_cnn_transformer.yaml" \
             --dataset UDIADS_BIB \
             --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
             --manuscript ${MANUSCRIPT} \
@@ -173,7 +175,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
             --fusion_method smart \
             --deep_supervision \
             --use_groupnorm \
-            --output_dir "./Result/a1/${MANUSCRIPT}"
+            --output_dir "./Result/simmim/${MANUSCRIPT}"
         
         TEST_EXIT_CODE=$?
         
@@ -206,5 +208,5 @@ echo "==========================================================================
 echo "ALL MANUSCRIPTS PROCESSED"
 echo "============================================================================"
 echo "Configuration Used: BASELINE + DEEP SUPERVISION + SMART FEATURE FUSION"
-echo "Results Location: ./Result/a1/"
+echo "Results Location: ./Result/simmim/"
 echo "============================================================================"

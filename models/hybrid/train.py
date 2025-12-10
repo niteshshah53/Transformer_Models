@@ -12,6 +12,7 @@ import warnings
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
+import torch.nn.functional as F
 
 # Add common directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
@@ -32,6 +33,57 @@ try:
 except ImportError:
     DivaHisDBDataset = None
     DIVAHISDB_AVAILABLE = False
+
+
+def _is_simmim_config(config):
+    """
+    Check if the SimMIM config is being used.
+
+    Args:
+        config: Configuration object
+
+    Returns:
+        bool: True if SimMIM config is detected
+    """
+    # Check config name
+    if hasattr(config.MODEL, 'NAME') and 'simmim' in str(config.MODEL.NAME).lower():
+        return True
+
+    # Check pretrained checkpoint path
+    if hasattr(config.MODEL, 'PRETRAIN_CKPT') and config.MODEL.PRETRAIN_CKPT:
+        pretrained_path = str(config.MODEL.PRETRAIN_CKPT)
+        if 'simmim' in pretrained_path.lower():
+            return True
+
+    return False
+
+
+def _resize_relative_position_bias_table(table, old_window, new_window):
+    """
+    Interpolate relative position bias table from old_window to new_window.
+
+    Args:
+        table: Relative position bias table tensor with shape (old_size * old_size, num_heads)
+        old_window: Original window size (e.g., 6 for SimMIM)
+        new_window: Target window size (e.g., 7 for Swin encoder)
+
+    Returns:
+        Interpolated table with shape (new_size * new_size, num_heads)
+    """
+    old_size = 2 * old_window - 1
+    new_size = 2 * new_window - 1
+
+    # Reshape to (1, num_heads, old_size, old_size)
+    num_heads = table.shape[-1]
+    table = table.reshape(old_size, old_size, num_heads).permute(2, 0, 1).unsqueeze(0)
+
+    # Interpolate using bicubic interpolation
+    table = F.interpolate(table, size=(new_size, new_size), mode='bicubic', align_corners=False)
+
+    # Reshape back to (new_size * new_size, num_heads)
+    table = table.squeeze(0).permute(1, 2, 0).reshape(new_size * new_size, num_heads)
+
+    return table
 
 
 def load_pretrained_encoder_weights(model, config):
@@ -69,14 +121,37 @@ def load_pretrained_encoder_weights(model, config):
     
     print(f"  Loading pretrained encoder weights from: {pretrained_path}")
     pretrained_dict = torch.load(pretrained_path, map_location=device)
-    
+
     # Handle different checkpoint formats
     if "model" in pretrained_dict:
         pretrained_dict = pretrained_dict['model']
-    
+
+    # Handle SimMIM relative position bias interpolation (window_size 6 -> 7)
+    is_simmim = _is_simmim_config(config)
+    old_window_size = 6  # SimMIM pretraining uses window_size=6
+    new_window_size = getattr(config.MODEL.SWIN, 'WINDOW_SIZE', 7) if hasattr(config.MODEL, 'SWIN') else 7
+
+    if is_simmim and old_window_size != new_window_size:
+        interpolated_count = 0
+        old_size = (2 * old_window_size - 1) ** 2
+        for k in list(pretrained_dict.keys()):
+            if "relative_position_bias_table" in k:
+                tensor = pretrained_dict[k]
+                if tensor.shape[0] == old_size:
+                    pretrained_dict[k] = _resize_relative_position_bias_table(
+                        tensor, old_window_size, new_window_size
+                    )
+                    interpolated_count += 1
+        if interpolated_count > 0:
+            print(
+                f"  SimMIM config detected: interpolated {interpolated_count} "
+                f"relative position bias tables from window_size={old_window_size} "
+                f"to window_size={new_window_size} for encoder"
+            )
+
     # Get encoder state dict
     encoder_dict = model.encoder.state_dict()
-    
+
     # Filter pretrained dict to only include encoder weights
     # Swin encoder keys typically start with: patch_embed, layers, norm
     filtered_dict = {}
@@ -84,7 +159,7 @@ def load_pretrained_encoder_weights(model, config):
         # Skip decoder/upsample layers (layers_up) - these are for SwinUnet decoder, not encoder
         if "layers_up" in k or "output" in k or "decode_head" in k:
             continue
-        
+
         # Map encoder layers
         if k in encoder_dict:
             if encoder_dict[k].shape == v.shape:
@@ -94,15 +169,15 @@ def load_pretrained_encoder_weights(model, config):
             # Keep as is for encoder
             if k in encoder_dict and encoder_dict[k].shape == v.shape:
                 filtered_dict[k] = v
-    
+
     # Load filtered weights
     msg = model.encoder.load_state_dict(filtered_dict, strict=False)
     if msg.missing_keys:
-        print(f"  ⚠️  Missing encoder keys: {len(msg.missing_keys)} (this is OK, decoder keys are expected)")
+        print(f"  WARNING: Missing encoder keys: {len(msg.missing_keys)} (this is OK, decoder keys are expected)")
     if msg.unexpected_keys:
-        print(f"  ⚠️  Unexpected encoder keys: {len(msg.unexpected_keys)}")
+        print(f"  WARNING: Unexpected encoder keys: {len(msg.unexpected_keys)}")
     if not msg.missing_keys and not msg.unexpected_keys:
-        print(f"  ✓ All encoder weights loaded successfully")
+        print(f"  [OK] All encoder weights loaded successfully")
 
 
 def get_model(args, config):
@@ -122,14 +197,14 @@ def get_model(args, config):
     decoder_type = getattr(args, 'decoder', 'simple')
     
     # Simplified logic:
-    # - If --use_baseline is used without --decoder → decoder='simple' (default)
-    # - If --use_baseline is used with --decoder → use specified decoder
-    # - If --decoder is used without --use_baseline → error (caught in validate_arguments)
+    # - If --use_baseline is used without --decoder -> decoder='simple' (default)
+    # - If --use_baseline is used with --decoder -> use specified decoder
+    # - If --decoder is used without --use_baseline -> error (caught in validate_arguments)
     if use_baseline:
         # use_baseline is set, use specified decoder (or 'simple' if not specified)
         decoder_type = decoder_type  # Already set from args
     else:
-        # No use_baseline flag → error (should be caught in validate, but handle gracefully)
+        # No use_baseline flag -> error (should be caught in validate, but handle gracefully)
         print("ERROR: --use_baseline flag is required")
         print("Usage: --use_baseline [--decoder simple|EfficientNet-B4|ResNet50]")
         raise ValueError("--use_baseline flag is required")
@@ -149,7 +224,7 @@ def get_model(args, config):
         img_size = config.DATA.IMG_SIZE if hasattr(config, 'DATA') and hasattr(config.DATA, 'IMG_SIZE') else args.img_size
     else:
         # Fallback to defaults if no config (should not happen, but handle gracefully)
-        print("⚠️  Warning: No config provided, using default encoder parameters")
+        print("WARNING: No config provided, using default encoder parameters")
         embed_dim = 96
         depths = [2, 2, 2, 2]
         num_heads = [3, 6, 12, 24]
@@ -159,7 +234,7 @@ def get_model(args, config):
     
     # Always use baseline with configurable decoder (flags control enhancements)
     print("=" * 80)
-    print(f"🚀 Loading Hybrid2 with {decoder_type} Decoder")
+    print(f"Loading Hybrid2 with {decoder_type} Decoder")
     print(f"   Encoder: SwinUnet (from config)")
     if config is not None:
         print(f"   Config: {config.MODEL.NAME if hasattr(config.MODEL, 'NAME') else 'Unknown'}")
@@ -197,12 +272,12 @@ def get_model(args, config):
     if config is not None:
         try:
             load_pretrained_encoder_weights(model, config)
-            print("✓ Pretrained encoder weights loaded successfully")
+            print("[OK] Pretrained encoder weights loaded successfully")
         except FileNotFoundError as e:
-            print(f"⚠️  Warning: Pretrained checkpoint not found: {e}")
+            print(f"WARNING: Pretrained checkpoint not found: {e}")
             print("   Continuing training without pretrained weights (random initialization)")
         except Exception as e:
-            print(f"⚠️  Warning: Failed to load pretrained weights: {e}")
+            print(f"WARNING: Failed to load pretrained weights: {e}")
             print("   Continuing training without pretrained weights (random initialization)")
     
     return model
@@ -235,7 +310,7 @@ def setup_datasets(args):
         # Create datasets
         use_class_aware_aug = getattr(args, 'use_class_aware_aug', False)
         if use_class_aware_aug:
-            print("✓ Class-aware augmentation enabled (stronger augmentation for rare classes)")
+            print("[OK] Class-aware augmentation enabled (stronger augmentation for rare classes)")
             if num_classes == 5:
                 print("  Rare classes: Paratext, Decoration, Title")
             else:  # num_classes == 6
@@ -516,9 +591,9 @@ def main():
         balanced_sampler = create_balanced_sampler(train_dataset, args.num_classes)
         args.balanced_sampler = balanced_sampler
         if balanced_sampler is not None:
-            print("✓ Balanced sampler enabled (oversampling rare classes)")
+            print("[OK] Balanced sampler enabled (oversampling rare classes)")
         else:
-            print("⚠️  Balanced sampler requested but could not be created (using default shuffling)")
+            print("WARNING: Balanced sampler requested but could not be created (using default shuffling)")
             args.balanced_sampler = None
     else:
         args.balanced_sampler = None

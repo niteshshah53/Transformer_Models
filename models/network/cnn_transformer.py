@@ -1438,10 +1438,12 @@ class EfficientNetSwinUNet(nn.Module):
                 use_groupnorm=use_groupnorm
             )
         
-        # Target dimensions for decoder (matching your diagram exactly)
+        # Target dimensions for decoder
         # Stage resolutions: 56x56, 28x28, 14x14, 7x7
-        # Channel dimensions: 96, 192, 384, 768 (as shown in your diagram)
-        self.decoder_dims = [96, 192, 384, 768]  # Exact dimensions from your diagram
+        # Channel dimensions calculated from embed_dim: [embed_dim, embed_dim*2, embed_dim*4, embed_dim*8]
+        # Swin Tiny (default): [96, 192, 384, 768]
+        # Swin Base (SimMIM): [128, 256, 512, 1024]
+        self.decoder_dims = [embed_dim, embed_dim * 2, embed_dim * 4, embed_dim * 8]
         
         # Feature adapters (external mode) to convert CNN features to transformer format
         encoder_spatial_sizes = [img_size // 4, img_size // 8, img_size // 16, img_size // 32]
@@ -1534,35 +1536,35 @@ class EfficientNetSwinUNet(nn.Module):
             # After layer 2: x=[96] decoder + C1=[96] encoder → [96]
             self.skip_fusions = nn.ModuleList([
                 FourierFeatureFusion(
-                    in_dim1=384,  # Layer 1 input dimension
-                    in_dim2=384,  # C3 encoder dimension
-                    out_dim=384   # Layer 1 output dimension
+                    in_dim1=self.decoder_dims[2],  # Layer 1 input dimension
+                    in_dim2=self.decoder_dims[2],  # C3 encoder dimension
+                    out_dim=self.decoder_dims[2]   # Layer 1 output dimension
                 ),
                 FourierFeatureFusion(
-                    in_dim1=192,  # Layer 2 input dimension
-                    in_dim2=192,  # C2 encoder dimension
-                    out_dim=192   # Layer 2 output dimension
+                    in_dim1=self.decoder_dims[1],  # Layer 2 input dimension
+                    in_dim2=self.decoder_dims[1],  # C2 encoder dimension
+                    out_dim=self.decoder_dims[1]   # Layer 2 output dimension
                 ),
                 FourierFeatureFusion(
-                    in_dim1=96,   # Layer 3 input dimension
-                    in_dim2=96,   # C1 encoder dimension
-                    out_dim=96    # Layer 3 output dimension
+                    in_dim1=self.decoder_dims[0],   # Layer 3 input dimension
+                    in_dim2=self.decoder_dims[0],   # C1 encoder dimension
+                    out_dim=self.decoder_dims[0]    # Layer 3 output dimension
                 )
             ])
         elif fusion_method == 'smart':
             # Attention-based smart skip connections (like hybrid1)
             self.smart_skips = nn.ModuleList([
-                SmartSkipConnectionTransformer(encoder_dim=384, decoder_dim=384, num_heads=num_heads[2]),
-                SmartSkipConnectionTransformer(encoder_dim=192, decoder_dim=192, num_heads=num_heads[1]),
-                SmartSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96,  num_heads=num_heads[0]),
+                SmartSkipConnectionTransformer(encoder_dim=self.decoder_dims[2], decoder_dim=self.decoder_dims[2], num_heads=num_heads[2]),
+                SmartSkipConnectionTransformer(encoder_dim=self.decoder_dims[1], decoder_dim=self.decoder_dims[1], num_heads=num_heads[1]),
+                SmartSkipConnectionTransformer(encoder_dim=self.decoder_dims[0], decoder_dim=self.decoder_dims[0], num_heads=num_heads[0]),
             ])
             self.skip_fusions = None
         elif fusion_method == 'simple':
             # Simple skip connections matching hybrid2's SimpleSkipConnection pattern
             self.simple_skips = nn.ModuleList([
-                SimpleSkipConnectionTransformer(encoder_dim=384, decoder_dim=384),
-                SimpleSkipConnectionTransformer(encoder_dim=192, decoder_dim=192),
-                SimpleSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96),
+                SimpleSkipConnectionTransformer(encoder_dim=self.decoder_dims[2], decoder_dim=self.decoder_dims[2]),
+                SimpleSkipConnectionTransformer(encoder_dim=self.decoder_dims[1], decoder_dim=self.decoder_dims[1]),
+                SimpleSkipConnectionTransformer(encoder_dim=self.decoder_dims[0], decoder_dim=self.decoder_dims[0]),
             ])
             self.skip_fusions = None
             self.smart_skips = None
@@ -1571,9 +1573,9 @@ class EfficientNetSwinUNet(nn.Module):
             # GCFF (Global Context Feature Fusion) skip connections from MSAGHNet
             # ch_out matches decoder_dim for each stage
             self.gcff_skips = nn.ModuleList([
-                GCFFSkipConnectionTransformer(encoder_dim=384, decoder_dim=384, ch_out=384, use_groupnorm=use_groupnorm),
-                GCFFSkipConnectionTransformer(encoder_dim=192, decoder_dim=192, ch_out=192, use_groupnorm=use_groupnorm),
-                GCFFSkipConnectionTransformer(encoder_dim=96,  decoder_dim=96,  ch_out=96,  use_groupnorm=use_groupnorm),
+                GCFFSkipConnectionTransformer(encoder_dim=self.decoder_dims[2], decoder_dim=self.decoder_dims[2], ch_out=self.decoder_dims[2], use_groupnorm=use_groupnorm),
+                GCFFSkipConnectionTransformer(encoder_dim=self.decoder_dims[1], decoder_dim=self.decoder_dims[1], ch_out=self.decoder_dims[1], use_groupnorm=use_groupnorm),
+                GCFFSkipConnectionTransformer(encoder_dim=self.decoder_dims[0], decoder_dim=self.decoder_dims[0], ch_out=self.decoder_dims[0], use_groupnorm=use_groupnorm),
             ])
             self.skip_fusions = None
             self.smart_skips = None

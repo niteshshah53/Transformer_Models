@@ -154,14 +154,14 @@ def aggregate_metrics(results_dir, manuscripts):
         if metrics:
             all_metrics.append(metrics)
             manuscript_results[manuscript] = metrics
-            print(f"  ✓ Metrics extracted:")
+            print("  Metrics extracted:")
             print(f"    Precision: {metrics['precision']:.4f}")
             print(f"    Recall:    {metrics['recall']:.4f}")
             print(f"    F1:        {metrics['f1']:.4f}")
             print(f"    IoU:       {metrics['iou']:.4f}")
         else:
-            print(f"  ✗ Could not find metrics for {manuscript}")
-            print(f"    Please ensure testing has completed and output files exist")
+            print(f"  Could not find metrics for {manuscript}")
+            print("    Please ensure testing has completed and output files exist")
     
     if not all_metrics:
         print("\n" + "="*80)
@@ -259,7 +259,7 @@ def save_aggregated_results(results, output_file):
         f.write(f"Average IoU:       {avg['iou']:.4f}\n")
         f.write("="*80 + "\n")
     
-    print(f"\n✓ Results saved to: {output_file}")
+    print(f"\nResults saved to: {output_file}")
 
 
 def main():

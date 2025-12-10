@@ -451,9 +451,9 @@ def predict_patch_with_tta(patch_tensor, model, use_amp=True):
     Predict patch with 8-augmentation TTA ensemble for improved rare class stability.
     
     Rotation convention: PyTorch's TF.rotate uses counter-clockwise rotation for positive angles.
-    - Forward: angle=-90 (clockwise 90°) -> Reverse: angle=+90 (counter-clockwise 90°) = identity
-    - Forward: angle=-180 (clockwise 180°) -> Reverse: angle=+180 (counter-clockwise 180°) = identity
-    - Forward: angle=-270 (clockwise 270°) -> Reverse: angle=+270 (counter-clockwise 270°) = identity
+    - Forward: angle=-90 (clockwise 90 deg) -> Reverse: angle=+90 (counter-clockwise 90 deg) = identity
+    - Forward: angle=-180 (clockwise 180 deg) -> Reverse: angle=+180 (counter-clockwise 180 deg) = identity
+    - Forward: angle=-270 (clockwise 270 deg) -> Reverse: angle=+270 (counter-clockwise 270 deg) = identity
     
     Note: The transforms are verified on first call to ensure forward+reverse = identity.
     """
@@ -573,7 +573,7 @@ def predict_patch_with_tta_and_multiscale(patch_tensor, model, scales=[0.75, 1.0
             model_input_tensor = patch_tensor
             scaled_size = original_size
         else:
-            # Scale the patch (e.g., 0.75x → 168x168, 1.25x → 280x280)
+            # Scale the patch (e.g., 0.75x -> 168x168, 1.25x -> 280x280)
             scaled_h = int(original_size[0] * scale)
             scaled_w = int(original_size[1] * scale)
             scaled_size = (scaled_h, scaled_w)

@@ -24,6 +24,9 @@ import torchvision.transforms.functional as TF
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 
+# Import configuration module
+from configs.config import get_config
+
 warnings.filterwarnings("ignore")
 
 
@@ -38,6 +41,12 @@ Examples:
   python test.py --dataset DIVAHISDB --output_dir ./models/ --manuscript Latin2
         """
     )
+    
+    # Config file configuration
+    parser.add_argument('--cfg', type=str, required=False, help='Path to config file (optional when using --yaml)')
+    parser.add_argument('--yaml', type=str, default=None,
+                        choices=['network'],
+                        help="Choose which preset YAML to use from common/configs: 'network'. If provided, --cfg is optional and will be overridden.")
     
     parser.add_argument('--output_dir', type=str, required=True,
                        help='Directory containing trained model checkpoints')
@@ -105,6 +114,28 @@ Examples:
                        help='Use deterministic testing')
     parser.add_argument('--seed', type=int, default=1234,
                        help='Random seed for reproducibility')
+    
+    # Config override flags (match train.py to satisfy update_config in config.py)
+    parser.add_argument('--zip', action='store_true', default=False,
+                        help='Use zipped dataset (unused for current datasets)')
+    parser.add_argument('--cache_mode', type=str, default='',
+                        help='Cache mode for dataset (unused for current datasets)')
+    parser.add_argument('--resume', type=str, default='',
+                        help='Path to resume checkpoint (unused for testing)')
+    parser.add_argument('--accumulation_steps', type=int, default=0,
+                        help='Gradient accumulation steps (unused for testing)')
+    parser.add_argument('--use_checkpoint', action='store_true', default=False,
+                        help='Enable gradient checkpointing (unused for testing)')
+    parser.add_argument('--amp_opt_level', type=str, default='',
+                        help='AMP optimization level (unused for testing)')
+    parser.add_argument('--tag', type=str, default='',
+                        help='Experiment tag (unused for testing)')
+    parser.add_argument('--eval', action='store_true', default=False,
+                        help='Eval mode flag (unused for testing)')
+    parser.add_argument('--throughput', action='store_true', default=False,
+                        help='Throughput mode flag (unused for testing)')
+    parser.add_argument('--opts', nargs='*', default=None,
+                        help='Additional options to override config')
     # Testing-specific flags (not in train.py, but needed for testing)
     # Note: Legacy/unused flags removed for clarity
     
@@ -116,6 +147,10 @@ def validate_arguments(args):
     bad_tokens = [t for t in sys.argv[1:] if t.lstrip('-').startswith('mg_')]
     if bad_tokens:
         logging.warning(f"Suspicious argv tokens detected: {bad_tokens}")
+    
+    # Check if config file exists (if provided)
+    if hasattr(args, 'cfg') and args.cfg and not os.path.exists(args.cfg):
+        raise ValueError(f"Config file not found: {args.cfg}")
     
     if not os.path.exists(args.output_dir):
         raise ValueError(f"Output directory not found: {args.output_dir}")
@@ -144,8 +179,24 @@ def get_model(args, config):
     Create and load the CNN-Transformer model.
     
     All architecture flags are independent and can be combined freely (matching train.py).
+    Now supports config file for DECODER_DEPTHS and encoder parameters.
     """
     from vision_transformer_cnn import CNNTransformerUnet as ViT_seg
+    
+    # Get decoder depths from config if available, otherwise use default
+    if config is not None and hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'DECODER_DEPTHS'):
+        decoder_depths = config.MODEL.SWIN.DECODER_DEPTHS
+        print(f"Using DECODER_DEPTHS from config: {decoder_depths}")
+    else:
+        decoder_depths = [2, 2, 2, 2]  # Default
+        print(f"Using default DECODER_DEPTHS: {decoder_depths}")
+    
+    # Get encoder type from config if available, otherwise from args
+    if config is not None and hasattr(config.MODEL, 'ENCODER') and hasattr(config.MODEL.ENCODER, 'TYPE'):
+        encoder_type = config.MODEL.ENCODER.TYPE
+        print(f"Using encoder type from config: {encoder_type}")
+    else:
+        encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Get all model configuration from args (all flags are independent, matching train.py)
     use_bottleneck = getattr(args, 'bottleneck', True)
@@ -156,7 +207,6 @@ def get_model(args, config):
     use_groupnorm = getattr(args, 'use_groupnorm', True)
     use_se_msfe = getattr(args, 'use_se_msfe', False)
     use_msfa_mct_bottleneck = getattr(args, 'use_msfa_mct_bottleneck', False)
-    encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Print configuration (matching train.py format)
     print("=" * 80)
@@ -176,6 +226,7 @@ def get_model(args, config):
         else:
             print("    - Type: 2 Swin Transformer blocks")
     print("  ✓ Swin Transformer Decoder")
+    print(f"    - Decoder Depths: {decoder_depths}")
     print(f"  ✓ Fusion Method: {fusion_method}")
     print(f"  ✓ Adapter Mode: {adapter_mode}")
     print(f"  ✓ Deep Supervision: {'Enabled' if use_deep_supervision else 'Disabled'}")
@@ -185,7 +236,7 @@ def get_model(args, config):
     
     # Create model with all flags (all independent and compatible, matching train.py)
     model = ViT_seg(
-        None,
+        config,  # Pass config for decoder_depths
         img_size=args.img_size,
         num_classes=args.num_classes,
         use_deep_supervision=use_deep_supervision,
@@ -196,7 +247,8 @@ def get_model(args, config):
         use_groupnorm=use_groupnorm,
         encoder_type=encoder_type,
         use_se_msfe=use_se_msfe,
-        use_msfa_mct_bottleneck=use_msfa_mct_bottleneck
+        use_msfa_mct_bottleneck=use_msfa_mct_bottleneck,
+        decoder_depths=decoder_depths  # Pass decoder depths from config
     )
     
     if torch.cuda.is_available():
@@ -1200,14 +1252,40 @@ def main():
     
     args = parse_arguments()
     
+    # Map the --yaml shortcut to an actual config file path in the repo.
+    # This must be set BEFORE validate_arguments(args) which checks args.cfg exists.
+    base_config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/configs'))
+    
+    if args.yaml == 'network':
+        default_cfg = os.path.join(base_config_dir, 'network_cnn_transformer.yaml')
+    else:
+        default_cfg = None
+    
+    # If user passed explicit --cfg, prefer that; otherwise use shorthand mapping
+    if not args.cfg:
+        if default_cfg and os.path.exists(default_cfg):
+            args.cfg = default_cfg
+        elif args.yaml:
+            # If the chosen config file is missing, raise a helpful error
+            raise FileNotFoundError(f"Config for --yaml {args.yaml} not found at {default_cfg}. Make sure the file exists.")
+    
     try:
         validate_arguments(args)
     except ValueError as e:
         print(f"ERROR: {e}")
         sys.exit(1)
     
+    # Load configuration if config file is provided
+    config = None
+    if hasattr(args, 'cfg') and args.cfg:
+        print("Loading configuration for CNN-Transformer...")
+        config = get_config(args)
+        print(f"Config loaded from: {args.cfg}")
+    else:
+        print("No config file provided, using default parameters and command-line arguments")
+    
     setup_reproducible_testing(args)
-    model = get_model(args, None)
+    model = get_model(args, config)
     
     try:
         checkpoint_name = load_model_checkpoint(model, args)

@@ -101,7 +101,7 @@ def setup_datasets(args):
         # Check if class-aware augmentation is enabled
         use_class_aware_aug = getattr(args, 'use_class_aware_aug', False)
         if use_class_aware_aug:
-            print("✓ Class-aware augmentation enabled (stronger augmentation for rare classes)")
+            print("[OK] Class-aware augmentation enabled (stronger augmentation for rare classes)")
             if num_classes == 5:
                 print("  Rare classes: Paratext, Decoration, Title")
             else:  # num_classes == 6

@@ -74,6 +74,12 @@ _C.MODEL.SWIN.APE = False
 _C.MODEL.SWIN.PATCH_NORM = True
 _C.MODEL.SWIN.FINAL_UPSAMPLE= "expand_first"
 
+# Encoder parameters (for CNN-Transformer network model)
+_C.MODEL.ENCODER = CN()
+_C.MODEL.ENCODER.TYPE = 'efficientnet'  # 'efficientnet' or 'resnet50'
+_C.MODEL.ENCODER.EFFICIENTNET_MODEL = 'tf_efficientnet_b4_ns'
+_C.MODEL.ENCODER.PRETRAINED = True
+
 # -----------------------------------------------------------------------------
 # Training settings
 # -----------------------------------------------------------------------------
@@ -193,7 +199,8 @@ def update_config(config, args):
     _update_config_from_file(config, args.cfg)
 
     config.defrost()
-    if args.opts:
+    # Check if opts exists before accessing it (may not be set in all scripts)
+    if hasattr(args, 'opts') and args.opts:
         config.merge_from_list(args.opts)
 
     # merge from specific arguments

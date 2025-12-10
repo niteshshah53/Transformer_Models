@@ -1,17 +1,3 @@
-"""
-SwinUnet Training Module
-Training approach for SwinUnet model with early stopping and class weights.
-Enhanced with features from Network/Hybrid models:
-- Auto-resume checkpoint functionality
-- Mixed Precision Training (AMP)
-- Effective Number of Samples (ENS) class weighting
-- Balanced sampler for rare classes
-- Multiple LR scheduler types
-- NaN/Inf detection
-- Periodic checkpoints
-- Enhanced error handling
-"""
-
 import os
 import sys
 import logging
@@ -26,6 +12,8 @@ from torch.utils.tensorboard import SummaryWriter
 from PIL import Image
 import warnings
 from collections import defaultdict
+from functools import partial
+import random
 
 # Add common directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '../../common'))
@@ -105,7 +93,6 @@ def compute_class_weights(train_dataset, num_classes, method='ens'):
             (0, 255, 255): 2,    # Decoration
             (255, 0, 255): 3,    # Main text
             (255, 0, 0): 4,      # Title
-            # Note: Chapter Heading (0, 255, 0) is not present in Syriaque341
         }
     elif num_classes == 4:
         # DivaHisDB color map
@@ -133,9 +120,6 @@ def compute_class_weights(train_dataset, num_classes, method='ens'):
 
     if method == 'ens':
         # Effective Number of Samples (ENS) method
-        # Paper: "Class-Balanced Loss Based on Effective Number of Samples"
-        # ENS = (1 - β^n) / (1 - β)
-        # where n = number of samples per class, β = re-weighting factor
         beta = 0.9999  # Standard value for extreme imbalance
         
         # Compute ENS weights
@@ -153,13 +137,26 @@ def compute_class_weights(train_dataset, num_classes, method='ens'):
             weights = ens_weights / ens_weights[0]
         else:
             weights = ens_weights
-        
-        # Additional boosting for extreme cases (as per user's suggestion)
-        weights[1] *= 8.0   # Paratext (was 6.0)
-        weights[4] *= 10.0  # Title - rarest (was 8.0)
-        if num_classes >= 6:
-            weights[5] *= 7.0   # Chapter Heading (was 5.0)
-        
+
+        if num_classes == 4:
+            # DivaHisDB
+            weights[1] *= 1.0   # moderate rare
+            weights[2] *= 1.5   # extremely rare
+            weights[3] *= 1.0   # moderate rare
+        elif num_classes == 5:
+            # UdiAdsBib_Syriaque341
+            weights[1] *= 1.2
+            weights[2] *= 1.5
+            weights[3] *= 1.2
+            weights[4] *= 1.8   # rarest title class
+        elif num_classes == 6:
+            # UdiAdsBib_Standard
+            weights[1] *= 1.2
+            weights[2] *= 1.5
+            weights[3] *= 1.2
+            weights[4] *= 1.8
+            weights[5] *= 1.4
+
         method_name = "ENS (Effective Number of Samples)"
     else:
         # Default: Inverse frequency with logarithmic smoothing
@@ -280,6 +277,20 @@ def create_balanced_sampler(train_dataset, num_classes, threshold=0.01, eps=1e-6
     return sampler
 
 
+def _worker_init_fn(worker_id, seed):
+    """
+    Worker initialization function for DataLoader.
+    Must be at module level for Windows multiprocessing compatibility.
+    
+    Args:
+        worker_id: Worker process ID
+        seed: Base random seed
+    """
+    random.seed(seed + worker_id)
+    np.random.seed(seed + worker_id)
+    torch.manual_seed(seed + worker_id)
+
+
 def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, seed, sampler=None):
     """
     Create data loaders for training and validation.
@@ -298,9 +309,8 @@ def create_data_loaders(train_dataset, val_dataset, batch_size, num_workers, see
     Returns:
         tuple: (train_loader, val_loader)
     """
-    def worker_init_fn(worker_id):
-        import random
-        random.seed(seed + worker_id)
+    # Use functools.partial to create a picklable worker_init_fn for Windows compatibility
+    worker_init_fn = partial(_worker_init_fn, seed=seed) if num_workers > 0 else None
     
     if sampler is not None:
         # When providing a sampler, DataLoader requires shuffle=False
@@ -402,9 +412,9 @@ def create_loss_functions(class_weights, num_classes):
         create_loss_functions._weights_printed = True
         if class_weights is not None and isinstance(class_weights, torch.Tensor):
             weights_list = class_weights.cpu().tolist()
-            print(f"Loss: CE (weighted) + Focal (γ=5, weighted) + Dice (weighted) | Weights: {[f'{w:.2f}' for w in weights_list]}")
+            print(f"Loss: CE (weighted) + Focal (gamma=5, weighted) + Dice (weighted) | Weights: {[f'{w:.2f}' for w in weights_list]}")
         else:
-            print(f"Loss: CE (weighted) + Focal (γ=5, weighted) + Dice (weighted)")
+            print(f"Loss: CE (weighted) + Focal (gamma=5, weighted) + Dice (weighted)")
     
     return ce_loss, focal_loss, dice_loss
 
@@ -876,7 +886,7 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             sampler = create_balanced_sampler(train_dataset, args.num_classes)
             if sampler is not None:
                 print("Balanced sampler enabled (oversampling rare classes)")
-                print("  → Using uniform class weights to avoid double correction")
+                print("  -> Using uniform class weights to avoid double correction")
             else:
                 print("WARNING: Balanced sampler requested but could not be created (using default shuffling)")
                 use_balanced_sampler = False  # Fall back to class weights
@@ -907,7 +917,7 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             # Option A: Balanced sampler + uniform weights (avoid double correction)
             # Skip compute_class_weights call - no need to compute weights we won't use
             print("Class Weight Strategy: Uniform (balanced sampler handles class imbalance)")
-            print("  → Skipping class weight computation (using uniform weights)")
+            print("  -> Skipping class weight computation (using uniform weights)")
             class_weights = torch.ones(args.num_classes)
             if torch.cuda.is_available():
                 class_weights = class_weights.cuda()
@@ -927,9 +937,9 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                     class_weights[4] = class_weights[4] * 10.0  # Title: 10.0x boost (matches ENS, rarest)
                     if class_weights.numel() >= 6:
                         class_weights[5] = class_weights[5] * 7.0   # Chapter Heading: 7.0x boost (matches ENS)
-                print(f"  → Rare class boosting: Paratext (8x), Title (10x), Chapter Heading (7x)")
+                print(f"  -> Rare class boosting: Paratext (8x), Title (10x), Chapter Heading (7x)")
             else:
-                print(f"  → Rare class boosting: Paratext (8x), Title (10x), Chapter Heading (7x)")
+                print(f"  -> Rare class boosting: Paratext (8x), Title (10x), Chapter Heading (7x)")
     else:
         class_weights = torch.ones(args.num_classes)
         if torch.cuda.is_available():
@@ -980,7 +990,7 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     
     # Load checkpoint if found
     if checkpoint_path and os.path.exists(checkpoint_path):
-        print(f"   📂 Loading checkpoint: {checkpoint_path}")
+        print(f"   [Loading checkpoint]: {checkpoint_path}")
         try:
             checkpoint = torch.load(checkpoint_path, map_location='cpu')
             
@@ -1210,10 +1220,10 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
             
             # Print epoch summary
             print(f"Results:")
-            print(f"  • Train Loss: {train_loss:.4f}")
-            print(f"  • Validation Loss: {val_loss:.4f}")
-            print(f"  • Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
-            print(f"  • Mean Dice (Foreground): {mean_dice_foreground:.4f} {'(BEST!)' if mean_dice_foreground > best_mean_dice else ''}")
+            print(f"  - Train Loss: {train_loss:.4f}")
+            print(f"  - Validation Loss: {val_loss:.4f}")
+            print(f"  - Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
+            print(f"  - Mean Dice (Foreground): {mean_dice_foreground:.4f} {'(BEST!)' if mean_dice_foreground > best_mean_dice else ''}")
             
             # Per-class Dice scores are calculated and logged to TensorBoard but not printed to console
             # (calculation is needed for mean_dice_foreground, but printing is removed for cleaner output)

@@ -21,6 +21,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../../'))
 warnings.filterwarnings("ignore")
 
 # Import configuration and training modules
+from configs.config import get_config
 from trainer import trainer_synapse
 
 # Import dataset classes
@@ -38,16 +39,32 @@ def get_model(args, config):
     Create and initialize the CNN-Transformer model.
     
     All architecture flags are independent and can be combined freely.
+    Now supports config file for DECODER_DEPTHS and encoder parameters.
     
     Args:
         args: Command line arguments containing model type and parameters
-        config: Configuration object with model settings (not used for CNN-Transformer)
+        config: Configuration object with model settings (optional, used for DECODER_DEPTHS and encoder params)
         
     Returns:
         torch.nn.Module: Initialized CNN-Transformer model ready for training
     """
     print("Loading CNN-Transformer model...")
     from vision_transformer_cnn import CNNTransformerUnet as ViT_seg
+    
+    # Get decoder depths from config if available, otherwise use default
+    if config is not None and hasattr(config.MODEL, 'SWIN') and hasattr(config.MODEL.SWIN, 'DECODER_DEPTHS'):
+        decoder_depths = config.MODEL.SWIN.DECODER_DEPTHS
+        print(f"Using DECODER_DEPTHS from config: {decoder_depths}")
+    else:
+        decoder_depths = [2, 2, 2, 2]  # Default
+        print(f"Using default DECODER_DEPTHS: {decoder_depths}")
+    
+    # Get encoder type from config if available, otherwise from args
+    if config is not None and hasattr(config.MODEL, 'ENCODER') and hasattr(config.MODEL.ENCODER, 'TYPE'):
+        encoder_type = config.MODEL.ENCODER.TYPE
+        print(f"Using encoder type from config: {encoder_type}")
+    else:
+        encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Get all model configuration from args (all flags are independent)
     use_bottleneck = getattr(args, 'bottleneck', True)
@@ -58,7 +75,6 @@ def get_model(args, config):
     use_groupnorm = getattr(args, 'use_groupnorm', True)
     use_se_msfe = getattr(args, 'use_se_msfe', False)
     use_msfa_mct_bottleneck = getattr(args, 'use_msfa_mct_bottleneck', False)
-    encoder_type = getattr(args, 'encoder_type', 'efficientnet')  # 'efficientnet' or 'resnet50'
     
     # Print configuration
     print("=" * 80)
@@ -78,6 +94,7 @@ def get_model(args, config):
         else:
             print("    - Type: 2 Swin Transformer blocks")
     print("  ✓ Swin Transformer Decoder")
+    print(f"    - Decoder Depths: {decoder_depths}")
     print(f"  ✓ Fusion Method: {fusion_method}")
     print(f"  ✓ Adapter Mode: {adapter_mode}")
     print(f"  ✓ Deep Supervision: {'Enabled' if use_deep_supervision else 'Disabled'}")
@@ -87,7 +104,7 @@ def get_model(args, config):
     
     # Create model with all flags (all independent and compatible)
     model = ViT_seg(
-        None, 
+        config,  # Pass config for decoder_depths
         img_size=args.img_size, 
         num_classes=args.num_classes,
         use_deep_supervision=use_deep_supervision,
@@ -98,7 +115,8 @@ def get_model(args, config):
         use_groupnorm=use_groupnorm,
         encoder_type=encoder_type,
         use_se_msfe=use_se_msfe,
-        use_msfa_mct_bottleneck=use_msfa_mct_bottleneck
+        use_msfa_mct_bottleneck=use_msfa_mct_bottleneck,
+        decoder_depths=decoder_depths  # Pass decoder depths from config
     )
     
     # Move to GPU if available
@@ -108,7 +126,7 @@ def get_model(args, config):
     else:
         print("CUDA not available, using CPU")
     
-    model.load_from(None)
+    model.load_from(config)
     return model
 
 
@@ -179,6 +197,15 @@ def setup_datasets(args):
         print("Setting up DivaHisDB dataset...")
         args.num_classes = 4
         
+        # DivaHisDB: Disable all augmentation for network model (like SwinUnet) to prevent gradient explosions
+        # SwinUnet uses NO augmentation (identity_transform) and achieves <0.1% skipped batches
+        # Even simple transforms (flips + 90° rotations) cause 50-65% skipped batches for network model
+        # The network model architecture is more sensitive to augmentation than SwinUnet
+        use_class_aware_aug = False  # Force disabled for network model on DivaHisDB
+        print("✓ Using NO augmentation (identity transform, like SwinUnet)")
+        print("  Network model is sensitive to augmentation - even simple transforms cause gradient explosions")
+        print("  Class imbalance handled by: Balanced Sampler + CB Loss + Focal Loss")
+        
         # Handle patched data path: add _patched suffix if use_patched_data=True and path doesn't already have it
         root_dir = args.divahisdb_root
         if args.use_patched_data and not root_dir.endswith('_patched'):
@@ -187,13 +214,16 @@ def setup_datasets(args):
         elif not args.use_patched_data and root_dir.endswith('_patched'):
             print(f"Warning: root directory ends with '_patched' but use_patched_data=False")
         
+        print(f"DivaHisDB dataset: 4 classes (Background: 80.7%, Comment: 8.95%, Decoration: 0.36%, Main Text: 9.99%)")
+        
         train_dataset = DivaHisDBDataset(
             root_dir=root_dir,
             split='training',
             patch_size=args.img_size,
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
-            model_type='network'  # Network model (previously called 'hybrid1')
+            model_type='network',  # Network model (previously called 'hybrid1')
+            use_class_aware_aug=use_class_aware_aug
         )
         
         val_dataset = DivaHisDBDataset(
@@ -202,7 +232,8 @@ def setup_datasets(args):
             patch_size=args.img_size,
             use_patched_data=args.use_patched_data,
             manuscript=args.manuscript,
-            model_type='network'  # Network model (previously called 'hybrid1')
+            model_type='network',  # Network model (previously called 'hybrid1')
+            use_class_aware_aug=False  # Never use augmentation for validation
         )
         
     else:
@@ -221,6 +252,11 @@ def validate_arguments(args):
     Raises:
         SystemExit: If validation fails
     """
+    # Check if config file exists (if provided)
+    if hasattr(args, 'cfg') and args.cfg and not os.path.exists(args.cfg):
+        print(f"ERROR: Config file not found: {args.cfg}")
+        sys.exit(1)
+    
     # Check if dataset root exists
     if args.dataset == 'UDIADS_BIB' and not os.path.exists(args.udiadsbib_root):
         print(f"ERROR: UDIADS_BIB root directory not found: {args.udiadsbib_root}")
@@ -244,6 +280,12 @@ def parse_arguments():
         argparse.Namespace: Parsed arguments
     """
     parser = argparse.ArgumentParser(description='CNN-Transformer Training for Historical Document Segmentation')
+    
+    # Config file configuration
+    parser.add_argument('--cfg', type=str, required=False, help='Path to config file (optional when using --yaml)')
+    parser.add_argument('--yaml', type=str, default=None,
+                        choices=['network'],
+                        help="Choose which preset YAML to use from common/configs: 'network'. If provided, --cfg is optional and will be overridden.")
     
     # Model configuration
     parser.add_argument('--img_size', type=int, default=224, help='Input image size')
@@ -281,7 +323,7 @@ def parse_arguments():
     parser.add_argument('--no_amp', dest='use_amp', action='store_false',
                        help='Disable AMP (use FP32 training)')
     parser.add_argument('--n_gpu', type=int, default=1, help='Number of GPUs')
-    parser.add_argument('--num_workers', type=int, default=4, help='Number of data loading workers')
+    parser.add_argument('--num_workers', type=int, default=8, help='Number of data loading workers (default: 8 for faster data loading)')
     parser.add_argument('--seed', type=int, default=1234, help='Random seed')
     
     # Model architecture flags (all flags are independent and can be combined freely)
@@ -344,6 +386,17 @@ def parse_arguments():
     parser.add_argument('--focal_gamma', type=float, default=3.0,
                        help='Focal loss gamma parameter (default: 3.0 for extreme imbalance with CB Loss, 4.0 for standalone use, 2.0 for moderate imbalance)')
     
+    # Additional options for config override (required by config.py)
+    parser.add_argument('--opts', nargs='*', default=None, help='Additional options to override config')
+    parser.add_argument('--zip', action='store_true', help='Use zipped dataset instead of folder dataset')
+    parser.add_argument('--cache_mode', type=str, default='part', choices=['no', 'full', 'part'], help='Cache mode')
+    parser.add_argument('--accumulation_steps', type=int, help='Gradient accumulation steps')
+    parser.add_argument('--use_checkpoint', action='store_true', help='Whether to use gradient checkpointing to save memory')
+    parser.add_argument('--amp_opt_level', type=str, default='O1', choices=['O0', 'O1', 'O2'], help='Mixed precision opt level')
+    parser.add_argument('--tag', type=str, help='Tag of experiment')
+    parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
+    parser.add_argument('--throughput', action='store_true', help='Test throughput only')
+    
     return parser.parse_args()
 
 
@@ -353,6 +406,23 @@ def main():
     """
     # Parse arguments
     args = parse_arguments()
+    
+    # Map the --yaml shortcut to an actual config file path in the repo.
+    # This must be set BEFORE validate_arguments(args) which checks args.cfg exists.
+    base_config_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../common/configs'))
+    
+    if args.yaml == 'network':
+        default_cfg = os.path.join(base_config_dir, 'network_cnn_transformer.yaml')
+    else:
+        default_cfg = None
+    
+    # If user passed explicit --cfg, prefer that; otherwise use shorthand mapping
+    if not args.cfg:
+        if default_cfg and os.path.exists(default_cfg):
+            args.cfg = default_cfg
+        elif args.yaml:
+            # If the chosen config file is missing, raise a helpful error
+            raise FileNotFoundError(f"Config for --yaml {args.yaml} not found at {default_cfg}. Make sure the file exists.")
     
     # Validate arguments
     validate_arguments(args)
@@ -366,6 +436,15 @@ def main():
     torch.cuda.manual_seed_all(args.seed)
     cudnn.deterministic = True
     cudnn.benchmark = False
+    
+    # Load configuration if config file is provided
+    config = None
+    if hasattr(args, 'cfg') and args.cfg:
+        print("Loading configuration for CNN-Transformer...")
+        config = get_config(args)
+        print(f"Config loaded from: {args.cfg}")
+    else:
+        print("No config file provided, using default parameters and command-line arguments")
     
     # Set up datasets
     train_dataset, val_dataset = setup_datasets(args)
@@ -383,8 +462,8 @@ def main():
     else:
         args.balanced_sampler = None
     
-    # Create model (no config needed for CNN-Transformer)
-    model = get_model(args, None)
+    # Create model (now supports config for DECODER_DEPTHS)
+    model = get_model(args, config)
     print("Model created successfully with {} classes".format(args.num_classes))
     
     # Create output directory

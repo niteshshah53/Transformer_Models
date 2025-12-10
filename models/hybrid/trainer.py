@@ -1,12 +1,3 @@
-"""
-Hybrid2 Model Training Module
-Training approach for Hybrid2 model with early stopping and class weights.
-
-Hybrid2: SwinUnet encoder + EfficientNet/ResNet50 decoder
-
-Uses training approach with all three losses (CE + Focal + Dice).
-"""
-
 import os
 import sys
 import logging
@@ -160,11 +151,11 @@ def compute_class_weights(train_dataset, num_classes, smoothing=0.05):
         raise ValueError("No valid pixels found in training masks!")
     
     if num_classes == 5 and chapter_heading_count > 0:
-        print(f"\n⚠️  WARNING: Found {chapter_heading_count:,} Chapter Heading pixels")
-        print(f"   These will be mapped to Background (class 0)")
+        print(f"\nWARNING: Found {chapter_heading_count:,} Chapter Heading pixels")
+        print("   These will be mapped to Background (class 0)")
     
     if unmapped_count > 0:
-        print(f"⚠️  WARNING: {unmapped_count:,} unmapped pixels (mapped to Background)")
+        print(f"WARNING: {unmapped_count:,} unmapped pixels (mapped to Background)")
     
     # Compute class frequencies
     class_freq = class_counts / total_pixels
@@ -403,7 +394,7 @@ def create_loss_functions(class_weights, num_classes, focal_gamma=2.0):
     # Dice loss (handles class imbalance internally, matching Network model)
     dice_loss = DiceLoss(num_classes)
     
-    print(f"✓ Loss functions created: CE (weighted, label_smoothing=0.1), Focal (γ={focal_gamma}), Dice")
+    print(f"[OK] Loss functions created: CE (weighted, label_smoothing=0.1), Focal (gamma={focal_gamma}), Dice")
     
     return ce_loss, focal_loss, dice_loss
 
@@ -575,11 +566,11 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader
             # Calculate actual steps per epoch from data loader
             steps_per_epoch = len(train_loader)
             total_steps = max_epochs * steps_per_epoch
-            print(f"  📊 OneCycleLR: {steps_per_epoch} steps/epoch × {max_epochs} epochs = {total_steps} total steps")
+            print(f"  OneCycleLR: {steps_per_epoch} steps/epoch x {max_epochs} epochs = {total_steps} total steps")
         else:
             # Fallback: estimate steps per epoch
             total_steps = max_epochs * 1000  # Estimate: ~1000 steps per epoch
-            print(f"  📊 OneCycleLR: Estimated {total_steps} total steps (1000 steps/epoch)")
+            print(f"  OneCycleLR: Estimated {total_steps} total steps (1000 steps/epoch)")
         
         scheduler = optim.lr_scheduler.OneCycleLR(
             optimizer,
@@ -624,12 +615,12 @@ def create_optimizer_and_scheduler(model, learning_rate, args=None, train_loader
         )
         scheduler_name = "CosineAnnealingWarmRestarts (T_0=50, T_mult=2)"
     
-    print("🚀 Hybrid2 Best Practice: Differential Learning Rates")
-    print(f"  📊 Encoder LR:     {learning_rate * 0.1:.6f} (10x smaller, {len(encoder_params)} params)")
-    print(f"  📊 Bottleneck LR:  {learning_rate * 0.5:.6f} (5x smaller, {len(bottleneck_params)} params)")
-    print(f"  📊 Decoder LR:     {learning_rate:.6f} (base LR, {len(decoder_params)} params)")
-    print(f"  ⚙️  Scheduler: {scheduler_name}")
-    print(f"  ⚙️  Weight decay: Encoder=1e-3, Bottleneck=5e-3, Decoder=1e-2")
+    print("Hybrid2 Best Practice: Differential Learning Rates")
+    print(f"  Encoder LR:     {learning_rate * 0.1:.6f} (10x smaller, {len(encoder_params)} params)")
+    print(f"  Bottleneck LR:  {learning_rate * 0.5:.6f} (5x smaller, {len(bottleneck_params)} params)")
+    print(f"  Decoder LR:     {learning_rate:.6f} (base LR, {len(decoder_params)} params)")
+    print(f"  Scheduler: {scheduler_name}")
+    print("  Weight decay: Encoder=1e-3, Bottleneck=5e-3, Decoder=1e-2")
     
     return optimizer, scheduler
 
@@ -714,7 +705,7 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
                 scheduler.step()
             elif hasattr(scheduler, 'total_steps') and not scheduler_warning_printed:
                 if scheduler.last_epoch + 1 >= scheduler.total_steps:
-                    print("⚠️  Scheduler reached max steps, stopping LR updates.")
+                    print("WARNING: Scheduler reached max steps, stopping LR updates.")
                     scheduler_warning_printed = True
         
         # Accumulate losses from loss_dict (skip non-numeric values like resolution strings)
@@ -727,7 +718,7 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
     # Print summary only if batches were skipped
     if skipped_loss_nan > 0 or skipped_grad_nan > 0:
         total_skipped = skipped_loss_nan + skipped_grad_nan
-        print(f"  ⚠️  Skipped {total_skipped} batches ({skipped_loss_nan} NaN/Inf loss, {skipped_grad_nan} NaN/Inf gradients)")
+        print(f"  WARNING: Skipped {total_skipped} batches ({skipped_loss_nan} NaN/Inf loss, {skipped_grad_nan} NaN/Inf gradients)")
     
     # Average losses
     if num_batches > 0:
@@ -862,7 +853,7 @@ def save_best_model(model, epoch, val_loss, best_val_loss, snapshot_path,
         # Save checkpoint
         torch.save(checkpoint, best_model_path)
         
-        print(f"    ✓ New best checkpoint saved! Val loss: {val_loss:.4f}")
+        print(f"    New best checkpoint saved! Val loss: {val_loss:.4f}")
     else:
         print(f"    No improvement (current: {val_loss:.4f}, best: {best_val_loss:.4f})")
     
@@ -909,19 +900,20 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
         args.num_workers, 
         args.seed
     )
-    
+
     # Print dataset statistics (matching Network model)
-    print(f"📊 Dataset Statistics:")
+    print(f"Dataset Statistics:")
     print(f"   - Training samples: {len(train_dataset)}")
     print(f"   - Validation samples: {len(val_dataset)}")
     print(f"   - Batch size: {args.batch_size * args.n_gpu}")
     print(f"   - Steps per epoch: {len(train_loader)}\n")
+
     
     # Compute class weights for balanced training
     if hasattr(train_dataset, 'mask_paths'):
         class_weights = compute_class_weights(train_dataset, args.num_classes, smoothing=0.0)
         # Print class weights (matching Network model)
-        print(f"📈 Class weights computed with ENS method (smoothing=0.1)")
+        print(f"Class weights computed with ENS method (smoothing=0.1)")
         print(f"   Final weights: {class_weights.cpu().numpy()}\n")
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -947,12 +939,12 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
     epochs_without_improvement = 0
     
     checkpoint_path = os.path.join(snapshot_path, 'best_model_latest.pth')
-    print(f"\n🔍 Checking for checkpoint at: {checkpoint_path}")
+    print(f"\nChecking for checkpoint at: {checkpoint_path}")
     print(f"   Absolute path: {os.path.abspath(checkpoint_path)}")
     print(f"   File exists: {os.path.exists(checkpoint_path)}")
     
     if os.path.exists(checkpoint_path):
-        print(f"\n📂 Found checkpoint: {checkpoint_path}")
+        print(f"\nFound checkpoint: {checkpoint_path}")
         print("   Attempting to resume training...")
         try:
             checkpoint = torch.load(checkpoint_path, map_location='cuda' if torch.cuda.is_available() else 'cpu')
@@ -963,18 +955,18 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
                     model.module.load_state_dict(checkpoint['model_state'], strict=False)
                 else:
                     model.load_state_dict(checkpoint['model_state'], strict=False)
-                print("   ✓ Loaded model state")
+                print("   Loaded model state")
             except Exception as e:
-                print(f"   ⚠️  Failed to load model state: {e}")
+                print(f"   WARNING: Failed to load model state: {e}")
                 raise  # Re-raise if model loading fails - cannot continue without model
             
             # Load optimizer state (handle parameter group mismatches gracefully)
             if optimizer is not None and 'optimizer_state' in checkpoint and checkpoint['optimizer_state'] is not None:
                 try:
                     optimizer.load_state_dict(checkpoint['optimizer_state'])
-                    print("   ✓ Loaded optimizer state")
+                    print("   Loaded optimizer state")
                 except Exception as e:
-                    print(f"   ⚠️  Could not load optimizer state: {e}")
+                    print(f"   WARNING: Could not load optimizer state: {e}")
                     print("   Starting with fresh optimizer state (this is OK if architecture changed)")
             
             # Load scheduler state (handle mismatches gracefully, especially for OneCycleLR)
@@ -1004,33 +996,33 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
                 if scheduler_type_match:
                     try:
                         scheduler.load_state_dict(scheduler_state)
-                        print("   ✓ Loaded scheduler state")
+                        print("   Loaded scheduler state")
                     except Exception as e:
-                        print(f"   ⚠️  Could not load scheduler state: {e}")
+                        print(f"   WARNING: Could not load scheduler state: {e}")
                         print("   Starting with fresh scheduler state")
                         # Fast-forward scheduler to current epoch if epoch-based
                         if current_scheduler_type in ['CosineAnnealingWarmRestarts', 'CosineAnnealingLR']:
                             for _ in range(checkpoint.get('epoch', 0)):
                                 scheduler.step()
-                            print(f"   ✓ Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
+                            print(f"   Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
                 else:
-                    print(f"   ⚠️  Scheduler type mismatch (checkpoint has different scheduler type)")
+                    print(f"   WARNING: Scheduler type mismatch (checkpoint has different scheduler type)")
                     print(f"   Starting with fresh scheduler state")
                     # Fast-forward scheduler to current epoch if epoch-based
                     if current_scheduler_type in ['CosineAnnealingWarmRestarts', 'CosineAnnealingLR']:
                         for _ in range(checkpoint.get('epoch', 0)):
                             scheduler.step()
-                        print(f"   ✓ Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
+                    print(f"   Fast-forwarded scheduler to epoch {checkpoint.get('epoch', 0)}")
             
             # Load training state
             start_epoch = checkpoint.get('epoch', 0) + 1
             best_val_loss = checkpoint.get('best_val_loss', float('inf'))
             
-            print(f"   ✓ Successfully loaded checkpoint from epoch {checkpoint.get('epoch', 0)}")
-            print(f"   ✓ Best validation loss: {best_val_loss:.4f}")
-            print(f"   ✓ Resuming from epoch {start_epoch}\n")
+            print(f"   Successfully loaded checkpoint from epoch {checkpoint.get('epoch', 0)}")
+            print(f"   Best validation loss: {best_val_loss:.4f}")
+            print(f"   Resuming from epoch {start_epoch}\n")
         except Exception as e:
-            print(f"   ⚠️  Failed to load checkpoint: {e}")
+            print(f"   WARNING: Failed to load checkpoint: {e}")
             print("   Starting training from scratch\n")
     
     # Training loop
@@ -1070,9 +1062,9 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
         
         # Print epoch summary
         print("Results:")
-        print(f"  • Train Loss: {train_loss:.4f}")
-        print(f"  • Validation Loss: {val_loss:.4f}")
-        print(f"  • Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
+        print(f"  - Train Loss: {train_loss:.4f}")
+        print(f"  - Validation Loss: {val_loss:.4f}")
+        print(f"  - Learning Rate: {optimizer.param_groups[0]['lr']:.6f}")
         
         # Save periodic checkpoint (every 100 epochs) - useful for recovery and evaluation
         if (epoch + 1) % 100 == 0:
@@ -1093,7 +1085,7 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
                 except Exception:
                     pass
             torch.save(periodic_checkpoint, periodic_checkpoint_path)
-            print(f"   💾 Periodic checkpoint saved: epoch_{epoch + 1}.pth")
+            print(f"   Periodic checkpoint saved: epoch_{epoch + 1}.pth")
         
         # Save best model and check for improvement
         best_val_loss, improvement_made = save_best_model(
@@ -1104,10 +1096,10 @@ def trainer_hybrid(args, model, snapshot_path, train_dataset=None, val_dataset=N
         # Early stopping logic
         if improvement_made:
             epochs_without_improvement = 0
-            print(f"    ✓ Improvement detected! Resetting patience counter.")
+            print(f"    Improvement detected! Resetting patience counter.")
         else:
             epochs_without_improvement += 1
-            print(f"    ⚠ No improvement for {epochs_without_improvement} epochs (patience: {patience}, remaining: {patience - epochs_without_improvement})")
+            print(f"    WARNING: No improvement for {epochs_without_improvement} epochs (patience: {patience}, remaining: {patience - epochs_without_improvement})")
         
         # Step scheduler per epoch (for schedulers that step per epoch, not per batch)
         # OneCycleLR is stepped per batch in run_training_epoch
