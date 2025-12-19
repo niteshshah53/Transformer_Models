@@ -6,8 +6,7 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=24:00:00
-#SBATCH --gres=gpu:v100:1
-#SBATCH --partition=v100
+#SBATCH --gres=gpu:1
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -50,7 +49,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 16 \
+        --batch_size 8 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 70 \

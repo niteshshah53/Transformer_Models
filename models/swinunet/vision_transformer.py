@@ -34,6 +34,7 @@ class SwinUnet(nn.Module):
                                 num_classes=self.num_classes,
                                 embed_dim=config.MODEL.SWIN.EMBED_DIM,
                                 depths=config.MODEL.SWIN.DEPTHS,
+                                depths_decoder=config.MODEL.SWIN.DECODER_DEPTHS,
                                 num_heads=config.MODEL.SWIN.NUM_HEADS,
                                 window_size=config.MODEL.SWIN.WINDOW_SIZE,
                                 mlp_ratio=config.MODEL.SWIN.MLP_RATIO,
@@ -141,6 +142,8 @@ class SwinUnet(nn.Module):
 
             model_dict = self.swin_unet.state_dict()
             full_dict = copy.deepcopy(pretrained_dict)
+            # Get num_layers from model to avoid hardcoding
+            num_layers = self.swin_unet.num_layers
             for k, v in pretrained_dict.items():
                 if "layers." in k:
                     # Extract layer number more robustly (e.g., "layers.0" -> 0, "layers.1" -> 1)
@@ -156,7 +159,8 @@ class SwinUnet(nn.Module):
                                 end_pos = len(k)
                             layer_str = k[start_pos:end_pos]
                             layer_num = int(layer_str)
-                            current_layer_num = 3 - layer_num
+                            # Map encoder layer to decoder layer: encoder layer i -> decoder layer (num_layers - 1 - i)
+                            current_layer_num = num_layers - 1 - layer_num
                             # Reconstruct the key for layers_up
                             current_k = "layers_up." + str(current_layer_num) + k[end_pos:]
                             full_dict.update({current_k: v})

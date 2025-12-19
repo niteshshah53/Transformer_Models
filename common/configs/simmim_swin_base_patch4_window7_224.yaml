@@ -2,7 +2,9 @@ MODEL:
   TYPE: swin
   NAME: simmim_swin_base_patch4_window7_224
   DROP_PATH_RATE: 0.1
-  PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_pretrain_swin_base_divahisdb_hybrid.pth"
+  #PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_pretrain_swin_base_divahisdb_swinunet.pth"
+  #PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_pretrain_swin_base_divahisdb_hybrid.pth"
+  PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_finetune__swin_base__img224_window7__100ep.pth"
   SWIN:
     FINAL_UPSAMPLE: "expand_first"
     EMBED_DIM: 128
@@ -26,4 +28,3 @@ TRAIN:
 PRINT_FREQ: 100
 SAVE_FREQ: 5
 TAG: simmim_finetune_swin_base_
-

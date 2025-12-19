@@ -563,9 +563,11 @@ class PatchEmbed(nn.Module):
 
     def forward(self, x):
         B, C, H, W = x.shape
-        # FIXME look at relaxing size constraints
-        assert H == self.img_size[0] and W == self.img_size[1], \
-            f"Input image size ({H}*{W}) doesn't match model ({self.img_size[0]}*{self.img_size[1]})."
+        # Relaxed size constraints: resize if input doesn't match expected size
+        if H != self.img_size[0] or W != self.img_size[1]:
+            import torch.nn.functional as F
+            # Resize to expected size using bilinear interpolation
+            x = F.interpolate(x, size=(self.img_size[0], self.img_size[1]), mode='bilinear', align_corners=False)
         x = self.proj(x).flatten(2).transpose(1, 2)  # B Ph*Pw C
         if self.norm is not None:
             x = self.norm(x)
@@ -643,8 +645,11 @@ class SwinTransformerSys(nn.Module):
 
         self.pos_drop = nn.Dropout(p=drop_rate)
 
-        # stochastic depth
+        # stochastic depth for encoder
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths))]  # stochastic depth decay rule
+        
+        # stochastic depth for decoder (using decoder depths)
+        dpr_decoder = [x.item() for x in torch.linspace(0, drop_path_rate, sum(depths_decoder))]  # decoder stochastic depth decay rule
 
         # build encoder and bottleneck layers
         self.layers = nn.ModuleList()
@@ -665,6 +670,11 @@ class SwinTransformerSys(nn.Module):
             self.layers.append(layer)
 
         # build decoder layers
+        # Channel dimension verification:
+        # - Encoder x_downsample[i] has channels: embed_dim * 2^i (before layer i)
+        # - Decoder layer i_layer connects with encoder layer (num_layers - 1 - i_layer)
+        # - After PatchExpand, decoder channels are halved, matching encoder skip connection channels
+        # - concat_back_dim reduces concatenated channels (2*C -> C) to match decoder input
         self.layers_up = nn.ModuleList()
         self.concat_back_dim = nn.ModuleList()
         for i_layer in range(self.num_layers):
@@ -681,14 +691,14 @@ class SwinTransformerSys(nn.Module):
                                          input_resolution=(
                                          patches_resolution[0] // (2 ** (self.num_layers - 1 - i_layer)),
                                          patches_resolution[1] // (2 ** (self.num_layers - 1 - i_layer))),
-                                         depth=depths[(self.num_layers - 1 - i_layer)],
+                                         depth=depths_decoder[i_layer],
                                          num_heads=num_heads[(self.num_layers - 1 - i_layer)],
                                          window_size=window_size,
                                          mlp_ratio=self.mlp_ratio,
                                          qkv_bias=qkv_bias, qk_scale=qk_scale,
                                          drop=drop_rate, attn_drop=attn_drop_rate,
-                                         drop_path=dpr[sum(depths[:(self.num_layers - 1 - i_layer)]):sum(
-                                             depths[:(self.num_layers - 1 - i_layer) + 1])],
+                                         drop_path=dpr_decoder[sum(depths_decoder[:i_layer]):sum(
+                                             depths_decoder[:i_layer + 1])],
                                          norm_layer=norm_layer,
                                          upsample=PatchExpand if (i_layer < self.num_layers - 1) else None,
                                          use_checkpoint=use_checkpoint)
@@ -739,14 +749,19 @@ class SwinTransformerSys(nn.Module):
 
         return x, x_downsample
 
-    # Dencoder and Skip connection
+    # Decoder and Skip connection
+    # Skip connections: decoder layer i connects with encoder layer (num_layers - 1 - i)
+    # This ensures symmetric encoder-decoder connections (e.g., encoder layer 0 <-> decoder layer 3)
     def forward_up_features(self, x, x_downsample):
         for inx, layer_up in enumerate(self.layers_up):
             if inx == 0:
+                # Bottleneck layer: no skip connection
                 x = layer_up(x)
             else:
-                x = torch.cat([x, x_downsample[3 - inx]], -1)
-                x = self.concat_back_dim[inx](x)
+                # Connect with corresponding encoder layer via skip connection
+                # x_downsample[self.num_layers - 1 - inx] has matching channel dimensions
+                x = torch.cat([x, x_downsample[self.num_layers - 1 - inx]], -1)
+                x = self.concat_back_dim[inx](x)  # Reduce concatenated channels to match decoder input
                 x = layer_up(x)
 
         x = self.norm_up(x)  # B L C
@@ -754,15 +769,26 @@ class SwinTransformerSys(nn.Module):
         return x
 
     def up_x4(self, x):
+        """
+        Final upsampling to original image resolution.
+        
+        Input: (B, H*W, C) where H*W = patches_resolution (e.g., 56*56 for 224x224 input with patch_size=4)
+        Output: (B, num_classes, img_size, img_size) matching original input dimensions
+        
+        Resolution flow:
+        - Input patches: img_size // patch_size (e.g., 224 // 4 = 56)
+        - After decoder: patches_resolution (56x56)
+        - After FinalPatchExpand_X4: 4x upsampling -> img_size x img_size (224x224)
+        """
         H, W = self.patches_resolution
         B, L, C = x.shape
         assert L == H * W, "input features has wrong size"
 
         if self.final_upsample == "expand_first":
-            x = self.up(x)
-            x = x.view(B, 4 * H, 4 * W, -1)
+            x = self.up(x)  # FinalPatchExpand_X4: (B, H*W, C) -> (B, 4*H*4*W, C)
+            x = x.view(B, 4 * H, 4 * W, -1)  # Reshape to spatial dimensions
             x = x.permute(0, 3, 1, 2)  # B,C,H,W
-            x = self.output(x)
+            x = self.output(x)  # Final conv: (B, C, H, W) -> (B, num_classes, H, W)
 
         return x
 

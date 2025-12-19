@@ -3,6 +3,7 @@ MODEL:
   NAME: network_cnn_transformer
   DROP_PATH_RATE: 0.1
   # SimMIM Swin-Base checkpoint (enables automatic decoder overrides)
+  #PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_finetune__swin_base__img224_window7__100ep.pth"
   PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_pretrain_swin_base_divahisdb_network.pth"
   SWIN:
     # These are defaults; they are overridden when a SimMIM checkpoint is detected:
@@ -39,4 +40,3 @@ TRAIN:
 PRINT_FREQ: 10
 SAVE_FREQ: 1
 TAG: network_cnn_transformer
-

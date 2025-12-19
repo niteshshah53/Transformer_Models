@@ -478,3 +478,491 @@ Mean metrics:
 [10:29:39.882] Resizing ground truth for e-codices_fmb-cb-0055_0108v_max: (6496, 4872) -> (6496, 4928)
 [10:29:54.555] Resizing ground truth for metrics computation: (6496, 4872) -> (6496, 4928)
 [10:29:55.095] Processing: e-codices_fmb-cb-0055_0116r_max
+[03:55:10.703] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[03:55:10.703] 
+[03:55:10.882] Found 1620 patches
+[03:55:10.884] Processing: 076
+[03:56:13.217] Processing: 079
+[03:57:13.171] Processing: 082
+[03:58:13.156] Processing: 095
+[03:59:12.362] Processing: 106
+[04:00:12.701] Processing: 111
+[04:01:13.158] Processing: 115
+[04:02:13.153] Processing: 117
+[04:03:12.871] Processing: 128
+[04:04:12.348] Processing: 134
+[04:05:12.480] Processing: 138
+[04:06:12.954] Processing: 142
+[04:07:12.906] Processing: 159
+[04:08:13.861] Processing: 166
+[04:09:13.250] Processing: 185
+[04:10:12.693] Processing: 200
+[04:11:12.947] Processing: 203
+[04:12:12.191] Processing: 208
+[04:13:11.538] Processing: 229
+[04:14:10.993] Processing: 230
+[04:15:10.689] Processing: 235
+[04:16:10.503] Processing: 236
+[04:17:10.518] Processing: 248
+[04:18:10.691] Processing: 249
+[04:19:10.110] Processing: 250
+[04:20:10.814] Processing: 251
+[04:21:12.206] Processing: 252
+[04:22:12.470] Processing: 275
+[04:23:13.078] Processing: 277
+[04:24:12.494] Processing: 297
+[04:25:13.030] 
+Per-class metrics:
+[04:25:13.031] --------------------------------------------------------------------------------
+[04:25:13.031] Background     : Precision=0.9942, Recall=0.9943, F1=0.9943, IoU=0.9886
+[04:25:13.031] Paratext       : Precision=0.8770, Recall=0.6969, F1=0.7766, IoU=0.6348
+[04:25:13.031] Decoration     : Precision=0.8829, Recall=0.9236, F1=0.9028, IoU=0.8228
+[04:25:13.031] Main Text      : Precision=0.8745, Recall=0.9190, F1=0.8962, IoU=0.8119
+[04:25:13.031] Title          : Precision=0.9107, Recall=0.8239, F1=0.8652, IoU=0.7624
+[04:25:13.031] Chapter Headings: Precision=0.8707, Recall=0.4596, F1=0.6017, IoU=0.4303
+[04:25:13.031] 
+Mean metrics:
+[04:25:13.031] ----------------------------------------
+[04:25:13.031] Mean Precision: 0.9017
+[04:25:13.031] Mean Recall: 0.8029
+[04:25:13.031] Mean F1: 0.8395
+[04:25:13.031] Mean IoU: 0.7418
+[08:24:52.939] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[08:24:52.940] 
+[08:24:53.102] Found 1620 patches
+[08:24:53.104] Processing: 014
+[08:25:53.175] Processing: 032
+[08:26:53.164] Processing: 034
+[08:27:53.183] Processing: 036
+[08:28:54.196] Processing: 038
+[08:29:54.786] Processing: 047
+[08:30:54.943] Processing: 060
+[08:31:53.613] Processing: 085
+[08:32:52.952] Processing: 087
+[08:33:52.409] Processing: 104
+[08:34:52.731] Processing: 105
+[08:35:51.842] Processing: 108
+[08:36:51.075] Processing: 110
+[08:37:49.874] Processing: 136
+[08:38:48.941] Processing: 169
+[08:39:46.681] Processing: 195
+[08:40:44.810] Processing: 196
+[08:41:42.937] Processing: 198
+[08:42:40.560] Processing: 204
+[08:43:38.389] Processing: 223
+[08:44:36.021] Processing: 225
+[08:45:33.413] Processing: 227
+[08:46:30.670] Processing: 229
+[08:47:28.425] Processing: 251
+[08:48:26.554] Processing: 253
+[08:49:24.278] Processing: 255
+[08:50:22.393] Processing: 264
+[08:51:19.693] Processing: 270
+[08:52:17.522] Processing: 276
+[08:53:15.042] Processing: 325
+[08:54:12.779] 
+Per-class metrics:
+[08:54:12.779] --------------------------------------------------------------------------------
+[08:54:12.779] Background     : Precision=0.9950, Recall=0.9937, F1=0.9944, IoU=0.9888
+[08:54:12.779] Paratext       : Precision=0.6562, Recall=0.5486, F1=0.5976, IoU=0.4261
+[08:54:12.779] Decoration     : Precision=0.9643, Recall=0.9464, F1=0.9552, IoU=0.9143
+[08:54:12.779] Main Text      : Precision=0.9072, Recall=0.9532, F1=0.9296, IoU=0.8685
+[08:54:12.779] Title          : Precision=0.8448, Recall=0.9040, F1=0.8734, IoU=0.7752
+[08:54:12.779] Chapter Headings: Precision=0.9369, Recall=0.5300, F1=0.6770, IoU=0.5118
+[08:54:12.779] 
+Mean metrics:
+[08:54:12.779] ----------------------------------------
+[08:54:12.779] Mean Precision: 0.8841
+[08:54:12.779] Mean Recall: 0.8127
+[08:54:12.779] Mean F1: 0.8379
+[08:54:12.780] Mean IoU: 0.7475
+[12:47:56.274] Testing: Latin16746 | TTA: ON | Multi-scale: ON
+[12:47:56.276] 
+[12:47:56.649] Found 1620 patches
+[12:47:56.653] Processing: 009
+[12:48:57.781] Processing: 020
+[12:49:57.004] Processing: 022
+[12:50:55.004] Processing: 029
+[12:51:52.030] Processing: 035
+[12:52:48.565] Processing: 048
+[12:53:46.007] Processing: 069
+[12:54:43.074] Processing: 082
+[12:55:39.789] Processing: 088
+[12:56:36.917] Processing: 089
+[12:57:33.737] Processing: 091
+[12:58:30.407] Processing: 100
+[12:59:27.023] Processing: 106
+[13:00:24.411] Processing: 117
+[13:01:21.317] Processing: 123
+[13:02:18.412] Processing: 125
+[13:03:15.150] Processing: 130
+[13:04:11.750] Processing: 133
+[13:05:08.523] Processing: 137
+[13:06:05.026] Processing: 146
+[13:07:01.970] Processing: 166
+[13:07:59.177] Processing: 184
+[13:08:56.001] Processing: 215
+[13:09:52.732] Processing: 237
+[13:10:49.529] Processing: 243
+[13:11:46.059] Processing: 255
+[13:12:42.793] Processing: 258
+[13:13:39.445] Processing: 284
+[13:14:36.838] Processing: 325
+[13:15:33.489] Processing: 357
+[13:16:29.962] 
+Per-class metrics:
+[13:16:29.963] --------------------------------------------------------------------------------
+[13:16:29.963] Background     : Precision=0.9943, Recall=0.9923, F1=0.9933, IoU=0.9867
+[13:16:29.963] Paratext       : Precision=0.8497, Recall=0.8538, F1=0.8518, IoU=0.7418
+[13:16:29.963] Decoration     : Precision=0.9853, Recall=0.9348, F1=0.9594, IoU=0.9220
+[13:16:29.963] Main Text      : Precision=0.9131, Recall=0.9756, F1=0.9434, IoU=0.8928
+[13:16:29.963] Title          : Precision=0.9004, Recall=0.8411, F1=0.8697, IoU=0.7695
+[13:16:29.963] Chapter Headings: Precision=0.9593, Recall=0.7386, F1=0.8346, IoU=0.7162
+[13:16:29.963] 
+Mean metrics:
+[13:16:29.963] ----------------------------------------
+[13:16:29.963] Mean Precision: 0.9337
+[13:16:29.963] Mean Recall: 0.8894
+[13:16:29.963] Mean F1: 0.9087
+[13:16:29.963] Mean IoU: 0.8382
+[17:08:57.893] Testing: Syr341 | TTA: ON | Multi-scale: ON
+[17:08:57.895] 
+[17:08:58.254] Found 1620 patches
+[17:08:58.257] Processing: 031
+[17:09:57.809] Processing: 053
+[17:10:55.430] Processing: 054
+[17:11:52.130] Processing: 071
+[17:12:48.913] Processing: 073
+[17:13:45.812] Processing: 075
+[17:14:43.031] Processing: 100
+[17:15:39.982] Processing: 137
+[17:16:37.752] Processing: 150
+[17:17:34.780] Processing: 160
+[17:18:32.231] Processing: 167
+[17:19:29.242] Processing: 184
+[17:20:26.459] Processing: 190
+[17:21:24.059] Processing: 201
+[17:22:21.261] Processing: 210
+[17:23:18.188] Processing: 222
+[17:24:14.949] Processing: 224
+[17:25:12.142] Processing: 231
+[17:26:09.387] Processing: 241
+[17:27:06.456] Processing: 249
+[17:28:03.634] Processing: 252
+[17:29:00.871] Processing: 267
+[17:29:57.256] Processing: 281
+[17:30:54.057] Processing: 286
+[17:31:50.882] Processing: 290
+[17:32:48.032] Processing: 313
+[17:33:45.164] Processing: 362
+[17:34:41.762] Processing: 368
+[17:35:38.032] Processing: 376
+[17:36:35.284] Processing: 446
+[17:37:32.472] 
+Per-class metrics:
+[17:37:32.472] --------------------------------------------------------------------------------
+[17:37:32.472] Background     : Precision=0.9757, Recall=0.9820, F1=0.9789, IoU=0.9586
+[17:37:32.472] Paratext       : Precision=0.5917, Recall=0.6496, F1=0.6193, IoU=0.4485
+[17:37:32.472] Decoration     : Precision=0.9878, Recall=0.8476, F1=0.9123, IoU=0.8388
+[17:37:32.472] Main Text      : Precision=0.8741, Recall=0.8600, F1=0.8670, IoU=0.7653
+[17:37:32.472] Title          : Precision=0.7402, Recall=0.5977, F1=0.6614, IoU=0.4941
+[17:37:32.472] 
+Mean metrics:
+[17:37:32.472] ----------------------------------------
+[17:37:32.472] Mean Precision: 0.8339
+[17:37:32.473] Mean Recall: 0.7874
+[17:37:32.473] Mean F1: 0.8078
+[17:37:32.473] Mean IoU: 0.7010
+[14:46:42.706] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[14:46:42.707] 
+[14:46:42.902] Found 1620 patches
+[14:46:42.903] Processing: 076
+[14:47:24.341] Processing: 079
+[14:48:05.178] Processing: 082
+[14:48:45.338] Processing: 095
+[14:49:26.108] Processing: 106
+[14:50:06.397] Processing: 111
+[14:50:46.707] Processing: 115
+[14:51:26.866] Processing: 117
+[14:52:07.221] Processing: 128
+[14:52:48.126] Processing: 134
+[14:53:29.666] Processing: 138
+[14:54:11.045] Processing: 142
+[14:54:51.290] Processing: 159
+[14:55:31.848] Processing: 166
+[14:56:12.407] Processing: 185
+[14:56:52.620] Processing: 200
+[14:57:33.020] Processing: 203
+[14:58:13.613] Processing: 208
+[14:58:54.904] Processing: 229
+[14:59:35.586] Processing: 230
+[15:00:16.724] Processing: 235
+[15:00:56.680] Processing: 236
+[15:01:37.076] Processing: 248
+[15:02:17.337] Processing: 249
+[15:02:57.529] Processing: 250
+[15:03:37.665] Processing: 251
+[15:04:17.765] Processing: 252
+[15:04:57.957] Processing: 275
+[15:05:38.374] Processing: 277
+[15:06:18.920] Processing: 297
+[15:06:59.249] 
+Per-class metrics:
+[15:06:59.250] --------------------------------------------------------------------------------
+[15:06:59.250] Background     : Precision=0.9931, Recall=0.9958, F1=0.9945, IoU=0.9890
+[15:06:59.250] Paratext       : Precision=0.9091, Recall=0.7527, F1=0.8235, IoU=0.7000
+[15:06:59.250] Decoration     : Precision=0.8904, Recall=0.9476, F1=0.9181, IoU=0.8487
+[15:06:59.250] Main Text      : Precision=0.9133, Recall=0.9032, F1=0.9082, IoU=0.8319
+[15:06:59.250] Title          : Precision=0.8546, Recall=0.9103, F1=0.8816, IoU=0.7882
+[15:06:59.250] Chapter Headings: Precision=0.9472, Recall=0.5080, F1=0.6614, IoU=0.4941
+[15:06:59.250] 
+Mean metrics:
+[15:06:59.250] ----------------------------------------
+[15:06:59.250] Mean Precision: 0.9180
+[15:06:59.250] Mean Recall: 0.8363
+[15:06:59.250] Mean F1: 0.8645
+[15:06:59.250] Mean IoU: 0.7753
+[18:05:48.919] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[18:05:48.920] 
+[18:05:49.111] Found 1620 patches
+[18:05:49.113] Processing: 014
+[18:06:29.651] Processing: 032
+[18:07:10.126] Processing: 034
+[18:07:50.090] Processing: 036
+[18:08:30.277] Processing: 038
+[18:09:10.271] Processing: 047
+[18:09:51.006] Processing: 060
+[18:10:31.507] Processing: 085
+[18:11:11.585] Processing: 087
+[18:12:00.706] Processing: 104
+[18:12:41.340] Processing: 105
+[18:13:21.656] Processing: 108
+[18:14:01.566] Processing: 110
+[18:14:42.427] Processing: 136
+[18:15:22.697] Processing: 169
+[18:16:02.630] Processing: 195
+[18:16:42.808] Processing: 196
+[18:17:23.014] Processing: 198
+[18:18:03.203] Processing: 204
+[18:18:43.875] Processing: 223
+[18:19:24.104] Processing: 225
+[18:20:04.229] Processing: 227
+[18:20:44.396] Processing: 229
+[18:21:24.381] Processing: 251
+[18:22:04.401] Processing: 253
+[18:22:44.559] Processing: 255
+[18:23:24.940] Processing: 264
+[18:24:05.226] Processing: 270
+[18:24:46.484] Processing: 276
+[18:25:34.312] Processing: 325
+[18:26:15.342] 
+Per-class metrics:
+[18:26:15.342] --------------------------------------------------------------------------------
+[18:26:15.342] Background     : Precision=0.9945, Recall=0.9953, F1=0.9949, IoU=0.9898
+[18:26:15.342] Paratext       : Precision=0.8982, Recall=0.5899, F1=0.7121, IoU=0.5529
+[18:26:15.342] Decoration     : Precision=0.9725, Recall=0.9726, F1=0.9725, IoU=0.9465
+[18:26:15.342] Main Text      : Precision=0.9487, Recall=0.9478, F1=0.9482, IoU=0.9016
+[18:26:15.342] Title          : Precision=0.9108, Recall=0.9518, F1=0.9309, IoU=0.8707
+[18:26:15.342] Chapter Headings: Precision=0.9587, Recall=0.8614, F1=0.9074, IoU=0.8306
+[18:26:15.342] 
+Mean metrics:
+[18:26:15.342] ----------------------------------------
+[18:26:15.342] Mean Precision: 0.9472
+[18:26:15.342] Mean Recall: 0.8865
+[18:26:15.342] Mean F1: 0.9110
+[18:26:15.342] Mean IoU: 0.8487
+[21:22:38.915] Testing: Latin16746 | TTA: ON | Multi-scale: ON
+[21:22:38.916] 
+[21:22:39.090] Found 1620 patches
+[21:22:39.092] Processing: 009
+[21:23:19.152] Processing: 020
+[21:23:58.804] Processing: 022
+[21:24:38.335] Processing: 029
+[21:25:18.097] Processing: 035
+[21:25:57.482] Processing: 048
+[21:26:37.527] Processing: 069
+[21:27:17.282] Processing: 082
+[21:27:56.781] Processing: 088
+[21:28:36.593] Processing: 089
+[21:29:16.183] Processing: 091
+[21:29:55.856] Processing: 100
+[21:30:35.394] Processing: 106
+[21:31:16.017] Processing: 117
+[21:31:55.534] Processing: 123
+[21:32:37.060] Processing: 125
+[21:33:16.528] Processing: 130
+[21:33:57.042] Processing: 133
+[21:34:37.688] Processing: 137
+[21:35:17.399] Processing: 146
+[21:35:56.761] Processing: 166
+[21:36:36.503] Processing: 184
+[21:37:17.614] Processing: 215
+[21:37:58.025] Processing: 237
+[21:38:37.639] Processing: 243
+[21:39:17.261] Processing: 255
+[21:39:56.769] Processing: 258
+[21:40:36.456] Processing: 284
+[21:41:16.727] Processing: 325
+[21:41:57.525] Processing: 357
+[21:42:51.091] 
+Per-class metrics:
+[21:42:51.091] --------------------------------------------------------------------------------
+[21:42:51.091] Background     : Precision=0.9939, Recall=0.9947, F1=0.9943, IoU=0.9887
+[21:42:51.091] Paratext       : Precision=0.9170, Recall=0.8575, F1=0.8862, IoU=0.7957
+[21:42:51.091] Decoration     : Precision=0.9819, Recall=0.9634, F1=0.9725, IoU=0.9465
+[21:42:51.091] Main Text      : Precision=0.9510, Recall=0.9648, F1=0.9579, IoU=0.9192
+[21:42:51.091] Title          : Precision=0.9397, Recall=0.8827, F1=0.9103, IoU=0.8354
+[21:42:51.091] Chapter Headings: Precision=0.9752, Recall=0.8492, F1=0.9078, IoU=0.8312
+[21:42:51.091] 
+Mean metrics:
+[21:42:51.091] ----------------------------------------
+[21:42:51.091] Mean Precision: 0.9598
+[21:42:51.091] Mean Recall: 0.9187
+[21:42:51.091] Mean F1: 0.9382
+[21:42:51.091] Mean IoU: 0.8861
+[00:38:13.557] Testing: Syr341 | TTA: ON | Multi-scale: ON
+[00:38:13.557] 
+[00:38:13.802] Found 1620 patches
+[00:38:13.804] Processing: 031
+[00:38:55.977] Processing: 053
+[00:39:36.815] Processing: 054
+[00:40:17.397] Processing: 071
+[00:40:57.870] Processing: 073
+[00:41:38.317] Processing: 075
+[00:42:18.724] Processing: 100
+[00:42:58.330] Processing: 137
+[00:43:38.181] Processing: 150
+[00:44:18.965] Processing: 160
+[00:44:59.253] Processing: 167
+[00:45:38.953] Processing: 184
+[00:46:19.504] Processing: 190
+[00:46:59.919] Processing: 201
+[00:47:39.559] Processing: 210
+[00:48:19.413] Processing: 222
+[00:48:59.272] Processing: 224
+[00:49:38.825] Processing: 231
+[00:50:17.886] Processing: 241
+[00:50:56.908] Processing: 249
+[00:51:35.974] Processing: 252
+[00:52:15.286] Processing: 267
+[00:52:55.300] Processing: 281
+[00:53:35.159] Processing: 286
+[00:54:14.548] Processing: 290
+[00:54:53.904] Processing: 313
+[00:55:34.875] Processing: 362
+[00:56:15.668] Processing: 368
+[00:56:55.986] Processing: 376
+[00:57:36.818] Processing: 446
+[00:58:17.193] 
+Per-class metrics:
+[00:58:17.194] --------------------------------------------------------------------------------
+[00:58:17.194] Background     : Precision=0.9806, Recall=0.9814, F1=0.9810, IoU=0.9628
+[00:58:17.194] Paratext       : Precision=0.8072, Recall=0.6266, F1=0.7055, IoU=0.5450
+[00:58:17.194] Decoration     : Precision=0.9942, Recall=0.9476, F1=0.9703, IoU=0.9424
+[00:58:17.194] Main Text      : Precision=0.8719, Recall=0.8791, F1=0.8755, IoU=0.7786
+[00:58:17.194] Title          : Precision=0.8767, Recall=0.6123, F1=0.7210, IoU=0.5637
+[00:58:17.194] 
+Mean metrics:
+[00:58:17.194] ----------------------------------------
+[00:58:17.194] Mean Precision: 0.9061
+[00:58:17.194] Mean Recall: 0.8094
+[00:58:17.194] Mean F1: 0.8507
+[00:58:17.194] Mean IoU: 0.7585
+[14:24:53.051] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[14:24:53.052] 
+[14:24:53.285] Found 1620 patches
+[14:24:53.287] Processing: 076
+[14:25:15.748] Processing: 079
+[14:25:36.860] Processing: 082
+[14:25:57.995] Processing: 095
+[14:26:19.169] Processing: 106
+[14:26:41.720] Processing: 111
+[14:27:02.551] Processing: 115
+[14:27:23.418] Processing: 117
+[14:27:44.630] Processing: 128
+[14:28:05.535] Processing: 134
+[14:28:26.291] Processing: 138
+[14:28:47.282] Processing: 142
+[14:29:08.492] Processing: 159
+[14:29:29.561] Processing: 166
+[14:29:55.019] Processing: 185
+[14:30:15.963] Processing: 200
+[14:30:37.026] Processing: 203
+[14:30:57.927] Processing: 208
+[14:31:18.796] Processing: 229
+[14:31:40.243] Processing: 230
+[14:32:01.219] Processing: 235
+[14:32:22.344] Processing: 236
+[14:32:43.375] Processing: 248
+[14:33:04.280] Processing: 249
+[14:33:25.472] Processing: 250
+[14:33:46.426] Processing: 251
+[14:34:07.439] Processing: 252
+[14:34:28.442] Processing: 275
+[14:34:49.434] Processing: 277
+[14:35:10.733] Processing: 297
+[14:35:31.718] 
+Per-class metrics:
+[14:35:31.718] --------------------------------------------------------------------------------
+[14:35:31.718] Background     : Precision=0.9919, Recall=0.9963, F1=0.9941, IoU=0.9882
+[14:35:31.718] Paratext       : Precision=0.9323, Recall=0.6909, F1=0.7936, IoU=0.6579
+[14:35:31.718] Decoration     : Precision=0.9278, Recall=0.9062, F1=0.9169, IoU=0.8465
+[14:35:31.718] Main Text      : Precision=0.9136, Recall=0.8905, F1=0.9019, IoU=0.8213
+[14:35:31.718] Title          : Precision=0.8831, Recall=0.8557, F1=0.8692, IoU=0.7687
+[14:35:31.718] Chapter Headings: Precision=0.9433, Recall=0.5501, F1=0.6950, IoU=0.5325
+[14:35:31.718] 
+Mean metrics:
+[14:35:31.718] ----------------------------------------
+[14:35:31.718] Mean Precision: 0.9320
+[14:35:31.718] Mean Recall: 0.8150
+[14:35:31.718] Mean F1: 0.8618
+[14:35:31.718] Mean IoU: 0.7692
+[16:25:35.921] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[16:25:35.921] 
+[16:25:36.162] Found 1620 patches
+[16:25:36.165] Processing: 014
+[16:25:58.380] Processing: 032
+[16:26:19.083] Processing: 034
+[16:26:42.106] Processing: 036
+[16:27:03.082] Processing: 038
+[16:27:24.457] Processing: 047
+[16:27:45.179] Processing: 060
+[16:28:05.953] Processing: 085
+[16:28:27.272] Processing: 087
+[16:28:47.966] Processing: 104
+[16:29:08.683] Processing: 105
+[16:29:29.293] Processing: 108
+[16:29:50.063] Processing: 110
+[16:30:10.751] Processing: 136
+[16:30:31.534] Processing: 169
+[16:30:53.353] Processing: 195
+[16:31:15.996] Processing: 196
+[16:31:39.102] Processing: 198
+[16:32:01.756] Processing: 204
+[16:32:35.803] Processing: 223
+[16:32:58.820] Processing: 225
+[16:33:21.901] Processing: 227
+[16:33:44.400] Processing: 229
+[16:34:04.947] Processing: 251
+[16:34:25.688] Processing: 253
+[16:34:46.585] Processing: 255
+[16:35:07.603] Processing: 264
+[16:35:28.667] Processing: 270
+[16:35:49.731] Processing: 276
+[16:36:10.588] Processing: 325
+[16:36:31.107] 
+Per-class metrics:
+[16:36:31.107] --------------------------------------------------------------------------------
+[16:36:31.107] Background     : Precision=0.9931, Recall=0.9957, F1=0.9944, IoU=0.9889
+[16:36:31.107] Paratext       : Precision=0.8447, Recall=0.6080, F1=0.7071, IoU=0.5469
+[16:36:31.107] Decoration     : Precision=0.9659, Recall=0.9746, F1=0.9702, IoU=0.9422
+[16:36:31.107] Main Text      : Precision=0.9512, Recall=0.9423, F1=0.9468, IoU=0.8989
+[16:36:31.107] Title          : Precision=0.9433, Recall=0.9007, F1=0.9215, IoU=0.8544
+[16:36:31.107] Chapter Headings: Precision=0.9849, Recall=0.7462, F1=0.8491, IoU=0.7377
+[16:36:31.108] 
+Mean metrics:
+[16:36:31.108] ----------------------------------------
+[16:36:31.108] Mean Precision: 0.9472
+[16:36:31.108] Mean Recall: 0.8613
+[16:36:31.108] Mean F1: 0.8982
+[16:36:31.108] Mean IoU: 0.8282
