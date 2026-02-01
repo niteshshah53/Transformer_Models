@@ -62,6 +62,7 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
                            use_smart_skip=False, use_cross_attn=False,
                            use_multiscale_agg=False, use_groupnorm=True,
                            use_pos_embed=True,
+                           fusion_method='simple',  # 'simple', 'smart', or 'fourier'
                            encoder_embed_dim=96,
                            encoder_depths=[2, 2, 2, 2],
                            encoder_num_heads=[3, 6, 12, 24],
@@ -111,6 +112,7 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
             use_multiscale_agg=use_multiscale_agg,
             use_groupnorm=use_groupnorm,
             use_pos_embed=use_pos_embed,
+            fusion_method=fusion_method,
             use_bottleneck_swin=True,
             img_size=img_size
         )
@@ -126,6 +128,7 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
             use_multiscale_agg=use_multiscale_agg,
             use_groupnorm=use_groupnorm,
             use_pos_embed=use_pos_embed,
+            fusion_method=fusion_method,
             use_bottleneck_swin=True,
             img_size=img_size
         )
@@ -141,6 +144,7 @@ def create_hybrid2_baseline(num_classes=6, img_size=224, decoder='simple',
         use_multiscale_agg=use_multiscale_agg,
         use_groupnorm=use_groupnorm,
         use_pos_embed=use_pos_embed,
+        fusion_method=fusion_method,
         use_bottleneck_swin=True,
         img_size=img_size
     )

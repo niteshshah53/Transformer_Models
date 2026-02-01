@@ -253,6 +253,7 @@ def get_model(args, config):
         use_multiscale_agg=getattr(args, 'use_multiscale_agg', False),
         use_groupnorm=use_groupnorm_value,
         use_pos_embed=getattr(args, 'use_pos_embed', True),
+        fusion_method=getattr(args, 'fusion_method', 'simple'),
         # Pass encoder config parameters from YAML
         encoder_embed_dim=embed_dim,
         encoder_depths=depths,
@@ -489,6 +490,9 @@ def parse_arguments():
                        help='Enable CBAM attention modules')
     parser.add_argument('--use_smart_skip', action='store_true', default=False,
                        help='Use smart skip connections (attention-based) instead of simple concatenation')
+    parser.add_argument('--fusion_method', type=str, default='simple',
+                       choices=['simple', 'smart', 'fourier'],
+                       help='Feature fusion method: simple (concat), smart (CBAM attention), or fourier (FFT-based)')
     parser.add_argument('--use_cross_attn', action='store_true', default=False,
                        help='Enable cross-attention bottleneck')
     parser.add_argument('--use_multiscale_agg', action='store_true', default=False,

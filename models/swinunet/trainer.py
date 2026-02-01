@@ -551,8 +551,8 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
                 loss_focal = focal_loss(predictions, labels)
                 loss_dice = dice_loss(predictions, labels, softmax=True)
                 
-                # Combined loss: 30% CE + 20% Focal + 50% Dice
-                loss = 0.15 * loss_ce + 0.55 * loss_focal + 0.30 * loss_dice
+                # Combined loss: 20% CE + 40% Focal + 40% Dice (balanced for better training stability)
+                loss = 0.20 * loss_ce + 0.40 * loss_focal + 0.40 * loss_dice
         else:
             predictions = model(images)
             
@@ -561,8 +561,8 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
             loss_focal = focal_loss(predictions, labels)
             loss_dice = dice_loss(predictions, labels, softmax=True)
             
-            # Combined loss: 30% CE + 20% Focal + 50% Dice
-            loss = 0.15 * loss_ce + 0.55 * loss_focal + 0.30 * loss_dice
+            # Combined loss: 20% CE + 40% Focal + 40% Dice (balanced for better training stability)
+            loss = 0.20 * loss_ce + 0.40 * loss_focal + 0.40 * loss_dice
         
         # Check for NaN/Inf loss (like hybrid/network models)
         if torch.isnan(loss) or torch.isinf(loss):
@@ -581,7 +581,13 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
             scaler.unscale_(optimizer)
             
             # Gradient clipping to prevent exploding gradients
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            # Log gradient statistics for debugging
+            if batch_idx == 0 or (batch_idx + 1) % 20 == 0:
+                max_grad_value = max([p.grad.abs().max().item() for p in model.parameters() if p.grad is not None], default=0.0)
+                if max_grad_value > 10.0:
+                    print(f"  WARNING: Large gradient detected: max_grad_value={max_grad_value:.4f}, grad_norm={grad_norm:.4f}")
             
             # Check for NaN/Inf gradients
             has_nan_grad = False
@@ -594,7 +600,7 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
             if has_nan_grad:
                 skipped_batches += 1
                 if skipped_batches <= 5:
-                    print(f"  WARNING: Skipping batch {batch_idx + 1}: NaN/Inf gradients detected")
+                    print(f"  WARNING: Skipping batch {batch_idx + 1}: NaN/Inf gradients detected (grad_norm={grad_norm:.4f})")
                 scaler.update()
                 continue
             
@@ -605,7 +611,13 @@ def run_training_epoch(model, train_loader, ce_loss, focal_loss, dice_loss, opti
             loss.backward()
             
             # Gradient clipping to prevent exploding gradients
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            # Log gradient statistics for debugging
+            if batch_idx == 0 or (batch_idx + 1) % 20 == 0:
+                max_grad_value = max([p.grad.abs().max().item() for p in model.parameters() if p.grad is not None], default=0.0)
+                if max_grad_value > 10.0:
+                    print(f"  WARNING: Large gradient detected: max_grad_value={max_grad_value:.4f}, grad_norm={grad_norm:.4f}")
             
             optimizer.step()
         
@@ -676,7 +688,7 @@ def compute_per_class_dice(predictions, labels, num_classes, smooth=1e-4):
     return dice_scores
 
 
-def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_loss, num_classes, patch_size=224):
+def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_loss, num_classes, patch_size=224, batch_size=8):
     """
     Validate model using sliding window approach with per-class metrics.
     
@@ -686,6 +698,7 @@ def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_l
         ce_loss, focal_loss, dice_loss: Loss functions
         num_classes: Number of segmentation classes
         patch_size (int): Size of patches for sliding window
+        batch_size (int): Batch size for validation (default: 8 for efficiency)
         
     Returns:
         tuple: (average_validation_loss, per_class_dice_scores)
@@ -698,36 +711,46 @@ def validate_with_sliding_window(model, val_dataset, ce_loss, focal_loss, dice_l
     total_dice_scores = torch.zeros(num_classes, device='cuda' if torch.cuda.is_available() else 'cpu')
     class_counts = torch.zeros(num_classes, device='cuda' if torch.cuda.is_available() else 'cpu')
     
+    # Create DataLoader for batched validation
+    from torch.utils.data import DataLoader
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
+    
     with torch.no_grad():
-        for sample in val_dataset:
-            if isinstance(sample, dict):
-                image = sample['image'].unsqueeze(0).cuda()
-                label = sample['label'].unsqueeze(0).cuda()
+        for batch in val_loader:
+            # Handle different batch formats (dict vs tuple)
+            if isinstance(batch, dict):
+                images = batch['image'].cuda() if torch.cuda.is_available() else batch['image']
+                labels = batch['label'].cuda() if torch.cuda.is_available() else batch['label']
             else:
-                image, label = sample[0].unsqueeze(0).cuda(), sample[1].unsqueeze(0).cuda()
+                images = batch[0].cuda() if torch.cuda.is_available() else batch[0]
+                labels = batch[1].cuda() if torch.cuda.is_available() else batch[1]
             
             # Forward pass
-            predictions = model(image)
+            predictions = model(images)
             
             # Compute loss
-            loss_ce = ce_loss(predictions, label)
-            loss_focal = focal_loss(predictions, label)
-            loss_dice = dice_loss(predictions, label, softmax=True)
+            loss_ce = ce_loss(predictions, labels)
+            loss_focal = focal_loss(predictions, labels)
+            loss_dice = dice_loss(predictions, labels, softmax=True)
             
-            # Combined loss: 30% CE + 20% Focal + 50% Dice
-            loss = 0.15 * loss_ce + 0.55 * loss_focal + 0.30 * loss_dice
+            # Combined loss: 20% CE + 40% Focal + 40% Dice (balanced for better training stability)
+            loss = 0.20 * loss_ce + 0.40 * loss_focal + 0.40 * loss_dice
             
-            # Compute per-class Dice scores
-            per_class_dice = compute_per_class_dice(predictions, label, num_classes)
+            # Compute per-class Dice scores for each sample in batch
+            batch_size_actual = predictions.shape[0]
+            for b in range(batch_size_actual):
+                per_class_dice = compute_per_class_dice(
+                    predictions[b:b+1], labels[b:b+1], num_classes
+                )
+                
+                # Accumulate only valid (non-NaN) Dice scores
+                for i in range(num_classes):
+                    if not torch.isnan(per_class_dice[i]):
+                        total_dice_scores[i] += per_class_dice[i]
+                        class_counts[i] += 1.0
             
-            # Accumulate only valid (non-NaN) Dice scores
-            for i in range(num_classes):
-                if not torch.isnan(per_class_dice[i]):
-                    total_dice_scores[i] += per_class_dice[i]
-                    class_counts[i] += 1.0
-            
-            total_loss += loss.item()
-            num_samples += 1
+            total_loss += loss.item() * batch_size_actual
+            num_samples += batch_size_actual
     
     # Average per-class Dice scores (only for classes that appeared)
     # Classes that never appeared will have NaN
@@ -1116,7 +1139,7 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
     print("="*80)
     print("STARTING TRAINING")
     print("="*80)
-    print(f"Loss: 0.15*CE + 0.55*Focal + 0.30*Dice")
+    print(f"Loss: 0.20*CE + 0.40*Focal + 0.40*Dice")
     print(f"Early stopping: {patience} epochs patience")
     if scheduler_type != 'OneCycleLR' and warmup_epochs > 0:
         if start_epoch < warmup_epochs:
@@ -1171,9 +1194,10 @@ def trainer_synapse(args, model, snapshot_path, train_dataset=None, val_dataset=
                     # Subsequent epochs - brief warning
                     print(f"  WARNING: Training loss is very high ({train_loss_val:.4f}) - check class weights or learning rate")
             
-            # Validation phase with per-class metrics
+            # Validation phase with per-class metrics (batched for efficiency)
             val_loss, per_class_dice = validate_with_sliding_window(
-                model, val_dataset, ce_loss, focal_loss, dice_loss, args.num_classes
+                model, val_dataset, ce_loss, focal_loss, dice_loss, args.num_classes,
+                batch_size=args.batch_size  # Use same batch size as training for consistency
             )
             
             # Check for NaN/Inf in validation loss

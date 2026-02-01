@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.utils.checkpoint as checkpoint
 from einops import rearrange
 from timm.models.layers import DropPath, to_2tuple, trunc_normal_
@@ -565,7 +566,6 @@ class PatchEmbed(nn.Module):
         B, C, H, W = x.shape
         # Relaxed size constraints: resize if input doesn't match expected size
         if H != self.img_size[0] or W != self.img_size[1]:
-            import torch.nn.functional as F
             # Resize to expected size using bilinear interpolation
             x = F.interpolate(x, size=(self.img_size[0], self.img_size[1]), mode='bilinear', align_corners=False)
         x = self.proj(x).flatten(2).transpose(1, 2)  # B Ph*Pw C
@@ -793,9 +793,21 @@ class SwinTransformerSys(nn.Module):
         return x
 
     def forward(self, x):
+        # Store input dimensions for validation
+        input_h, input_w = x.shape[2], x.shape[3]
+        
         x, x_downsample = self.forward_features(x)
         x = self.forward_up_features(x, x_downsample)
         x = self.up_x4(x)
+        
+        # Validate output dimensions match input
+        output_h, output_w = x.shape[2], x.shape[3]
+        if output_h != input_h or output_w != input_w:
+            import warnings
+            warnings.warn(
+                f"Output size ({output_h}x{output_w}) doesn't match input size ({input_h}x{input_w}). "
+                f"This may indicate a dimension mismatch in the model architecture."
+            )
 
         return x
 

@@ -734,6 +734,92 @@ class SimpleSkipConnection(nn.Module):
         return fused
 
 
+class FourierSkipConnection(nn.Module):
+    """
+    Fourier-based feature fusion for CNN skip connections in hybrid models.
+    Works directly with spatial features (B, C, H, W) instead of tokens.
+    Combines features using FFT in frequency domain with proper dimension handling.
+    """
+    def __init__(self, encoder_channels, decoder_channels, use_groupnorm=True):
+        super().__init__()
+        self.encoder_channels = encoder_channels
+        self.decoder_channels = decoder_channels
+        
+        norm_layer = get_norm_layer(decoder_channels, 'group' if use_groupnorm else 'batch')
+        
+        # Project encoder features to decoder channel dimension
+        self.proj_encoder = nn.Sequential(
+            nn.Conv2d(encoder_channels, decoder_channels, 1, bias=False),
+            norm_layer,
+            nn.ReLU(inplace=True)
+        )
+        
+        # Final projection after fusion
+        self.fusion_proj = nn.Sequential(
+            nn.Conv2d(decoder_channels, decoder_channels, 1, bias=False),
+            norm_layer,
+            nn.ReLU(inplace=True)
+        )
+    
+    def forward(self, encoder_feat, decoder_feat):
+        """
+        Args:
+            encoder_feat: (B, encoder_channels, H_enc, W_enc) - Encoder skip features
+            decoder_feat: (B, decoder_channels, H_dec, W_dec) - Decoder features
+            
+        Returns:
+            fused: (B, decoder_channels, H_dec, W_dec) - Fused features
+        """
+        B, C_dec, H_dec, W_dec = decoder_feat.shape
+        
+        # Project encoder features to decoder dimension
+        encoder_proj = self.proj_encoder(encoder_feat)  # (B, decoder_channels, H_enc, W_enc)
+        
+        # Upsample encoder features to match decoder spatial size if needed
+        if encoder_proj.shape[2:] != (H_dec, W_dec):
+            encoder_proj = F.interpolate(
+                encoder_proj, size=(H_dec, W_dec), 
+                mode='bilinear', align_corners=False
+            )
+        
+        # Store original dtype for conversion back
+        original_dtype = decoder_feat.dtype
+        
+        # Convert to float32 for FFT (cuFFT requires float32 for non-power-of-2 dimensions)
+        # This is especially important when using mixed precision training
+        decoder_feat_fp32 = decoder_feat.float()
+        encoder_proj_fp32 = encoder_proj.float()
+        
+        # Transform to frequency domain (apply FFT across spatial dimensions H, W)
+        decoder_fft = torch.fft.rfft2(decoder_feat_fp32, norm='ortho')  # (B, C, H, W//2+1)
+        encoder_fft = torch.fft.rfft2(encoder_proj_fp32, norm='ortho')  # (B, C, H, W//2+1)
+        
+        # Extract magnitude and phase
+        decoder_mag = torch.abs(decoder_fft)
+        decoder_phase = torch.angle(decoder_fft)
+        encoder_mag = torch.abs(encoder_fft)
+        encoder_phase = torch.angle(encoder_fft)
+        
+        # Fuse in frequency domain (weighted average)
+        # You can adjust the weights (0.5, 0.5) for different fusion strategies
+        fused_mag = 0.5 * decoder_mag + 0.5 * encoder_mag
+        fused_phase = 0.5 * decoder_phase + 0.5 * encoder_phase
+        
+        # Reconstruct complex representation
+        fused_complex = fused_mag * torch.exp(1j * fused_phase)
+        
+        # Transform back to spatial domain
+        fused_spatial = torch.fft.irfft2(fused_complex, s=(H_dec, W_dec), norm='ortho')
+        
+        # Convert back to original dtype (float16 if using mixed precision)
+        fused_spatial = fused_spatial.to(original_dtype)
+        
+        # Final projection and normalization
+        output = self.fusion_proj(fused_spatial)
+        
+        return output
+
+
 class SimpleDecoderBlock(nn.Module):
     """Simple CNN decoder block with BatchNorm or GroupNorm support."""
     
@@ -792,6 +878,7 @@ class BaselineHybrid2Decoder(nn.Module):
                  use_multiscale_agg=False, use_groupnorm=True,
                  use_pos_embed=True,  # Default True to match SwinUnet pattern
                  use_bottleneck_swin=True,
+                 fusion_method='simple',  # 'simple', 'smart', or 'fourier'
                  img_size=224):
         super().__init__()
         
@@ -806,6 +893,13 @@ class BaselineHybrid2Decoder(nn.Module):
         self.use_groupnorm = use_groupnorm
         self.use_pos_embed = use_pos_embed
         self.use_bottleneck_swin = use_bottleneck_swin
+        # Determine fusion method: if fusion_method is set, use it; otherwise fall back to use_smart_skip for backward compatibility
+        if fusion_method in ['simple', 'smart', 'fourier']:
+            self.fusion_method = fusion_method
+        elif use_smart_skip:
+            self.fusion_method = 'smart'
+        else:
+            self.fusion_method = 'simple'
         
         if efficientnet_variant == 'b0':
             decoder_channels = [128, 64, 32, 16]
@@ -826,6 +920,7 @@ class BaselineHybrid2Decoder(nn.Module):
         print(f"  - Deep Supervision: {use_deep_supervision}")
         print(f"  - CBAM Attention: {use_cbam}")
         print(f"  - Smart Skip Connections: {use_smart_skip}")
+        print(f"  - Fusion Method: {self.fusion_method}")
         print(f"  - Cross-Attention: {use_cross_attn}")
         print(f"  - Multi-Scale Aggregation: {use_multiscale_agg}")
         print(f"  - GroupNorm: {use_groupnorm} (else BatchNorm)")
@@ -939,7 +1034,13 @@ class BaselineHybrid2Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip1 = FourierSkipConnection(
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
+                decoder_channels=decoder_channels[2],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
@@ -957,7 +1058,13 @@ class BaselineHybrid2Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip2 = FourierSkipConnection(
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
+                decoder_channels=decoder_channels[1],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
@@ -975,7 +1082,13 @@ class BaselineHybrid2Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip3 = FourierSkipConnection(
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
+                decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
@@ -989,7 +1102,13 @@ class BaselineHybrid2Decoder(nn.Module):
             )
         
         # Skip connection for decoder4: e1 (p1) → decoder4
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip4 = FourierSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip4 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
                 decoder_channels=64,  # decoder4 output is 64 channels
@@ -1213,6 +1332,7 @@ class SimpleDecoder(nn.Module):
                  use_multiscale_agg=False, use_groupnorm=True,
                  use_pos_embed=True,
                  use_bottleneck_swin=True,
+                 fusion_method='simple',  # 'simple', 'smart', or 'fourier'
                  img_size=224):
         super().__init__()
         
@@ -1228,6 +1348,13 @@ class SimpleDecoder(nn.Module):
         self.use_pos_embed = use_pos_embed
         self.use_bottleneck_swin = use_bottleneck_swin
         self.img_size = img_size
+        # Determine fusion method: if fusion_method is set, use it; otherwise fall back to use_smart_skip for backward compatibility
+        if fusion_method in ['simple', 'smart', 'fourier']:
+            self.fusion_method = fusion_method
+        elif use_smart_skip:
+            self.fusion_method = 'smart'
+        else:
+            self.fusion_method = 'simple'
         
         if efficientnet_variant == 'b0':
             decoder_channels = [128, 64, 32, 16]
@@ -1248,6 +1375,7 @@ class SimpleDecoder(nn.Module):
         print(f"  - Deep Supervision: {use_deep_supervision}")
         print(f"  - CBAM Attention: {use_cbam}")
         print(f"  - Smart Skip Connections: {use_smart_skip}")
+        print(f"  - Fusion Method: {self.fusion_method}")
         print(f"  - Cross-Attention: {use_cross_attn}")
         print(f"  - Multi-Scale Aggregation: {use_multiscale_agg}")
         print(f"  - GroupNorm: {use_groupnorm} (else BatchNorm)")
@@ -1361,7 +1489,13 @@ class SimpleDecoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip1 = FourierSkipConnection(
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
+                decoder_channels=decoder_channels[2],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
@@ -1379,7 +1513,13 @@ class SimpleDecoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip2 = FourierSkipConnection(
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
+                decoder_channels=decoder_channels[1],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
@@ -1397,7 +1537,13 @@ class SimpleDecoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip3 = FourierSkipConnection(
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
+                decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
@@ -1411,7 +1557,13 @@ class SimpleDecoder(nn.Module):
             )
         
         # Skip connection for decoder4: e1 (p1) → decoder4
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip4 = FourierSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip4 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
                 decoder_channels=64,  # decoder4 output is 64 channels
@@ -1675,6 +1827,7 @@ class ResNet50Decoder(nn.Module):
                  use_multiscale_agg=False, use_groupnorm=True,
                  use_pos_embed=True,
                  use_bottleneck_swin=True,
+                 fusion_method='simple',  # 'simple', 'smart', or 'fourier'
                  img_size=224):
         super().__init__()
         
@@ -1689,6 +1842,13 @@ class ResNet50Decoder(nn.Module):
         self.use_pos_embed = use_pos_embed
         self.use_bottleneck_swin = use_bottleneck_swin
         self.img_size = img_size
+        # Determine fusion method: if fusion_method is set, use it; otherwise fall back to use_smart_skip for backward compatibility
+        if fusion_method in ['simple', 'smart', 'fourier']:
+            self.fusion_method = fusion_method
+        elif use_smart_skip:
+            self.fusion_method = 'smart'
+        else:
+            self.fusion_method = 'simple'
         
         # ResNet50 decoder channels: [512, 256, 128, 64] (expansion factor 4)
         decoder_channels = [512, 256, 128, 64]
@@ -1703,6 +1863,7 @@ class ResNet50Decoder(nn.Module):
         print(f"  - Deep Supervision: {use_deep_supervision}")
         print(f"  - CBAM Attention: {use_cbam}")
         print(f"  - Smart Skip Connections: {use_smart_skip}")
+        print(f"  - Fusion Method: {self.fusion_method}")
         print(f"  - Cross-Attention: {use_cross_attn}")
         print(f"  - Multi-Scale Aggregation: {use_multiscale_agg}")
         print(f"  - GroupNorm: {use_groupnorm} (else BatchNorm)")
@@ -1812,7 +1973,13 @@ class ResNet50Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip1 = FourierSkipConnection(
+                encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
+                decoder_channels=decoder_channels[2],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip1 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[3],  # p4 (e4) → decoder1
                 decoder_channels=decoder_channels[2],
@@ -1830,7 +1997,13 @@ class ResNet50Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip2 = FourierSkipConnection(
+                encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
+                decoder_channels=decoder_channels[1],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip2 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[2],  # p3 (e3) → decoder2
                 decoder_channels=decoder_channels[1],
@@ -1848,7 +2021,13 @@ class ResNet50Decoder(nn.Module):
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
         )
         
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip3 = FourierSkipConnection(
+                encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
+                decoder_channels=decoder_channels[0],
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip3 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[1],  # p2 (e2) → decoder3
                 decoder_channels=decoder_channels[0],
@@ -1862,7 +2041,13 @@ class ResNet50Decoder(nn.Module):
             )
         
         # Skip connection for decoder4: e1 (p1) → decoder4
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip4 = FourierSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip4 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
                 decoder_channels=64,  # decoder4 output is 64 channels
@@ -2107,6 +2292,7 @@ class EfficientNetB4Decoder(nn.Module):
                  use_smart_skip=False, use_cross_attn=False,
                  use_multiscale_agg=False, use_groupnorm=True,
                  use_pos_embed=True, use_bottleneck_swin=True,
+                 fusion_method='simple',  # 'simple', 'smart', or 'fourier'
                  img_size=224):
         super().__init__()
         
@@ -2121,6 +2307,13 @@ class EfficientNetB4Decoder(nn.Module):
         self.use_pos_embed = use_pos_embed
         self.use_bottleneck_swin = use_bottleneck_swin
         self.img_size = img_size
+        # Determine fusion method: if fusion_method is set, use it; otherwise fall back to use_smart_skip for backward compatibility
+        if fusion_method in ['simple', 'smart', 'fourier']:
+            self.fusion_method = fusion_method
+        elif use_smart_skip:
+            self.fusion_method = 'smart'
+        else:
+            self.fusion_method = 'simple'
         
         # EfficientNet-B4 decoder channels (matching encoder output scales)
         decoder_channels = [256, 128, 64, 32]
@@ -2136,6 +2329,7 @@ class EfficientNetB4Decoder(nn.Module):
         print(f"  - Deep Supervision: {use_deep_supervision}")
         print(f"  - CBAM Attention: {use_cbam}")
         print(f"  - Smart Skip Connections: {use_smart_skip}")
+        print(f"  - Fusion Method: {self.fusion_method}")
         print(f"  - Cross-Attention: {use_cross_attn}")
         print(f"  - Multi-Scale Aggregation: {use_multiscale_agg}")
         print(f"  - GroupNorm: {use_groupnorm} (else BatchNorm)")
@@ -2301,7 +2495,13 @@ class EfficientNetB4Decoder(nn.Module):
             )
         
         # Skip connection for decoder4: e1 (p1) → decoder4
-        if use_smart_skip:
+        if self.fusion_method == 'fourier':
+            self.skip4 = FourierSkipConnection(
+                encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
+                decoder_channels=64,  # decoder4 output is 64 channels
+                use_groupnorm=use_groupnorm
+            )
+        elif self.fusion_method == 'smart' or use_smart_skip:
             self.skip4 = ImprovedSmartSkipConnection(
                 encoder_channels=decoder_channels[0],  # p1 (e1) → decoder4
                 decoder_channels=64,  # decoder4 output is 64 channels

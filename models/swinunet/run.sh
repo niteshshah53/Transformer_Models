@@ -33,7 +33,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 8 \
+        --batch_size 32 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --warmup_epochs 20 \

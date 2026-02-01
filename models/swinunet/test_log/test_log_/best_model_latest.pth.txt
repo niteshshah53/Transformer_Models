@@ -966,3 +966,214 @@ Mean metrics:
 [16:36:31.108] Mean Recall: 0.8613
 [16:36:31.108] Mean F1: 0.8982
 [16:36:31.108] Mean IoU: 0.8282
+[18:23:20.334] Testing: Latin16746 | TTA: ON | Multi-scale: ON
+[18:23:20.334] 
+[18:23:20.544] Found 1620 patches
+[18:23:20.546] Processing: 009
+[18:23:43.898] Processing: 020
+[18:24:05.757] Processing: 022
+[18:24:27.789] Processing: 029
+[18:24:49.877] Processing: 035
+[18:25:11.884] Processing: 048
+[18:25:33.895] Processing: 069
+[18:25:55.779] Processing: 082
+[18:26:18.257] Processing: 088
+[18:26:43.463] Processing: 089
+[18:27:05.100] Processing: 091
+[18:27:26.801] Processing: 100
+[18:27:49.021] Processing: 106
+[19:41:28.341] Testing: Latin2 | TTA: ON | Multi-scale: ON
+[19:41:28.341] 
+[19:41:28.602] Found 1620 patches
+[19:41:28.604] Processing: 076
+[19:41:51.012] Processing: 079
+[19:42:11.909] Processing: 082
+[19:42:32.938] Processing: 095
+[19:42:54.030] Processing: 106
+[19:43:14.901] Processing: 111
+[19:43:35.932] Processing: 115
+[19:43:56.949] Processing: 117
+[19:44:17.746] Processing: 128
+[19:44:38.485] Processing: 134
+[19:44:59.244] Processing: 138
+[19:45:19.841] Processing: 142
+[19:45:40.677] Processing: 159
+[19:46:01.449] Processing: 166
+[19:46:22.437] Processing: 185
+[19:46:43.307] Processing: 200
+[19:47:04.158] Processing: 203
+[19:47:25.009] Processing: 208
+[19:47:45.840] Processing: 229
+[19:48:06.517] Processing: 230
+[19:48:27.229] Processing: 235
+[19:48:47.856] Processing: 236
+[19:49:08.498] Processing: 248
+[19:49:29.471] Processing: 249
+[19:49:50.400] Processing: 250
+[19:50:11.330] Processing: 251
+[19:50:32.152] Processing: 252
+[19:50:53.044] Processing: 275
+[19:51:13.850] Processing: 277
+[19:51:34.703] Processing: 297
+[19:51:55.446] 
+Per-class metrics:
+[19:51:55.446] --------------------------------------------------------------------------------
+[19:51:55.446] Background     : Precision=0.9929, Recall=0.9956, F1=0.9943, IoU=0.9886
+[19:51:55.446] Paratext       : Precision=0.9115, Recall=0.7422, F1=0.8182, IoU=0.6923
+[19:51:55.446] Decoration     : Precision=0.9386, Recall=0.8901, F1=0.9137, IoU=0.8411
+[19:51:55.446] Main Text      : Precision=0.9032, Recall=0.9133, F1=0.9082, IoU=0.8318
+[19:51:55.446] Title          : Precision=0.8100, Recall=0.7939, F1=0.8019, IoU=0.6693
+[19:51:55.446] Chapter Headings: Precision=0.9499, Recall=0.5533, F1=0.6993, IoU=0.5376
+[19:51:55.446] 
+Mean metrics:
+[19:51:55.446] ----------------------------------------
+[19:51:55.446] Mean Precision: 0.9177
+[19:51:55.446] Mean Recall: 0.8147
+[19:51:55.446] Mean F1: 0.8559
+[19:51:55.446] Mean IoU: 0.7601
+[21:03:04.880] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[21:03:04.880] 
+[21:03:05.109] Found 1620 patches
+[21:03:05.111] Processing: 014
+[21:03:26.881] Processing: 032
+[21:03:48.114] Processing: 034
+[21:04:08.934] Processing: 036
+[21:04:30.264] Processing: 038
+[21:04:51.103] Processing: 047
+[21:05:12.022] Processing: 060
+[21:05:32.802] Processing: 085
+[21:05:53.560] Processing: 087
+[21:06:14.584] Processing: 104
+[21:06:35.410] Processing: 105
+[21:06:56.174] Processing: 108
+[21:07:17.082] Processing: 110
+[21:07:38.204] Processing: 136
+[21:07:59.284] Processing: 169
+[21:08:20.364] Processing: 195
+[21:08:41.630] Processing: 196
+[21:09:02.854] Processing: 198
+[21:09:23.813] Processing: 204
+[21:09:44.729] Processing: 223
+[21:10:06.186] Processing: 225
+[21:10:27.114] Processing: 227
+[21:10:48.217] Processing: 229
+[21:11:09.326] Processing: 251
+[21:11:30.533] Processing: 253
+[21:11:51.657] Processing: 255
+[21:12:12.572] Processing: 264
+[21:12:33.667] Processing: 270
+[21:12:54.701] Processing: 276
+[21:13:15.557] Processing: 325
+[21:13:36.381] 
+Per-class metrics:
+[21:13:36.381] --------------------------------------------------------------------------------
+[21:13:36.381] Background     : Precision=0.9935, Recall=0.9953, F1=0.9944, IoU=0.9888
+[21:13:36.381] Paratext       : Precision=0.8571, Recall=0.5778, F1=0.6903, IoU=0.5270
+[21:13:36.381] Decoration     : Precision=0.9746, Recall=0.9626, F1=0.9686, IoU=0.9391
+[21:13:36.381] Main Text      : Precision=0.9464, Recall=0.9410, F1=0.9437, IoU=0.8934
+[21:13:36.381] Title          : Precision=0.9177, Recall=0.9365, F1=0.9270, IoU=0.8639
+[21:13:36.381] Chapter Headings: Precision=0.9730, Recall=0.8393, F1=0.9012, IoU=0.8201
+[21:13:36.381] 
+Mean metrics:
+[21:13:36.381] ----------------------------------------
+[21:13:36.382] Mean Precision: 0.9437
+[21:13:36.382] Mean Recall: 0.8754
+[21:13:36.382] Mean F1: 0.9042
+[21:13:36.382] Mean IoU: 0.8387
+[22:24:27.761] Testing: Latin16746 | TTA: ON | Multi-scale: ON
+[22:24:27.761] 
+[22:24:28.037] Found 1620 patches
+[22:24:28.038] Processing: 009
+[22:24:50.084] Processing: 020
+[22:25:11.206] Processing: 022
+[22:25:32.094] Processing: 029
+[22:25:53.079] Processing: 035
+[22:26:13.887] Processing: 048
+[22:26:34.661] Processing: 069
+[22:26:59.684] Processing: 082
+[22:27:22.827] Processing: 088
+[22:27:43.540] Processing: 089
+[22:28:04.337] Processing: 091
+[22:28:25.114] Processing: 100
+[22:28:45.879] Processing: 106
+[22:29:06.904] Processing: 117
+[22:29:27.686] Processing: 123
+[22:29:48.466] Processing: 125
+[22:30:10.232] Processing: 130
+[22:30:31.112] Processing: 133
+[22:30:52.358] Processing: 137
+[22:31:13.171] Processing: 146
+[22:31:33.795] Processing: 166
+[22:31:54.540] Processing: 184
+[22:32:15.280] Processing: 215
+[22:32:36.094] Processing: 237
+[22:32:56.860] Processing: 243
+[22:33:17.561] Processing: 255
+[22:33:38.102] Processing: 258
+[22:33:58.657] Processing: 284
+[22:34:19.523] Processing: 325
+[22:34:40.085] Processing: 357
+[22:35:00.657] 
+Per-class metrics:
+[22:35:00.657] --------------------------------------------------------------------------------
+[22:35:00.657] Background     : Precision=0.9942, Recall=0.9942, F1=0.9942, IoU=0.9884
+[22:35:00.657] Paratext       : Precision=0.8998, Recall=0.8670, F1=0.8831, IoU=0.7907
+[22:35:00.657] Decoration     : Precision=0.9873, Recall=0.9621, F1=0.9746, IoU=0.9504
+[22:35:00.657] Main Text      : Precision=0.9423, Recall=0.9647, F1=0.9534, IoU=0.9109
+[22:35:00.657] Title          : Precision=0.9363, Recall=0.8920, F1=0.9136, IoU=0.8410
+[22:35:00.657] Chapter Headings: Precision=0.9690, Recall=0.8612, F1=0.9119, IoU=0.8381
+[22:35:00.657] 
+Mean metrics:
+[22:35:00.657] ----------------------------------------
+[22:35:00.657] Mean Precision: 0.9548
+[22:35:00.658] Mean Recall: 0.9235
+[22:35:00.658] Mean F1: 0.9385
+[22:35:00.658] Mean IoU: 0.8866
+[23:45:12.457] Testing: Syr341 | TTA: ON | Multi-scale: ON
+[23:45:12.457] 
+[23:45:12.699] Found 1620 patches
+[23:45:12.701] Processing: 031
+[23:45:34.103] Processing: 053
+[23:45:54.825] Processing: 054
+[23:46:15.377] Processing: 071
+[23:46:36.187] Processing: 073
+[23:46:57.053] Processing: 075
+[23:47:18.087] Processing: 100
+[23:47:38.987] Processing: 137
+[23:48:00.007] Processing: 150
+[23:48:20.845] Processing: 160
+[23:48:41.693] Processing: 167
+[23:49:02.305] Processing: 184
+[23:49:22.990] Processing: 190
+[23:49:43.658] Processing: 201
+[23:50:04.322] Processing: 210
+[23:50:25.140] Processing: 222
+[23:50:46.154] Processing: 224
+[23:51:07.287] Processing: 231
+[23:51:28.100] Processing: 241
+[23:51:50.155] Processing: 249
+[23:52:11.200] Processing: 252
+[23:52:32.256] Processing: 267
+[23:52:53.287] Processing: 281
+[23:53:14.068] Processing: 286
+[23:53:34.846] Processing: 290
+[23:53:55.599] Processing: 313
+[23:54:16.482] Processing: 362
+[23:54:37.426] Processing: 368
+[23:54:58.475] Processing: 376
+[23:55:19.503] Processing: 446
+[23:55:40.040] 
+Per-class metrics:
+[23:55:40.040] --------------------------------------------------------------------------------
+[23:55:40.040] Background     : Precision=0.9740, Recall=0.9845, F1=0.9792, IoU=0.9593
+[23:55:40.041] Paratext       : Precision=0.7581, Recall=0.7767, F1=0.7673, IoU=0.6224
+[23:55:40.041] Decoration     : Precision=0.9565, Recall=0.8844, F1=0.9190, IoU=0.8502
+[23:55:40.041] Main Text      : Precision=0.8915, Recall=0.8384, F1=0.8641, IoU=0.7608
+[23:55:40.041] Title          : Precision=0.7174, Recall=0.7169, F1=0.7172, IoU=0.5591
+[23:55:40.041] 
+Mean metrics:
+[23:55:40.041] ----------------------------------------
+[23:55:40.041] Mean Precision: 0.8595
+[23:55:40.041] Mean Recall: 0.8402
+[23:55:40.041] Mean F1: 0.8494
+[23:55:40.041] Mean IoU: 0.7504

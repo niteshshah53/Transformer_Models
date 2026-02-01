@@ -38,7 +38,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     python3 train.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
-        --cfg "../../common/configs/simmim_swin_base_patch4_window7_224.yaml" \
+        --cfg "../../common/configs/swin_tiny_patch4_window7_224_lite.yaml" \
         --use_smart_skip \
         --use_multiscale_agg \
         --use_deep_supervision \
@@ -63,7 +63,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     python3 test.py \
         --use_baseline \
         --decoder EfficientNet-B4 \
-        --cfg "../../common/configs/simmim_swin_base_patch4_window7_224.yaml" \
+        --cfg "../../common/configs/swin_tiny_patch4_window7_224_lite.yaml" \
         --use_smart_skip \
         --use_multiscale_agg \
         --use_deep_supervision \
