@@ -23,7 +23,7 @@ mkdir -p ./Results/udiadsbib
 conda activate pytorch2.6-py3.12
 
 # Train all manuscripts one by one (Latin2, Latin14396, Latin16746, Syr341)
-MANUSCRIPTS=(Latin2 Latin14396 Latin16746 Syr341) 
+MANUSCRIPTS= (Latin2 Latin16746 Syr341) 
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     echo "=== Training $MANUSCRIPT ==="
@@ -34,7 +34,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --batch_size 32 \
-        --max_epochs 300 \
+        --max_epochs 100 \
         --base_lr 0.0001 \
         --warmup_epochs 20 \
         --patience 100 \

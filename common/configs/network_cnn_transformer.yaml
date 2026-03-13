@@ -5,7 +5,9 @@ MODEL:
   # SimMIM Swin-Base checkpoint (enables automatic decoder overrides)
   #PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_finetune__swin_base__img224_window7__100ep.pth"
   #PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_pretrain_swin_base_divahisdb_network.pth"
-  PRETRAIN_CKPT: "../../pretrained_ckpt/swin_tiny_patch4_window7_224_.pth"
+  #PRETRAIN_CKPT: "../../pretrained_ckpt/swin_tiny_patch4_window7_224.pth"
+  PRETRAIN_CKPT: "../../pretrained_ckpt/simmim_udiadsbib_best_model_latest_.pth" 
+
   SWIN:
     # These are defaults; they are overridden when a SimMIM checkpoint is detected:
     # - DECODER_DEPTHS → [2, 18, 2, 2]

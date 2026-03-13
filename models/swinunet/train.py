@@ -211,7 +211,7 @@ def parse_arguments():
                        choices=['UDIADS_BIB', 'DIVAHISDB'], help='Dataset to use')
     parser.add_argument('--udiadsbib_root', type=str, default='U-DIADS-Bib-FS_patched',
                        help='Root directory for UDIADS_BIB dataset')
-    parser.add_argument('--divahisdb_root', type=str, default='DIVAHISDB',
+    parser.add_argument('--divahisdb_root', type=str, default='DivaHisDB_patched',
                        help='Root directory for DIVAHISDB dataset')
     parser.add_argument('--manuscript', type=str, default='Syr341FS',
                        help='Manuscript to train on')

@@ -1,12 +1,13 @@
 #!/bin/bash -l
-#SBATCH --job-name=H_udiads
+#SBATCH --job-name=H_1
 #SBATCH --output=./Result/udiadsbib/hybrid_simmim_udiadsbib_%j.out
 #SBATCH --error=./Result/udiadsbib/hybrid_simmim_udiadsbib_%j.out
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=4
+#SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a100:1
+#SBATCH --partition=a100
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -49,7 +50,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --udiadsbib_root "../../U-DIADS-Bib-MS_patched" \
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
-        --batch_size 8 \
+        --batch_size 32 \
         --max_epochs 300 \
         --base_lr 0.0001 \
         --patience 70 \

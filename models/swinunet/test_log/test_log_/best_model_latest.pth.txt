@@ -1177,3 +1177,52 @@ Mean metrics:
 [23:55:40.041] Mean Recall: 0.8402
 [23:55:40.041] Mean F1: 0.8494
 [23:55:40.041] Mean IoU: 0.7504
+[14:39:40.191] Testing: Latin14396 | TTA: ON | Multi-scale: ON
+[14:39:40.192] 
+[14:39:40.387] Found 1620 patches
+[14:39:40.389] Processing: 014
+[14:40:02.435] Processing: 032
+[14:40:23.898] Processing: 034
+[14:40:44.935] Processing: 036
+[14:41:06.874] Processing: 038
+[14:41:28.909] Processing: 047
+[14:41:50.311] Processing: 060
+[14:42:11.575] Processing: 085
+[14:42:33.262] Processing: 087
+[14:42:55.064] Processing: 104
+[14:43:16.086] Processing: 105
+[14:43:38.582] Processing: 108
+[14:44:00.341] Processing: 110
+[14:44:21.353] Processing: 136
+[14:44:42.203] Processing: 169
+[14:45:03.169] Processing: 195
+[14:45:24.187] Processing: 196
+[14:45:45.331] Processing: 198
+[14:46:06.056] Processing: 204
+[14:46:26.920] Processing: 223
+[14:46:47.736] Processing: 225
+[14:47:08.551] Processing: 227
+[14:47:30.849] Processing: 229
+[14:47:53.124] Processing: 251
+[14:48:15.104] Processing: 253
+[14:48:37.019] Processing: 255
+[14:48:58.303] Processing: 264
+[14:49:19.394] Processing: 270
+[14:49:40.514] Processing: 276
+[14:50:02.175] Processing: 325
+[14:50:23.691] 
+Per-class metrics:
+[14:50:23.692] --------------------------------------------------------------------------------
+[14:50:23.692] Background     : Precision=0.9929, Recall=0.9958, F1=0.9943, IoU=0.9887
+[14:50:23.692] Paratext       : Precision=0.8372, Recall=0.6074, F1=0.7040, IoU=0.5432
+[14:50:23.692] Decoration     : Precision=0.9697, Recall=0.9692, F1=0.9694, IoU=0.9406
+[14:50:23.692] Main Text      : Precision=0.9511, Recall=0.9354, F1=0.9432, IoU=0.8924
+[14:50:23.692] Title          : Precision=0.9278, Recall=0.9252, F1=0.9265, IoU=0.8631
+[14:50:23.692] Chapter Headings: Precision=0.9836, Recall=0.7921, F1=0.8775, IoU=0.7818
+[14:50:23.692] 
+Mean metrics:
+[14:50:23.692] ----------------------------------------
+[14:50:23.692] Mean Precision: 0.9437
+[14:50:23.692] Mean Recall: 0.8708
+[14:50:23.692] Mean F1: 0.9025
+[14:50:23.692] Mean IoU: 0.8350
