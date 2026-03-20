@@ -6,8 +6,8 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --time=24:00:00
-#SBATCH --gres=gpu:a100:1
-#SBATCH --partition=a100
+#SBATCH --gres=gpu:v100:1
+#SBATCH --partition=v100
 
 #SBATCH --export=NONE
 unset SLURM_EXPORT_ENV
@@ -25,7 +25,7 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512,expandable_segments:True
 #to use DivaHisDB, change the dataset to DIVAHISDB and the root to ../../DivaHisDB_patched and the manuscript to CB55, CSG18, CSG863
 #to use UDIADS-Bib-FS, change the dataset to UDIADS_BIB and the root to ../../U-DIADS-Bib-FS_patched and the manuscript to Latin2FS, Latin14396FS, Latin16746FS, Syr341FS
 #to use UDIADS-Bib-MS, change the dataset to UDIADS_BIB and the root to ../../U-DIADS-Bib-MS_patched and the manuscript to Latin2, Latin14396, Latin16746, Syr341
-MANUSCRIPTS=(CB55 CSG18 CSG863)
+MANUSCRIPTS=(CB55)
 
 for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
     python3 train.py \
@@ -35,7 +35,7 @@ for MANUSCRIPT in "${MANUSCRIPTS[@]}"; do
         --manuscript ${MANUSCRIPT} \
         --use_patched_data \
         --scheduler_type CosineAnnealingWarmRestarts \
-        --batch_size 32 \
+        --batch_size 16 \
         --max_epochs 200 \
         --base_lr 0.0001 \
         --patience 30 \

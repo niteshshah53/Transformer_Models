@@ -1,4 +1,4 @@
-# Historical Document Segmentation - Advanced Deep Learning Models
+# Benchmarking state-of-the-art Transformer Models for Handwritten Document Layout Analysis
 
 This repository contains state-of-the-art deep learning models for historical document segmentation, featuring transformer-based architectures and hybrid CNN-transformer combinations optimized for manuscript analysis.
 
@@ -32,7 +32,7 @@ Transformer_Models/
 │   │   ├── MISSFormer.py            # MissFormer model implementation
 │   │   ├── segformer.py             # SegFormer backbone
 │   │   └── ...                      # Other MissFormer-specific files
-│   ├── hybrid/                      # Hybrid CNN-Transformer Models
+│   ├── hybrid/                      # Hybrid CNN-Transformer Models(Encoder: Swin, Decoder: CNN)
 │   │   ├── hybrid2/                 # Swin-EfficientNet Hybrid (Enhanced)
 │   │   │   ├── model.py             # Main hybrid model
 │   │   │   ├── components.py        # Model components
@@ -44,7 +44,7 @@ Transformer_Models/
 │   │   ├── run.sh                   # Hybrid execution script
 │   │   ├── run1.sh, run2.sh, run3.sh  # Additional run scripts
 │   │   └── Result/                  # Training results
-│   └── network/                     # CNN-Transformer Network Models
+│   └── network/                     # Hybrid-1/Network Models (Encoder: CNN, Decoder: Swin)
 │       ├── train.py                 # Network training script
 │       ├── test.py                  # Network testing script
 │       ├── trainer.py               # Network-specific trainer
